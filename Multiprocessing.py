@@ -7,7 +7,6 @@ import multiprocessing as mp
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from Circuit_Properties import *
-from Stats import *
 from Functions import *
 from HexProperties import *
 from rstools import RSoftUserFunction, RSoftCircuit

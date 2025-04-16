@@ -31,7 +31,7 @@ def has_another_line(file):
     file.seek(current_pos)
     return read_line
 #################################################################################
-def AddHack(file_name, core_num, Corediam, Core_delta):
+def AddHack(file_name, core_num, Corediam):
                 #   monitor_width = {Corediam}
                 # monitor_height = {Corediam}
     block_text = { 
@@ -68,6 +68,3 @@ def AddHack(file_name, core_num, Corediam, Core_delta):
 
                 text = block_text[block_type].format(n=i,Corediam=Corediam)
                 f.write(text)
-
-    # Add separate effective index for the cores.
-    # insert_param_into_file(f"{file_name}.ind",Core_delta)
