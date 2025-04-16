@@ -22,6 +22,11 @@ with open("prior_space.json", "r") as read:
 
 para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
 
+with open("fibre_prop.json", "r") as mp_para:
+    mp_data = json.load(mp_para)
+    num_para = mp_data["num_paras"]
+    batch_num = mp_data["batch_number"]
+
 def RunRsoft(params): 
     param_dict = {dim.name: val for dim, val in zip(para_space, params)}
 
@@ -131,9 +136,9 @@ opt = Optimizer(
 # the multiprocessing in all its glory. The first if __name__ == "__main__" is required 
 if __name__ == "__main__":    
     # how many values in each parameter space to run simulation with
-    total_calls = 100
+    total_calls = num_para
     # this is the number of points to sample simultaneously. Increase to cycle through prior space quicker at the cost of CPU computation
-    batch_size = 6
+    batch_size = batch_num
     all_results = []
 
     for i in range(0, total_calls, batch_size):
