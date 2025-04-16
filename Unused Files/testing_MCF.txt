@@ -1,0 +1,237 @@
+segment 1
+	comp_name = Central_Core
+	extended = 1
+	position_taper = TAPER_LINEAR
+	begin.x = 0
+	begin.z = 0
+	begin.height = Corediam
+	begin.width = Corediam
+	end.x = 0
+	end.z = 1000
+	end.height = Corediam
+	end.width = Corediam
+end segment
+
+segment 2
+	comp_name = Left_Upper_Core
+	extended = 1
+	position_taper = TAPER_LINEAR
+	begin.x = -0.5*(Claddiam/2)
+	begin.y = 0.25*Claddiam/2
+	begin.z = 0
+	begin.height = Corediam
+	begin.width = Corediam
+	end.x = -0.5*(Claddiam/2)
+	end.y = 0.25*Claddiam/2
+	end.z = 1000
+	end.height = Corediam
+	end.width = Corediam
+end segment
+
+segment 3
+	comp_name = Left_Lower_Core
+	extended = 1
+	position_taper = TAPER_LINEAR
+	begin.x = -0.5*(Claddiam/2)
+	begin.y = -0.25*(Claddiam/2)
+	begin.z = 0
+	begin.height = Corediam
+	begin.width = Corediam
+	end.x = -0.5*(Claddiam/2)
+	end.y = -0.25*(Claddiam/2)
+	end.z = 1000
+	end.height = Corediam
+	end.width = Corediam
+end segment
+
+segment 4
+	comp_name = Bottom_Core
+	extended = 1
+	position_taper = TAPER_LINEAR
+	begin.x = 0
+	begin.y = -0.5*(Claddiam/2)
+	begin.z = 0
+	begin.height = Corediam
+	begin.width = Corediam
+	end.x = 0
+	end.y = -0.5*(Claddiam/2)
+	end.z = 1000
+	end.height = Corediam
+	end.width = Corediam
+end segment
+
+segment 5
+	comp_name = Right_Lower_Core
+	extended = 1
+	position_taper = TAPER_LINEAR
+	begin.x = 0.5*(Claddiam/2)
+	begin.y = -0.25*(Claddiam/2)
+	begin.z = 0
+	begin.height = Corediam
+	begin.width = Corediam
+	end.x = 0.5*(Claddiam/2)
+	end.y = -0.25*(Claddiam/2)
+	end.z = 1000
+	end.height = Corediam
+	end.width = Corediam
+end segment
+
+segment 6
+	comp_name = Right_Upper_Core
+	extended = 1
+	position_taper = TAPER_LINEAR
+	begin.x = 0.5*(Claddiam/2)
+	begin.y = 0.25*(Claddiam/2)
+	begin.z = 0
+	begin.height = Corediam
+	begin.width = Corediam
+	end.x = 0.5*(Claddiam/2)
+	end.y = 0.25*(Claddiam/2)
+	end.z = 1000
+	end.height = Corediam
+	end.width = Corediam
+end segment
+
+segment 7
+	comp_name = Upper_Core
+	extended = 1
+	position_taper = TAPER_LINEAR
+	begin.x = 0
+	begin.y = 0.5*(Claddiam/2)
+	begin.z = 0
+	begin.height = Corediam
+	begin.width = Corediam
+	end.x = 0
+	end.y = 0.5*(Claddiam/2)
+	end.z = 1000
+	end.height = Corediam
+	end.width = Corediam
+end segment
+
+
+pathway 1
+	1
+end pathway
+
+pathway 2
+	2
+end pathway
+
+pathway 3
+	3
+end pathway
+
+pathway 4
+	4
+end pathway
+
+pathway 5
+	5
+end pathway
+
+pathway 6
+	6
+end pathway
+
+pathway 7
+	7
+end pathway
+
+
+monitor 1
+	pathway = 1
+	monitor_type = MONITOR_WGMODE_POWER
+	monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 2
+	pathway = 2
+	monitor_type = MONITOR_WGMODE_POWER
+	monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 3
+	pathway = 3
+	monitor_type = MONITOR_WGMODE_POWER
+	monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 4
+	pathway = 4
+	monitor_type = MONITOR_WGMODE_POWER
+	monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 5
+	pathway = 5
+	monitor_type = MONITOR_WGMODE_POWER
+	monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 6
+	pathway = 6
+	monitor_type = MONITOR_WGMODE_POWER
+	monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 7
+	pathway = 7
+	monitor_type = MONITOR_WGMODE_POWER
+	monitor_component = COMPONENT_BOTH
+end monitor
+
+
+launch_field 1
+	launch_pathway = 1
+	launch_type = LAUNCH_WGMODE
+	launch_normalization = 1
+end launch_field
+
+launch_field 2
+	launch_pathway = 2
+	launch_type = LAUNCH_WGMODE
+	launch_normalization = 1
+	launch_align_file = 1
+	launch_phase = Phase
+end launch_field
+
+launch_field 3
+	launch_pathway = 3
+	launch_type = LAUNCH_WGMODE
+	launch_normalization = 1
+	launch_align_file = 1
+	launch_phase = Phase
+end launch_field
+
+launch_field 4
+	launch_pathway = 4
+	launch_type = LAUNCH_WGMODE
+	launch_normalization = 1
+	launch_align_file = 1
+	launch_phase = Phase
+end launch_field
+
+launch_field 5
+	launch_pathway = 5
+	launch_type = LAUNCH_WGMODE
+	launch_normalization = 1
+	launch_align_file = 1
+	launch_phase = Phase
+end launch_field
+
+launch_field 6
+	launch_pathway = 6
+	launch_type = LAUNCH_WGMODE
+	launch_normalization = 1
+	launch_align_file = 1
+	launch_phase = Phase
+end launch_field
+
+launch_field 7
+	launch_pathway = 7
+	launch_type = LAUNCH_WGMODE
+	launch_normalization = 1
+	launch_align_file = 1
+	launch_phase = Phase
+end launch_field
+# comment
