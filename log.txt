@@ -1,0 +1,858 @@
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=2773, NX=283, NY=283, Estimated Time = 0.251 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=3368, NX=283, NY=283, Estimated Time = 0.305 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=3430, NX=283, NY=283, Estimated Time = 0.310 min
+Message: NZ=3653, NX=283, NY=283, Estimated Time = 0.331 min
+Message: NZ=3711, NX=283, NY=283, Estimated Time = 0.336 min
+Message: NZ=3179, NX=283, NY=283, Estimated Time = 0.288 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.291 min
+Message: Actual Computation Time = 0.294 min
+Message: Actual Computation Time = 0.301 min
+Message: Actual Computation Time = 0.307 min
+Message: Actual Computation Time = 0.401 min
+Message: Actual Computation Time = 0.410 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=4068, NX=283, NY=283, Estimated Time = 0.456 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4423, NX=283, NY=283, Estimated Time = 0.496 min
+Message: NZ=4328, NX=283, NY=283, Estimated Time = 0.485 min
+Message: NZ=4964, NX=283, NY=283, Estimated Time = 0.557 min
+Message: NZ=3169, NX=283, NY=283, Estimated Time = 0.355 min
+Message: NZ=1801, NX=283, NY=283, Estimated Time = 0.202 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.311 min
+Message: Actual Computation Time = 0.315 min
+Message: Actual Computation Time = 0.318 min
+Message: Actual Computation Time = 0.329 min
+Message: Actual Computation Time = 0.386 min
+Message: Actual Computation Time = 0.447 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=5001, NX=283, NY=283, Estimated Time = 0.550 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=51, NX=283, NY=283, Estimated Time = 0.006 min
+Message: NZ=51, NX=283, NY=283, Estimated Time = 0.006 min
+Message: NZ=51, NX=283, NY=283, Estimated Time = 0.006 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=51, NX=283, NY=283, Estimated Time = 0.006 min
+Message: NZ=5001, NX=283, NY=283, Estimated Time = 0.550 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.248 min
+Message: Actual Computation Time = 0.249 min
+Message: Actual Computation Time = 0.250 min
+Message: Actual Computation Time = 0.250 min
+Message: Actual Computation Time = 0.448 min
+Message: Actual Computation Time = 0.438 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=602, NX=283, NY=283, Estimated Time = 0.053 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=5001, NX=283, NY=283, Estimated Time = 0.438 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=51, NX=283, NY=283, Estimated Time = 0.004 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=51, NX=283, NY=283, Estimated Time = 0.004 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=5001, NX=283, NY=283, Estimated Time = 0.438 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=51, NX=283, NY=283, Estimated Time = 0.004 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.200 min
+Message: Actual Computation Time = 0.200 min
+Message: Actual Computation Time = 0.200 min
+Message: Actual Computation Time = 0.225 min
+Message: Actual Computation Time = 0.429 min
+Message: Actual Computation Time = 0.430 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=235, NX=283, NY=283, Estimated Time = 0.020 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4895, NX=283, NY=283, Estimated Time = 0.421 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4964, NX=283, NY=283, Estimated Time = 0.427 min
+Message: NZ=51, NX=283, NY=283, Estimated Time = 0.004 min
+Message: NZ=590, NX=283, NY=283, Estimated Time = 0.051 min
+Message: NZ=4976, NX=283, NY=283, Estimated Time = 0.428 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.174 min
+Message: Actual Computation Time = 0.204 min
+Message: Actual Computation Time = 0.207 min
+Message: Actual Computation Time = 0.502 min
+Message: Actual Computation Time = 0.505 min
+Message: Actual Computation Time = 0.502 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=564, NX=283, NY=283, Estimated Time = 0.057 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=104, NX=283, NY=283, Estimated Time = 0.010 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=562, NX=283, NY=283, Estimated Time = 0.057 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4618, NX=283, NY=283, Estimated Time = 0.466 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=298, NX=283, NY=283, Estimated Time = 0.030 min
+Message: NZ=4727, NX=283, NY=283, Estimated Time = 0.477 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.205 min
+Message: Actual Computation Time = 0.224 min
+Message: Actual Computation Time = 0.244 min
+Message: Actual Computation Time = 0.235 min
+Message: Actual Computation Time = 0.415 min
+Message: Actual Computation Time = 0.418 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=117, NX=283, NY=283, Estimated Time = 0.010 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4996, NX=283, NY=283, Estimated Time = 0.441 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=169, NX=283, NY=283, Estimated Time = 0.015 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4422, NX=283, NY=283, Estimated Time = 0.391 min
+Message: NZ=5001, NX=283, NY=283, Estimated Time = 0.442 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4480, NX=283, NY=283, Estimated Time = 0.396 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.156 min
+Message: Actual Computation Time = 0.147 min
+Message: Actual Computation Time = 0.421 min
+Message: Actual Computation Time = 0.421 min
+Message: Actual Computation Time = 0.450 min
+Message: Actual Computation Time = 0.447 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=324, NX=283, NY=283, Estimated Time = 0.029 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4719, NX=283, NY=283, Estimated Time = 0.422 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=112, NX=283, NY=283, Estimated Time = 0.010 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4315, NX=283, NY=283, Estimated Time = 0.386 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=65, NX=283, NY=283, Estimated Time = 0.006 min
+Message: NZ=262, NX=283, NY=283, Estimated Time = 0.023 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.213 min
+Message: Actual Computation Time = 0.220 min
+Message: Actual Computation Time = 0.230 min
+Message: Actual Computation Time = 0.234 min
+Message: Actual Computation Time = 0.393 min
+Message: Actual Computation Time = 0.412 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=211, NX=283, NY=283, Estimated Time = 0.018 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4911, NX=283, NY=283, Estimated Time = 0.428 min
+Message: NZ=122, NX=283, NY=283, Estimated Time = 0.011 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4907, NX=283, NY=283, Estimated Time = 0.428 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=72, NX=283, NY=283, Estimated Time = 0.006 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=236, NX=283, NY=283, Estimated Time = 0.021 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.216 min
+Message: Actual Computation Time = 0.224 min
+Message: Actual Computation Time = 0.236 min
+Message: Actual Computation Time = 0.229 min
+Message: Actual Computation Time = 0.418 min
+Message: Actual Computation Time = 0.419 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=4467, NX=283, NY=283, Estimated Time = 0.381 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4798, NX=283, NY=283, Estimated Time = 0.410 min
+Message: NZ=4471, NX=283, NY=283, Estimated Time = 0.382 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4762, NX=283, NY=283, Estimated Time = 0.406 min
+Message: NZ=219, NX=283, NY=283, Estimated Time = 0.019 min
+Message: NZ=4328, NX=283, NY=283, Estimated Time = 0.369 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.110 min
+Message: Actual Computation Time = 0.404 min
+Message: Actual Computation Time = 0.435 min
+Message: Actual Computation Time = 0.427 min
+Message: Actual Computation Time = 0.442 min
+Message: Actual Computation Time = 0.447 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=77, NX=283, NY=283, Estimated Time = 0.007 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4903, NX=283, NY=283, Estimated Time = 0.457 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=314, NX=283, NY=283, Estimated Time = 0.029 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=417, NX=283, NY=283, Estimated Time = 0.039 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4912, NX=283, NY=283, Estimated Time = 0.458 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4847, NX=283, NY=283, Estimated Time = 0.452 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.175 min
+Message: Actual Computation Time = 0.189 min
+Message: Actual Computation Time = 0.196 min
+Message: Actual Computation Time = 0.442 min
+Message: Actual Computation Time = 0.449 min
+Message: Actual Computation Time = 0.452 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=4919, NX=283, NY=283, Estimated Time = 0.454 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=268, NX=283, NY=283, Estimated Time = 0.025 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4564, NX=283, NY=283, Estimated Time = 0.421 min
+Message: NZ=4795, NX=283, NY=283, Estimated Time = 0.442 min
+Message: NZ=388, NX=283, NY=283, Estimated Time = 0.036 min
+Message: NZ=4594, NX=283, NY=283, Estimated Time = 0.424 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.161 min
+Message: Actual Computation Time = 0.173 min
+Message: Actual Computation Time = 0.463 min
+Message: Actual Computation Time = 0.474 min
+Message: Actual Computation Time = 0.475 min
+Message: Actual Computation Time = 0.509 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=4907, NX=283, NY=283, Estimated Time = 0.508 min
+Message: NZ=5001, NX=283, NY=283, Estimated Time = 0.518 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=51, NX=283, NY=283, Estimated Time = 0.005 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=447, NX=283, NY=283, Estimated Time = 0.046 min
+Message: NZ=2063, NX=283, NY=283, Estimated Time = 0.213 min
+Message: NZ=261, NX=283, NY=283, Estimated Time = 0.027 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.230 min
+Message: Actual Computation Time = 0.258 min
+Message: Actual Computation Time = 0.270 min
+Message: Actual Computation Time = 0.284 min
+Message: Actual Computation Time = 0.327 min
+Message: Actual Computation Time = 0.459 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=193, NX=283, NY=283, Estimated Time = 0.018 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4749, NX=283, NY=283, Estimated Time = 0.445 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4969, NX=283, NY=283, Estimated Time = 0.465 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4906, NX=283, NY=283, Estimated Time = 0.459 min
+Message: NZ=4843, NX=283, NY=283, Estimated Time = 0.453 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4651, NX=283, NY=283, Estimated Time = 0.435 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.128 min
+Message: Actual Computation Time = 0.463 min
+Message: Actual Computation Time = 0.481 min
+Message: Actual Computation Time = 0.486 min
+Message: Actual Computation Time = 0.492 min
+Message: Actual Computation Time = 0.498 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=4663, NX=283, NY=283, Estimated Time = 0.468 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4935, NX=283, NY=283, Estimated Time = 0.495 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4746, NX=283, NY=283, Estimated Time = 0.476 min
+Message: NZ=78, NX=283, NY=283, Estimated Time = 0.008 min
+Message: NZ=91, NX=283, NY=283, Estimated Time = 0.009 min
+Message: NZ=143, NX=283, NY=283, Estimated Time = 0.014 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.210 min
+Message: Actual Computation Time = 0.212 min
+Message: Actual Computation Time = 0.216 min
+Message: Actual Computation Time = 0.480 min
+Message: Actual Computation Time = 0.483 min
+Message: Actual Computation Time = 0.493 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=4645, NX=283, NY=283, Estimated Time = 0.464 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4452, NX=283, NY=283, Estimated Time = 0.445 min
+Message: NZ=293, NX=283, NY=283, Estimated Time = 0.029 min
+Message: NZ=4440, NX=283, NY=283, Estimated Time = 0.444 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=3938, NX=283, NY=283, Estimated Time = 0.394 min
+Message: NZ=424, NX=283, NY=283, Estimated Time = 0.042 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.177 min
+Message: Actual Computation Time = 0.191 min
+Message: Actual Computation Time = 0.426 min
+Message: Actual Computation Time = 0.466 min
+Message: Actual Computation Time = 0.467 min
+Message: Actual Computation Time = 0.483 min
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=121, NX=283, NY=283, Estimated Time = 0.012 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=127, NX=283, NY=283, Estimated Time = 0.013 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4964, NX=283, NY=283, Estimated Time = 0.516 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=4834, NX=283, NY=283, Estimated Time = 0.502 min
+Message: NZ=4921, NX=283, NY=283, Estimated Time = 0.511 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: NZ=292, NX=283, NY=283, Estimated Time = 0.030 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+Message: Actual Computation Time = 0.220 min
+Message: Actual Computation Time = 0.213 min
+Message: Actual Computation Time = 0.223 min
+Message: Actual Computation Time = 0.493 min
+Message: Actual Computation Time = 0.494 min
+Message: Actual Computation Time = 0.499 min
