@@ -1,4 +1,3 @@
-
 # Function to extract parameters from the .ind file
 def Extract_params(param=""):
     with open("MCF_Test.ind", "r") as r:
@@ -9,21 +8,21 @@ def Extract_params(param=""):
                 val = float(value.strip())
                 break # <-- stop reading the file once found
     return val
+#################################################################################
+# def insert_param_into_file(file_path, param):
+#     with open(file_path, "r") as f:
+#         lines = f.readlines()
 
-def insert_param_into_file(file_path, param):
-    with open(file_path, "r") as f:
-        lines = f.readlines()
+#     new_lines = []
+#     for i, line in enumerate(lines):
+#         new_lines.append(line)
+#         if line.strip().startswith("begin.width"):
+#             new_lines.append(f"\tbegin.delta = {param}\n")
+#         elif line.strip().startswith("end.width"):
+#             new_lines.append(f"\tend.delta = {param}\n")
 
-    new_lines = []
-    for i, line in enumerate(lines):
-        new_lines.append(line)
-        if line.strip().startswith("begin.width"):
-            new_lines.append(f"\tbegin.delta = {param}\n")
-        elif line.strip().startswith("end.width"):
-            new_lines.append(f"\tend.delta = {param}\n")
-
-    with open(file_path, "w") as f:
-        f.writelines(new_lines)
+#     with open(file_path, "w") as f:
+#         f.writelines(new_lines)
 #################################################################################
 def has_another_line(file):
     current_pos = file.tell()
@@ -32,8 +31,6 @@ def has_another_line(file):
     return read_line
 #################################################################################
 def AddHack(file_name, core_num, Corediam):
-                #   monitor_width = {Corediam}
-                # monitor_height = {Corediam}
     block_text = { 
         "pathway":'''
         pathway {n}
