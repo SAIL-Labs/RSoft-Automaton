@@ -15,6 +15,7 @@ with open("variable_paras.json", "r") as f:
     dat = json.load(f)
     name = dat["Name"]
     background_index = dat["background_index"]
+    core_num = dat["core_num"]
 
 with open("prior_space.json", "r") as read:
     param_range = json.load(read)
@@ -25,7 +26,7 @@ with open("fibre_prop.json", "r") as mp_para:
     mp_data = json.load(mp_para)
     num_para = mp_data["num_paras"]
     batch_num = mp_data["batch_number"]
-    
+
 def RunRsoft(params): 
     param_dict = {dim.name: val for dim, val in zip(para_space, params)}
 
@@ -58,6 +59,10 @@ def RunRsoft(params):
             modified_lines.append(line)
             modified_lines.append(f"\tbegin.delta = {delta_expr}\n")
             modified_lines.append(f"\tend.delta = {delta_expr}\n")
+            continue
+        if line_strip.startswith("monitor "):
+            modified_lines.append(line)
+            modified_lines.append(f"\tmonitor_delta = {delta_expr}\n")
             continue
 
         # Skip replacing Core_index directly (if already covered elsewhere)
@@ -196,6 +201,17 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.savefig(f"plot_iteration_{i//batch_size + 1}.png", dpi=300)
 
+        # move images to prevent clumping
+        user_home = os.path.expanduser("~")
+        desktop_path = os.path.join(user_home, "Desktop")
+        results_root = os.path.join(desktop_path, "Results")
+        images_dir = os.path.join(results_root, "Images")
+
+        os.makedirs(images_dir, exist_ok = True)
+        for file in os.listdir():
+            if file.startswith("plot_iteration_"):
+                shutil.move(file, os.path.join(images_dir, file))
+        
         para_tag = "best_params_log.csv"
         with open(para_tag, "w", newline="") as log:
             writer = csv.writer(log)

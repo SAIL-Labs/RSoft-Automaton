@@ -30,7 +30,7 @@ def has_another_line(file):
     file.seek(current_pos)
     return read_line
 #################################################################################
-def AddHack(file_name, core_num, Corediam):
+def AddHack(file_name, core_num,background_index):
     block_text = { 
         "pathway":'''
         pathway {n}
@@ -43,6 +43,9 @@ def AddHack(file_name, core_num, Corediam):
                 monitor_type = MONITOR_WGMODE_POWER
                 monitor_tilt = 1
                 monitor_component = COMPONENT_BOTH
+                monitor_background_index = {background_index}
+                monitor_width = 9.0
+                monitor_height = 9.0
         end monitor
         ''',
         "launch_field":'''
@@ -63,5 +66,5 @@ def AddHack(file_name, core_num, Corediam):
                 if block_type == "launch_field" and i != 1:
                     continue
 
-                text = block_text[block_type].format(n=i,Corediam=Corediam)
+                text = block_text[block_type].format(n=i, background_index = background_index)
                 f.write(text)
