@@ -1,0 +1,3 @@
+#This file is generated automatically.  Do not attempt to edit it!
+ft=6001 ext=.nef fname=femtmp.nef cols=[X,Y1,Y2] xnames=['mode index'] wnames=['neff_{r}','neff_{i}'] num_modes=1
+ft=6002 ext=.mon fname=femtmp.mon cols=[X,Y+] xnames=['Mode#'] wnames=['Mon. val.'] header=[skip,skip,skip,skip,skip] num_modes=1 num_cols=1

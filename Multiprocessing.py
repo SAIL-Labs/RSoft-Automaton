@@ -26,10 +26,20 @@ with open("fibre_prop.json", "r") as mp_para:
     mp_data = json.load(mp_para)
     num_para = mp_data["num_paras"]
     batch_num = mp_data["batch_number"]
+    free_space_wavelength = mp_data["free_space_wavelength"]
 
 def RunRsoft(params): 
     param_dict = {dim.name: val for dim, val in zip(para_space, params)}
-
+    ##########################################################################################################################################################
+    '''
+    This block of code will test the incoming prior values and filter them such that the 
+    V-number satisfies the single mode fibre condition.
+    '''
+    # V = calc_V(param_dict["Corediam"], param_dict["Core_index"], background_index, free_space_wavelength)
+    # if V >= 2.405 or V <= 1.0:
+    #     return 1e6
+    # prior_sampling(param_dict,background_index, free_space_wavelength)
+    ##########################################################################################################################################################
     '''
     Manual setup to loop through a list of values
     Runs the terminal line that will initiate RSoft. 
@@ -46,24 +56,22 @@ def RunRsoft(params):
         lines = r.readlines()
 
     # Construct symbolic delta expression
-    delta_expr = param_dict["Core_index"] - background_index
+    delta_expr = param_dict["Core_index"] 
+    # delta_expr = param_dict["Core_index"] - background_index
+
+    # Insert delta after core segment start
+    lines = insert_after_match(lines, "comp_name = core", 
+                        [f"\tbegin.delta = {delta_expr}\n",
+                        f"\tend.delta = {delta_expr}\n" ])
+
+    # Insert delta after monitor segment starts
+    lines = insert_after_match(lines, "monitor ",f"\tmonitor_delta = {delta_expr}\n")
 
     # Build the updated lines
     modified_lines = []
     for line in lines:
         line_strip = line.strip()
         replaced = False
-
-        # Insert delta after segment start
-        if line_strip.startswith("segment"):
-            modified_lines.append(line)
-            modified_lines.append(f"\tbegin.delta = {delta_expr}\n")
-            modified_lines.append(f"\tend.delta = {delta_expr}\n")
-            continue
-        if line_strip.startswith("monitor "):
-            modified_lines.append(line)
-            modified_lines.append(f"\tmonitor_delta = {delta_expr}\n")
-            continue
 
         # Skip replacing Core_index directly (if already covered elsewhere)
         for param, val in param_dict.items():
