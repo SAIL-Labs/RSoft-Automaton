@@ -1,0 +1,118 @@
+
+Claddiam = 125
+Core_delta = 0.01
+Core_sep = 60
+Corediam = 8.2
+Dx = 0.1
+Dy = 0.1
+Dz = 0.2
+H = 5
+Length = 1000
+Name = MCF_Test
+Phase = 0
+alpha = 0
+background_index = 1.456
+batch_number = 12
+boundary_gap_x = 10
+boundary_gap_y = 10
+boundary_gap_z = 0
+boundary_max = 80
+boundary_max_y = 80
+boundary_min = -boundary_max
+boundary_min_y = -boundary_max_y
+bpm_pathway = 1
+bpm_pathway_monitor = 1
+cad_aspectratio = 1
+cad_aspectratio_x = -1
+cad_aspectratio_y = -1
+cad_aspectratio_z = -1
+cad_ind_file = MCF_Test.ind
+core_num = 1
+delta = 0.012
+dimension = 3
+eim = 0
+fem_nev = 10
+free_space_wavelength = 1.55
+grid_size = 0.1
+grid_size_y = 0.1
+grid_uniform = 0
+height = 5
+k0 = 4.05366794
+lambda = free_space_wavelength
+launch_align_file = 1
+launch_file = SMF28_FEMSIM_ex.m00
+launch_normalization = 1
+launch_tilt = 1
+launch_type = LAUNCH_FILE
+mode_output_format = OUTPUT_REAL_IMAG
+num_paras = 24
+output_as_3d = 1
+polarization = 0
+prefix = SMF28_BEAMPROP
+sim_tool = ST_BEAMPROP
+slice_display_mode = DISPLAY_CONTOURMAPXZ
+slice_position_z = 100
+step_size = 0.2
+structure = STRUCT_FIBER
+sym_tool = ST_BEAMPROP
+taper_ratio = 10
+width = 5
+
+
+segment 1
+	comp_name = core_01
+	extended = 1
+	begin.x = 0
+	begin.z = 0
+	begin.height = Corediam
+	begin.width = Corediam
+	end.x = 0 rel begin segment 1
+	end.y = 0 rel begin segment 1
+	end.z = Length rel begin segment 1
+	end.height = Corediam
+	end.width = Corediam
+end segment
+
+segment 2
+	profile_type = PROF_INACTIVE
+	comp_name = Super Cladding
+	extended = 1
+	begin.x = 0
+	begin.z = 0
+	begin.height = Claddiam
+	begin.width = Claddiam
+	end.x = 0 rel begin segment 2
+	end.y = 0 rel begin segment 2
+	end.z = Length rel begin segment 2
+	end.height = Claddiam
+	end.width = Claddiam
+end segment
+
+
+pathway 1
+	1
+	2
+end pathway
+
+
+monitor 1
+	pathway = 1
+	monitor_type = MONITOR_WG_POWER
+	monitor_tilt = 1
+	monitor_normalization = 1
+	monitor_background_index = 1.456
+	monitor_width = 8.2
+	monitor_height = 8.2
+end monitor
+
+
+launch_field 1
+	launch_pathway = 1
+	launch_type = LAUNCH_FILE
+	launch_tilt = 1
+	launch_normalization = 1
+	launch_align_file = 1
+	launch_file = SMF28_FEMSIM_ex.m00
+end launch_field
+
+
