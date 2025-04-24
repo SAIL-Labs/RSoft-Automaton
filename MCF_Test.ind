@@ -42,7 +42,7 @@ slice_position_z = 100
 step_size = 0.2
 structure = STRUCT_FIBER
 sym_tool = ST_BEAMPROP
-taper_ratio = 1
+taper_ratio = 10
 width = 5
 
 
@@ -60,6 +60,21 @@ segment 1
 	end.width = Corediam
 end segment
 
+segment 2
+	comp_name = Super Cladding
+	profile_type = PROF_INACTIVE
+	extended = 1
+	begin.x = 0
+	begin.z = 0
+	begin.height = Claddiam
+	begin.width = Claddiam
+	end.x = 0 rel begin segment 2
+	end.y = 0 rel begin segment 2
+	end.z = Length rel begin segment 2
+	end.height = Claddiam
+	end.width = Claddiam
+end segment
+
 
 
 
@@ -71,17 +86,15 @@ end segment
         
         monitor 1
             pathway = 1
-            monitor_type = MONITOR_WGMODE_POWER
+            monitor_type = MONITOR_WG_POWER
             monitor_tilt = 1
             monitor_component = COMPONENT_BOTH
             monitor_background_index = 1.456
-            monitor_width = 8.2
-            monitor_height = 8.2
         end monitor
         
         launch_field 1
             launch_pathway = 1
-            launch_type = LAUNCH_WGMODE
+            launch_type = LAUNCH_FILE
             launch_mode = 0
             launch_mode_radial = 1
             launch_align_file = 1

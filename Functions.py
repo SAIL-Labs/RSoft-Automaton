@@ -32,7 +32,7 @@ def has_another_line(file):
     file.seek(current_pos)
     return read_line
 #################################################################################
-def AddHack(file_name, json, core_num,background_index):
+def AddHack(file_name, json, core_num, background_index):
     launch_array = {}
     for launch_key in json:
         launch_array[launch_key] = json[launch_key]
@@ -50,8 +50,6 @@ def AddHack(file_name, json, core_num,background_index):
             monitor_tilt = {launch_tilt}
             monitor_component = {comp}
             monitor_background_index = {background_index}
-            monitor_width = 8.2
-            monitor_height = 8.2
         end monitor
         ''',
         "launch_field":'''
@@ -71,7 +69,11 @@ def AddHack(file_name, json, core_num,background_index):
     # appends the above text to the .ind file
     with open(f"{file_name}.ind", "a") as f:
         for block_type in ["pathway","monitor","launch_field"]:
-            for i in range(1,int(core_num) + 1):
+            if core_num == 1:
+                max_segments = int(core_num) + 1
+            else:
+                max_segments = int(core_num) + 2
+            for i in range(1,max_segments):
                 # i += 1
                 if block_type == "launch_field" and i != 1:
                     continue

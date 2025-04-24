@@ -10,6 +10,7 @@ class RSoftSim:
     def __init__(self, name=""):
         self.name = name
         self.sym = {}
+        self.core_log = {}
 
         # Generate Fibre Parameters
         self.length = 1000
@@ -58,12 +59,12 @@ class RSoftSim:
         self.comp = Monitor_comp.BOTH
         self.launch_port = 1
         self.launch_type = LaunchType.SM
-        # launch_file = "single_0.2_0.2_1.fld"
+        self.launch_file = ""
         self.launch_random_set = 0 if self.launch_type == LaunchType.SM else 1
         self.launch_tilt = 1 if self.launch_type == LaunchType.SM else 0
         self.launch_align_file = 1
-        self.launch_mode = 0
-        self.launch_mode_radial = 1
+        self.launch_mode = 0 if self.launch_type == LaunchType.SM else "*"
+        self.launch_mode_radial = 1 if self.launch_type == LaunchType.SM else "*"
         self.launch_normalization = 1
         self.grid_size = self.Dx
         self.grid_size_y = self.Dy
@@ -159,6 +160,7 @@ class RSoftSim:
             "launch_port": self.launch_port,
             "launch_align_file": self.launch_align_file,
             "launch_mode": self.launch_mode,
+            "launch_file": self.launch_file,
             "launch_type": self.launch_type,
             "launch_random_set": self.launch_random_set,
             "launch_mode_radial": self.launch_mode_radial,
@@ -171,6 +173,7 @@ class RSoftSim:
             }
         if custom:
             base_priors.update(custom)
+        self.prior_space = base_priors
         return base_priors
     
     def save_all_json(self):
@@ -181,7 +184,7 @@ class RSoftSim:
         with open("launch_para.json", "w") as l:
             json.dump(self.launch_parameters_dict(), l)
         with open("prior_space.json", "w") as write:
-            json.dump(self.init_priors(), write)
+            json.dump(self.prior_space, write)
     
     def load_json_parameters(self):
         """
@@ -220,20 +223,74 @@ class RSoftSim:
             self.circuit.set_symbol(key, val)
 
         name = self.sym["Name"]
-        core_beg_dims = ('Corediam', 'Corediam')
-        core_end_dims = ('Corediam', 'Corediam')
+        core_beg_dims = (self.sym['Corediam'] / self.sym['taper_ratio'], self.sym['Corediam'] / self.sym['taper_ratio'])
+        core_end_dims = (self.sym['Corediam'] , self.sym['Corediam'])
+        cladding_beg_dims = (self.sym['Claddiam'] / self.sym['taper_ratio'], self.sym['Claddiam'] / self.sym['taper_ratio'])
+        cladding_end_dims = (self.sym['Claddiam'] , self.sym['Claddiam'])
         core_name = [f"core_{n+1:02}" for n in range(self.sym['core_num'])]
 
-        for j, (x, y) in enumerate(self.core_positions):
-            core = self.circuit.add_segment(
-                position=(x / self.sym['taper_ratio'], y / self.sym['taper_ratio'], 0),
-                offset=(x, y, 'Length'),
-                dimensions=core_beg_dims,
-                dimensions_end=core_end_dims
-            )
-            core.set_name(core_name[j])
+        if self.sym['core_num'] == 1:
+
+            for j, (x, y) in enumerate(self.core_positions):
+                core = self.circuit.add_segment(
+                    position=(x, y, 0),
+                    offset=(x, y, 'Length'),
+                    dimensions=('Corediam','Corediam'),
+                    dimensions_end=('Corediam','Corediam')
+                )
+                core.set_name(core_name[j])
+
+                # log individual core parameters
+                self.core_log[core_name[j]] = {
+                    "position": (x, y, 0),
+                    "offset": (x, y, 'Length'),
+                    "dimensions": ('Corediam','Corediam'),
+                    "dimensions_end": ('Corediam','Corediam'),
+                    "Core index": self.sym['Core_delta'],
+                    }
+                cladding = self.circuit.add_segment(
+                    position=(0, 0, 0),
+                    offset=(0, 0, 'Length'),
+                    dimensions=('Claddiam','Claddiam'),
+                    dimensions_end=('Claddiam','Claddiam')
+                    )
+                cladding.set_name("Super Cladding")
+            
+        if self.sym['core_num'] != 1:
+            cladding = self.circuit.add_segment(
+                position=(0, 0, 0),
+                offset=(0, 0, self.length),
+                dimensions=cladding_beg_dims,
+                dimensions_end=cladding_end_dims
+                )
+            cladding.set_name("Super Cladding")
+            for j, (x, y) in enumerate(self.core_positions):
+                core = self.circuit.add_segment(
+                    position=(x / self.sym['taper_ratio'], y / self.sym['taper_ratio'], 0),
+                    offset=(x, y, 'Length'),
+                    dimensions=core_beg_dims,
+                    dimensions_end=core_end_dims
+                )
+                core.set_name(core_name[j])
+
+                # log individual core parameters
+                self.core_log[core_name[j]] = {
+                    "position": (x / self.sym['taper_ratio'], y / self.sym['taper_ratio'], 0),
+                    "offset": (x, y, self.length),
+                    "dimensions": (self.Corediam,self.Corediam),
+                    "dimensions_end": (self.Corediam,self.Corediam),
+                    "Core index": self.sym['Core_delta'],
+                    }
 
         self.circuit.write(f"{name}.ind")
+        with open(f"{self.name}.ind", "r") as og:
+            og_lines = og.readlines()
+        # Insert cladding profile type after cladding segment start
+        line_mod = insert_after_match(og_lines,"comp_name = Super Cladding", 
+                                      f"\tprofile_type = PROF_INACTIVE\n")
+
+        with open(f"{name}.ind", "w") as out:
+            out.writelines(line_mod)  
         """
         Append all pathway, monitor, and launch field blocks based on launch parameters.
         """ 
@@ -241,6 +298,17 @@ class RSoftSim:
         core_num = self.sym["core_num"]
         background_index = self.sym["background_index"]
         AddHack(name, self.launch_params, int(core_num), background_index)
+    
+    def print_core_log(self):
+        for core_name, core_info in self.core_log.items():
+            print(f"{core_name}")
+            for key, val in core_info.items():
+                print(f"{key}: {val}")
+            print("") 
 
     def RunRSoft(self):
+        '''
+        Multiprocessing must to be run outside of a Jupyter cell or it will silently 
+        fail/infinitely loop on the first batch
+        '''
         subprocess.run(["python", "Multiprocessing.py"], check=True)

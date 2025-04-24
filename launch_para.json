@@ -1,1 +1,1 @@
-{"monitor_type": "MONITOR_WGMODE_POWER", "comp": "COMPONENT_BOTH", "launch_tilt": 1, "launch_port": 1, "launch_align_file": 1, "launch_mode": 0, "launch_type": "LAUNCH_WGMODE", "launch_random_set": 0, "launch_mode_radial": 1, "launch_normalization": 1}
+{"monitor_type": "MONITOR_WG_POWER", "comp": "COMPONENT_BOTH", "launch_tilt": 1, "launch_port": 1, "launch_align_file": 1, "launch_mode": 0, "launch_file": "SMF28_FEMSIM.m00", "launch_type": "LAUNCH_FILE", "launch_random_set": 0, "launch_mode_radial": 1, "launch_normalization": 1}

@@ -63,9 +63,12 @@ def RunRsoft(params):
     lines = insert_after_match(lines, "comp_name = core", 
                         [f"\tbegin.delta = {delta_expr}\n",
                         f"\tend.delta = {delta_expr}\n" ])
+    lines = insert_after_match(lines, "comp_name = Super Cladding", 
+                        [f"\tbegin.delta = {background_index}\n",
+                        f"\tend.delta = {background_index}\n" ])
 
     # Insert delta after monitor segment starts
-    lines = insert_after_match(lines, "monitor ",f"\tmonitor_delta = {delta_expr}\n")
+    # lines = insert_after_match(lines, "monitor ",f"\tmonitor_delta = {delta_expr}\n")
 
     # Build the updated lines
     modified_lines = []
