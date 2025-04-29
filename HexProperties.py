@@ -1,6 +1,74 @@
 import numpy as np, warnings, pandas as pd
 ##############################################################################
 '''
+Functions to generate a circular grid
+'''
+def generate_filled_circle_grid(radius, grid_spacing):
+    coord = []
+    dy = grid_spacing * np.sqrt(3) / 2  # similar vertical step as hex grids
+    y = -radius
+    row_num = 0
+
+    while y <= radius:
+        if abs(y) > radius:
+            y += dy
+            continue
+
+        # Circle intersection x-bounds
+        x_bound = np.sqrt(radius**2 - y**2)
+        x_left = -x_bound
+        x_right = x_bound
+
+        # Place points between x_left and x_right
+        num_points = int(np.floor((x_right - x_left) / grid_spacing)) 
+
+        if num_points > 0:
+            for i in range(num_points):
+                x = x_left + i * (x_right - x_left) / (num_points - 1) if num_points > 1 else (x_left + x_right) / 2
+                coord.append([row_num, x, y, 0])
+            row_num += 1
+
+        y += dy
+
+    # Output
+    hcoord = [c[1] for c in coord]
+    vcoord = [c[2] for c in coord]
+    return hcoord, vcoord
+
+def estimate_circle_radius_with_autofit(n_points, grid_spacing, tolerance=0):
+    """
+    Estimate the circle radius and auto-correct it to match desired n_points within a tolerance.
+
+    Args:
+        n_points (int): desired number of points
+        grid_spacing (float): spacing between points (μm)
+        tolerance (int): how close the result must be
+
+    Returns:
+        radius (float): adjusted radius
+    """
+    # Initial estimate
+    radius = grid_spacing * np.sqrt(n_points / np.pi)
+
+    # Auto-refine
+    max_iterations = 50
+    for _ in range(max_iterations):
+        hcoord, vcoord = generate_filled_circle_grid(radius, grid_spacing)
+        actual_points = len(hcoord)
+
+        if abs(actual_points - n_points) <= tolerance:
+            print(f"Matched {actual_points} points (target {n_points}) within ±{tolerance}")
+            return radius
+
+        if actual_points < n_points:
+            radius *= 1.02  # grow slightly
+        else:
+            radius *= 0.98  # shrink slightly
+
+    print(f"Max iterations reached: got {actual_points} points for target {n_points}")
+    return radius
+##############################################################################
+'''
 Functions to generate a pentagon grid
 '''
 
@@ -67,7 +135,6 @@ def generate_filled_pentagon_grid(radius, grid_spacing):
         y += dy
         row_num += 1
 
-    # Step 4: Output
     hcoord = [c[1] for c in coord]
     vcoord = [c[2] for c in coord]
     return hcoord, vcoord

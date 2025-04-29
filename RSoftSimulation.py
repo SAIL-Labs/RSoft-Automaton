@@ -22,7 +22,10 @@ class RSoftSim:
         self.Core_delta = 0.01
         self.background_index = 1.456
         self.delta = 0.0036# 0.012
+
+        # Cire geometry
         self.grid_type = "Hex"
+        self.core_positions = [] # store tuples of (x, y)
 
         # Multiprocessing Parameters
         self.num_paras = 288
@@ -215,13 +218,22 @@ class RSoftSim:
                 raise ValueError(f"The number of cores must be odd to perfectly fit inside the hex grid. Received: {core_num}")
 
             row_numbers = [number_rows(core_num)]
-            self.core_positions = []  # store tuples of (x, y)
             for row_num in row_numbers:
                 hcoord, vcoord = generate_hex_grid(row_num, self.sym["Core_sep"])
                 self.core_positions = list(zip(hcoord, vcoord))
         if self.grid_type == "Pent":
+            """
+            Generate pentagon core coordinates and store internally.
+            """
             estimated_radius = estimate_pentagon_radius(self.core_num,self.Core_sep)
             hcoord, vcoord= generate_filled_pentagon_grid(estimated_radius, self.Core_sep)
+            self.core_positions = list(zip(hcoord, vcoord))
+        if self.grid_type == "Circ":
+            """
+            Generate circular core coordinates and store internally.
+            """
+            estimated_radius = estimate_circle_radius_with_autofit(self.core_num,self.Core_sep)
+            hcoord, vcoord = generate_filled_circle_grid(estimated_radius, self.Core_sep)
             self.core_positions = list(zip(hcoord, vcoord))
 
 
