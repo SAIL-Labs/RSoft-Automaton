@@ -38,32 +38,36 @@ def AddHack(file_name, json, core_num, background_index):
         launch_array[launch_key] = json[launch_key]
     
     block_text = { 
-        "pathway":'''
-        pathway {n}
-            {n}
-        end pathway
-        ''',
-        "monitor": '''
-        monitor {n}
-            pathway = {n}
-            monitor_type = {monitor_type}
-            monitor_tilt = {launch_tilt}
-            monitor_component = {comp}
-            monitor_background_index = {background_index}
-        end monitor
-        ''',
-        "launch_field":'''
-        launch_field {n}
-            launch_pathway = {n}
-            launch_type = {launch_type}
-            launch_mode = {launch_mode}
-            launch_mode_radial = {launch_mode_radial}
-            launch_align_file = {launch_align_file}
-            launch_random_set = {launch_random_set}
-            launch_tilt = {launch_tilt}
-            launch_normalization = {launch_normalization}
-        end launch_field
-        '''
+    "pathway":'''
+    pathway {n}
+        {n}
+    end pathway
+    ''',
+    "monitor": '''
+    monitor {n}
+        pathway = {n}
+        monitor_type = {monitor_type}
+        monitor_tilt = {launch_tilt}
+        monitor_component = {comp}
+        monitor_background_index = {background_index}
+        monitor_width = {monitor_width}
+        monitor_height = {monitor_height} 
+    end monitor
+    ''',
+    "launch_field":'''
+    launch_field {n}
+        launch_pathway = {n}
+        launch_type = {launch_type}
+        launch_mode = {launch_mode}
+        launch_mode_radial = {launch_mode_radial}
+        launch_align_file = {launch_align_file}
+        launch_random_set = {launch_random_set}
+        launch_tilt = {launch_tilt}
+        launch_normalization = {launch_normalization}
+        launch_height = {monitor_height}
+        launch_width = {monitor_width}
+    end launch_field
+    '''
     }
 
     # appends the above text to the .ind file
@@ -74,12 +78,14 @@ def AddHack(file_name, json, core_num, background_index):
             else:
                 max_segments = int(core_num) + 2
             for i in range(1,max_segments):
-                # i += 1
+                # only add 1 launch field
                 if block_type == "launch_field" and i != 1:
                     continue
 
                 text = block_text[block_type].format(
                     n=i, 
+                    monitor_height = launch_array["monitor_height"],
+                    monitor_width = launch_array["monitor_width"],
                     background_index = background_index,
                     monitor_type=launch_array["monitor_type"],
                     comp=launch_array["comp"],

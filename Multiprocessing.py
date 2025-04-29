@@ -56,7 +56,7 @@ def RunRsoft(params):
         lines = r.readlines()
 
     # Construct symbolic delta expression
-    delta_expr = param_dict["Core_index"] 
+    delta_expr = 1.46# param_dict["Core_index"] 
     # delta_expr = param_dict["Core_index"] - background_index
 
     # Insert delta after core segment start
@@ -80,6 +80,24 @@ def RunRsoft(params):
         for param, val in param_dict.items():
             if param == "Core_index":
                 continue
+            # dynamically replace the monitor/launch field dimensions
+            if param == "Corediam":
+                if line_strip.startswith("monitor_height ="):
+                    modified_lines.append(f"\tmonitor_height = {(val * 1.1):.4f}\n")
+                    replaced = True
+                    break
+                if line_strip.startswith("monitor_width ="):
+                    modified_lines.append(f"\tmonitor_width = {(val * 1.1):.4f}\n")
+                    replaced = True
+                    break
+                if line_strip.startswith("launch_height ="):
+                    modified_lines.append(f"\tlaunch_height = {(val):.4f}\n")
+                    replaced = True
+                    break
+                if line_strip.startswith("launch_width ="):
+                    modified_lines.append(f"\tlaunch_width = {(val):.4f}\n")
+                    replaced = True
+                    break
             if line_strip.startswith(f"{param} ="):
                 modified_lines.append(f"{param} = {val:.4f}\n")
                 replaced = True

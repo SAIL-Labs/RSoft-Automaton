@@ -21,7 +21,8 @@ class RSoftSim:
         self.core_num = 1
         self.Core_delta = 0.01
         self.background_index = 1.456
-        self.delta = 0.012
+        self.delta = 0.0036# 0.012
+        self.grid_type = "Hex"
 
         # Multiprocessing Parameters
         self.num_paras = 288
@@ -69,6 +70,8 @@ class RSoftSim:
         self.grid_size = self.Dx
         self.grid_size_y = self.Dy
         self.step_size = self.Dz
+        self.monitor_width = self.Corediam * 1.1
+        self.monitor_height = self.monitor_width * 1.1
 
         self.structure = Struct_type.FIBRE
     
@@ -116,7 +119,7 @@ class RSoftSim:
             "core_num": self.core_num,
             "Core_delta": self.Core_delta,
             "background_index": self.background_index,
-            "delta": self.delta
+            "delta": self.delta,
         }
 
     def fixed_parameters_dict(self):
@@ -164,7 +167,9 @@ class RSoftSim:
             "launch_type": self.launch_type,
             "launch_random_set": self.launch_random_set,
             "launch_mode_radial": self.launch_mode_radial,
-            "launch_normalization": self.launch_normalization
+            "launch_normalization": self.launch_normalization,
+            "monitor_width": self.monitor_width,
+            "monitor_height": self.monitor_height
         }
 
     def init_priors(self, custom = None):
@@ -201,18 +206,24 @@ class RSoftSim:
         self.launch_params = launch_params
 
     def generate_core_positions(self):
-        """
-        Generate hexagonal core coordinates and store internally.
-        """
-        core_num = self.sym["core_num"]
-        if core_num % 2 == 0:
-            raise ValueError(f"The number of cores must be odd to perfectly fit inside the hex grid. Received: {core_num}")
+        if self.grid_type == "Hex":
+            """
+            Generate hexagonal core coordinates and store internally.
+            """
+            core_num = self.sym["core_num"]
+            if core_num % 2 == 0:
+                raise ValueError(f"The number of cores must be odd to perfectly fit inside the hex grid. Received: {core_num}")
 
-        row_numbers = [number_rows(core_num)]
-        self.core_positions = []  # store tuples of (x, y)
-        for row_num in row_numbers:
-            hcoord, vcoord = generate_hex_grid(row_num, self.sym["Core_sep"])
+            row_numbers = [number_rows(core_num)]
+            self.core_positions = []  # store tuples of (x, y)
+            for row_num in row_numbers:
+                hcoord, vcoord = generate_hex_grid(row_num, self.sym["Core_sep"])
+                self.core_positions = list(zip(hcoord, vcoord))
+        if self.grid_type == "Pent":
+            estimated_radius = estimate_pentagon_radius(self.core_num,self.Core_sep)
+            hcoord, vcoord= generate_filled_pentagon_grid(estimated_radius, self.Core_sep)
             self.core_positions = list(zip(hcoord, vcoord))
+
 
     def build_circuit(self):
         """

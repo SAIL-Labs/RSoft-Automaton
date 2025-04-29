@@ -1,1 +1,1 @@
-{"Name": "MCF_Test", "Length": 1000, "Corediam": 8.2, "Claddiam": 125, "Core_sep": 60, "taper_ratio": 10, "core_num": 1, "Core_delta": 0.01, "background_index": 1.456, "delta": 0.012}
+{"Name": "MCF_Test", "Length": 1000, "Corediam": 8.2, "Claddiam": 125, "Core_sep": 60, "taper_ratio": 10, "core_num": 1, "Core_delta": 0.01, "background_index": 1.456, "delta": 0.0036}
