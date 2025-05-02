@@ -16,19 +16,19 @@ class RSoftSim:
         self.length = 1000
         self.Corediam = 8.2
         self.Claddiam = 125
+        self.acore_taper_ratio = 10
         self.Core_sep = 60
-        self.taper_ratio = 1
         self.core_num = 1
         self.Core_delta = 0.01
-        self.background_index = 1.456
-        self.delta = 0.0036# 0.012
+        self.background_index = 1.456 
+        self.delta =  0.012 # 0.0036
 
         # Cire geometry
         self.grid_type = "Hex"
         self.core_positions = [] # store tuples of (x, y)
 
         # Multiprocessing Parameters
-        self.num_paras = 288
+        self.num_paras = 96
         self.batch_number = 12
 
         # Simulation Setup
@@ -73,10 +73,21 @@ class RSoftSim:
         self.grid_size = self.Dx
         self.grid_size_y = self.Dy
         self.step_size = self.Dz
-        self.monitor_width = self.Corediam * 1.1
-        self.monitor_height = self.monitor_width * 1.1
+        self.core_monitor_width = self.Corediam * 1.1
+        self.core_monitor_height = self.core_monitor_width 
+        self.cladd_monitor_width = self.Claddiam * 1.1
+        self.cladd_monitor_height = self.cladd_monitor_width 
+        self.launch_field_height = self.core_beg_diam
+        self.launch_field_width = self.core_beg_diam
 
         self.structure = Struct_type.FIBRE
+
+    @property
+    def core_beg_diam(self):
+        return self.Corediam / self.acore_taper_ratio
+    @property
+    def cladding_beg_diam(self):
+        return self.Claddiam / self.acore_taper_ratio
     
     def fixed_parameters_dict(self):
             return {
@@ -118,11 +129,19 @@ class RSoftSim:
             "Corediam": self.Corediam,
             "Claddiam": self.Claddiam,
             "Core_sep": self.Core_sep,
-            "taper_ratio": self.taper_ratio,
+            "acore_taper_ratio": self.acore_taper_ratio,
+            "core_beg_diam": self.core_beg_diam,
+            "cladding_beg_diam": self.cladding_beg_diam,
             "core_num": self.core_num,
             "Core_delta": self.Core_delta,
             "background_index": self.background_index,
             "delta": self.delta,
+            "core_monitor_width": self.core_monitor_width,
+            "core_monitor_height": self.core_monitor_height,
+            "cladd_monitor_width": self.cladd_monitor_width,
+            "cladd_monitor_height": self.cladd_monitor_height,
+            "launch_field_height": self.launch_field_height,
+            "launch_field_width": self.launch_field_width
         }
 
     def fixed_parameters_dict(self):
@@ -171,8 +190,12 @@ class RSoftSim:
             "launch_random_set": self.launch_random_set,
             "launch_mode_radial": self.launch_mode_radial,
             "launch_normalization": self.launch_normalization,
-            "monitor_width": self.monitor_width,
-            "monitor_height": self.monitor_height
+            "core_monitor_width": self.core_monitor_width,
+            "core_monitor_height": self.core_monitor_height,
+            "cladd_monitor_width": self.cladd_monitor_width,
+            "cladd_monitor_height": self.cladd_monitor_height,
+            "launch_field_height": self.launch_field_height,
+            "launch_field_width": self.launch_field_width
         }
 
     def init_priors(self, custom = None):
@@ -221,6 +244,7 @@ class RSoftSim:
             for row_num in row_numbers:
                 hcoord, vcoord = generate_hex_grid(row_num, self.sym["Core_sep"])
                 self.core_positions = list(zip(hcoord, vcoord))
+
         if self.grid_type == "Pent":
             """
             Generate pentagon core coordinates and store internally.
@@ -228,6 +252,7 @@ class RSoftSim:
             estimated_radius = estimate_pentagon_radius(self.core_num,self.Core_sep)
             hcoord, vcoord= generate_filled_pentagon_grid(estimated_radius, self.Core_sep)
             self.core_positions = list(zip(hcoord, vcoord))
+
         if self.grid_type == "Circ":
             """
             Generate circular core coordinates and store internally.
@@ -246,66 +271,89 @@ class RSoftSim:
             self.circuit.set_symbol(key, val)
 
         name = self.sym["Name"]
-        core_beg_dims = (self.sym['Corediam'] / self.sym['taper_ratio'], self.sym['Corediam'] / self.sym['taper_ratio'])
-        core_end_dims = (self.sym['Corediam'] , self.sym['Corediam'])
-        cladding_beg_dims = (self.sym['Claddiam'] / self.sym['taper_ratio'], self.sym['Claddiam'] / self.sym['taper_ratio'])
-        cladding_end_dims = (self.sym['Claddiam'] , self.sym['Claddiam'])
+        core_beg_dims = ('Corediam', 'Corediam')
+        core_end_dims = ('Corediam' , 'Corediam')
+        cladding_beg_dims = ('Claddiam', 'Claddiam')
+        cladding_end_dims = ('Claddiam' , 'Claddiam')
         core_name = [f"core_{n+1:02}" for n in range(self.sym['core_num'])]
+        core_num = self.sym["core_num"]
+        path_num = 0
+        # for core_arr in range(1, self.sym['core_num'] + 1):
+        for j, (x, y) in enumerate(self.core_positions):
+            path_num += 1
+            core = self.circuit.add_segment(
+                position=(x, y, 0),
+                offset=(x, y, 'Length'),
+                dimensions= core_beg_dims,
+                dimensions_end= core_end_dims
+            )
+            core.set_name(core_name[j])
+            # self.circuit.write(f"{name}.ind")
 
-        if self.sym['core_num'] == 1:
-
-            for j, (x, y) in enumerate(self.core_positions):
-                core = self.circuit.add_segment(
-                    position=(x, y, 0),
-                    offset=(x, y, 'Length'),
-                    dimensions=('Corediam','Corediam'),
-                    dimensions_end=('Corediam','Corediam')
-                )
-                core.set_name(core_name[j])
-
-                # log individual core parameters
-                self.core_log[core_name[j]] = {
-                    "position": (x, y, 0),
-                    "offset": (x, y, 'Length'),
-                    "dimensions": ('Corediam','Corediam'),
-                    "dimensions_end": ('Corediam','Corediam'),
-                    "Core index": self.sym['Core_delta'],
-                    }
-                cladding = self.circuit.add_segment(
-                    position=(0, 0, 0),
-                    offset=(0, 0, 'Length'),
-                    dimensions=('Claddiam','Claddiam'),
-                    dimensions_end=('Claddiam','Claddiam')
-                    )
-                cladding.set_name("Super Cladding")
-            
-        if self.sym['core_num'] != 1:
-            cladding = self.circuit.add_segment(
-                position=(0, 0, 0),
-                offset=(0, 0, self.length),
-                dimensions=cladding_beg_dims,
-                dimensions_end=cladding_end_dims
-                )
-            cladding.set_name("Super Cladding")
-            for j, (x, y) in enumerate(self.core_positions):
-                core = self.circuit.add_segment(
-                    position=(x / self.sym['taper_ratio'], y / self.sym['taper_ratio'], 0),
-                    offset=(x, y, 'Length'),
-                    dimensions=core_beg_dims,
-                    dimensions_end=core_end_dims
-                )
-                core.set_name(core_name[j])
-
-                # log individual core parameters
-                self.core_log[core_name[j]] = {
-                    "position": (x / self.sym['taper_ratio'], y / self.sym['taper_ratio'], 0),
-                    "offset": (x, y, self.length),
-                    "dimensions": (self.Corediam,self.Corediam),
-                    "dimensions_end": (self.Corediam,self.Corediam),
-                    "Core index": self.sym['Core_delta'],
-                    }
-
+            # add_pathway(name, self.launch_params,path_num)
+            # add_monitor(name, self.launch_params,path_num)
+            # if j == 0:
+            #     add_launch_field(name, self.launch_params, path_num)
+            # log individual core parameters
+            self.core_log[core_name[j]] = {
+                "position": (x, y, 0),
+                "offset": (x, y, 'Length'),
+                "dimensions": core_beg_dims,
+                "dimensions_end": core_end_dims,
+                "Core index": self.sym['Core_delta'],
+                }
+             
+        # cladding = self.circuit.add_segment(
+        #         position=(0, 0, 0),
+        #         offset=(0, 0, 'Length'),
+        #         dimensions= cladding_beg_dims,
+        #         dimensions_end=cladding_end_dims
+        #         )
+        # cladding.set_name("Super Cladding")
+        # path_num += 1
+        
+        # add_pathway(name, self.launch_params,path_num)
+        # add_monitor(name, self.launch_params,path_num)
+        
         self.circuit.write(f"{name}.ind")
+        # for k in range(1, path_num + 1):
+        #     add_pathway(name, self.launch_params,k)
+
+        # add_monitor(name, self.launch_params,1, self.cladd_monitor_height, self.cladd_monitor_width)
+        # for k in range(2, path_num + 1):
+        #         add_monitor(name, self.launch_params,k, self.core_monitor_height, self.core_monitor_width)
+        # add_launch_field(name, self.launch_params, self.core_positions.index((0,0)) + 2)
+
+
+        # if self.sym['core_num'] != 1:
+
+        #     cladding = self.circuit.add_segment(
+        #         position=(0, 0, 0),
+        #         offset=(0, 0, self.length),
+        #         dimensions=cladding_beg_dims,
+        #         dimensions_end=cladding_end_dims
+        #         )
+        #     cladding.set_name("Super Cladding")
+
+        #     for j, (x, y) in enumerate(self.core_positions):
+        #         core = self.circuit.add_segment(
+        #             position=(x / self.sym['taper_ratio'], y / self.sym['taper_ratio'], 0),
+        #             offset=(x, y, 'Length'),
+        #             dimensions=core_beg_dims,
+        #             dimensions_end=core_end_dims
+        #         )
+        #         core.set_name(core_name[j])
+
+        #         # log individual core parameters
+        #         self.core_log[core_name[j]] = {
+        #             "position": (x / self.sym['taper_ratio'], y / self.sym['taper_ratio'], 0),
+        #             "offset": (x, y, self.length),
+        #             "dimensions": (self.Corediam,self.Corediam),
+        #             "dimensions_end": (self.Corediam,self.Corediam),
+        #             "Core index": self.sym['Core_delta'],
+        #             }
+
+        # self.circuit.write(f"{name}.ind")
         with open(f"{self.name}.ind", "r") as og:
             og_lines = og.readlines()
         # Insert cladding profile type after cladding segment start
@@ -320,7 +368,23 @@ class RSoftSim:
         name = self.sym["Name"]
         core_num = self.sym["core_num"]
         background_index = self.sym["background_index"]
-        AddHack(name, self.launch_params, int(core_num), background_index)
+
+        if path_num == 1:
+            launch_pathway_id = path_num
+        elif path_num == 2:
+            launch_pathway_id = path_num - 1
+        else:
+            launch_pathway_id = self.core_positions((0,0))
+        # central_index = next(
+        #     (i for i, (x, y) in enumerate(self.core_positions) if abs(x) < 1e-6 and abs(y) < 1e-6), 
+        #     None
+        # )
+
+        # if central_index is not None:
+        #     launch_pathway_id = central_index + 2  # +1 for 0-indexed, +1 because i=1 is cladding
+        # else:
+        #     launch_pathway_id = 2  # fallback
+        AddHack(name, self.launch_params, path_num -1,launch_pathway_id,background_index)
     
     def print_core_log(self):
         for core_name, core_info in self.core_log.items():
