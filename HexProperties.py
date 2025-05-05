@@ -201,3 +201,22 @@ def number_rows(n_points):
             return 2*r+1
         r+=1
 ##############################################################################
+'''
+Generate Square Grid
+'''
+def generate_square_grid(core_num, spacing):
+    # Calculate grid size: smallest n such that n^2 >= core_num
+    side = int(np.ceil(np.sqrt(core_num)))
+    x_vals = []
+    y_vals = []
+
+    for i in range(side):
+        for j in range(side):
+            if len(x_vals) < core_num:
+                x = (i - (side - 1) / 2) * spacing
+                y = (j - (side - 1) / 2) * spacing
+                x_vals.append(x)
+                y_vals.append(y)
+    
+    return x_vals, y_vals
+##############################################################################

@@ -76,6 +76,9 @@ def RunRsoft(params):
     # Build the updated lines
     modified_lines = []
     in_core = False
+    with open("core_positions.json", "r") as g:
+        core_positions = json.load(g)
+        core_index = -1
 
     for line in lines:
         line_strip = line.strip()
@@ -92,6 +95,7 @@ def RunRsoft(params):
         # Detect if the segment is the core or cladding
         if line_strip.startswith("comp_name =") and "core_" in line_strip:
             in_core = True
+            core_index += 1
         elif line_strip.startswith("comp_name ="):  # not a core
             in_core = False
         
@@ -108,7 +112,6 @@ def RunRsoft(params):
         for param, val in param_dict.items():
             if param == "Core_index":
                 continue
-
             # dynamically replace the monitor/launch field dimensions
             # if param == "Corediam":
             #     if line_strip.startswith("monitor_height =") and in_core_monitor:
@@ -132,6 +135,18 @@ def RunRsoft(params):
                 replaced = True
                 break
 
+            if param == "acore_taper_ratio" and in_core:
+                if line_strip.startswith("begin.x ="):
+                    x, _ = core_positions[core_index]
+                    modified_lines.append(f"\tbegin.x = {x / val:.6f}\n")
+                    replaced = True
+                    break
+                if line_strip.startswith("begin.y =") and in_core:
+                    _, y = core_positions[core_index]
+                    modified_lines.append(f"\tbegin.y = {y / val:.6f}\n")
+                    replaced = True
+                    break
+
         if not replaced:
             modified_lines.append(line)
 
@@ -147,21 +162,19 @@ def RunRsoft(params):
     os.makedirs(results_folder, exist_ok=True)
 
     # Run simulation, if multiprocessing takes too long time it out and raise error
-    try:
+    # try:
         # os.environ["OMP_NUM_THREADS"] = "2" # my attempt at programmatically setting the number of threads BeamProp uses
         # there should be a way to make the outputs automatically be placed in a certain directory
-        subprocess.run(["bsimw32", filename, prefix, "wait=0"], check=True, timeout=120) # put this else where
-    except subprocess.TimeoutExpired:
-        print("RSoft timed out")
+    subprocess.run(["bsimw32", filename, prefix, "wait=0"], check=True) # put this else where
+    # except subprocess.TimeoutExpired:
+    #     print("RSoft timed out")
 
     # Read .mon file
     uf = RSoftUserFunction()
     uf.read(f"{name_tag}.mon")
     x_all, y_all = uf.get_arrays()
     x = x_all
-    y_real = np.real(y_all)
-    y_imag = np.imag(y_all)
-    y = y_real
+    y = np.real(y_all)
     # try:
     #     x = x_all[0]
     #     y = y_all[0]

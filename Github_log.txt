@@ -1,0 +1,7 @@
+Removed timeout process in RSoft subprocess.
+
+Added dynamic calculation of beginning core and cladding diameter to be calculated within RSoft. These are listed\calculated in the symbols tab.
+
+Fixed a bug whereby the positions of the cores at the multimode end were not tapering correctly, or were being positioned wrong.
+
+Added functionality for a square grid.

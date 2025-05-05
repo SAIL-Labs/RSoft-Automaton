@@ -133,10 +133,10 @@ end launch_field
             launch_normalization=launch_array["launch_normalization"])
         f.write(text)
 #################################################################################
-def AddHack(file_name, json, core_num, central_index, background_index):
+def AddHack(file_name, json, core_num, central_index):
     launch_array = {k: json[k] for k in json}
 
-    block_text = { # 11
+    block_text = { # 10.2
         "pathway": '''
 pathway {n}
     {n}
@@ -148,16 +148,15 @@ monitor {n}
     monitor_type = {monitor_type}
     monitor_tilt = {launch_tilt}
     monitor_component = {comp}
-    monitor_width = 10.2
-    monitor_height = 10.2
 end monitor
 ''',
         "launch_field": '''
 launch_field {n}
     launch_pathway = {central_index}
     launch_type = {launch_type}
-    launch_tilt = {launch_tilt}
-    launch_normalization = {launch_normalization}
+    launch_mode = {launch_mode}
+    launch_mode_radial = {launch_mode_radial}
+    launch_random_set = {launch_random_set}
 end launch_field
 '''
     }
@@ -172,9 +171,9 @@ end launch_field
 
         # Write all monitors
         for i in range(1, core_num + 2):
-            monitor_width = launch_array["cladd_monitor_width"] if i == 2 else launch_array["core_monitor_width"]
-            monitor_height = launch_array["cladd_monitor_height"] if i == 2 else launch_array["core_monitor_height"]
-            monitor_type = "MONITOR_WG_POWER" if i == 2 else launch_array["monitor_type"]
+            monitor_width = launch_array["cladd_monitor_width"] if i == 1 else launch_array["core_monitor_width"]
+            monitor_height = launch_array["cladd_monitor_height"] if i == 1 else launch_array["core_monitor_height"]
+            monitor_type = "MONITOR_WG_POWER" if i == 1 else launch_array["monitor_type"]
 
             text = block_text["monitor"].format(
                 n=i,
@@ -185,15 +184,18 @@ end launch_field
                 launch_tilt=launch_array["launch_tilt"]
             )
             f.write(text)
-
-        # Write only one launch field (for the core at central_index)
-        text = block_text["launch_field"].format(
-            n=1,
-            central_index=central_index,
-            launch_type=launch_array["launch_type"],
-            launch_tilt=launch_array["launch_tilt"],
-            launch_normalization=launch_array["launch_normalization"]
-        )
+            # Write only one launch field (for the cladding (MMF case)/core (SMF case))
+            text = block_text["launch_field"].format(
+                n=1,
+                central_index=1,
+                launch_type=launch_array["launch_type"],
+                launch_tilt=launch_array["launch_tilt"],
+                launch_normalization=launch_array["launch_normalization"],
+                launch_align_file = launch_array["launch_align_file"],
+                launch_mode=launch_array["launch_mode"],
+                launch_mode_radial=launch_array["launch_mode_radial"],
+                launch_random_set=launch_array["launch_random_set"]
+            )
         f.write(text)
 #################################################################################
 # Calculate the V-number from available parameters
