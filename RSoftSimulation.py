@@ -61,16 +61,16 @@ class RSoftSim:
         self.cad_aspectratio_x = -1
 
         # Launch Properties
-        self.monitor_type =  Monitor_Prop.FIBRE_MODE_POWER
+        self.monitor_type = Monitor_Prop.FIBRE_MODE_POWER
         self.comp = Monitor_comp.BOTH
-        self.launch_port = 1
-        self.launch_type = LaunchType.SM
+        self.launch_port = 0
+        self.launch_type = ""
         self.launch_file = ""
-        self.launch_random_set = 0 if self.launch_type == LaunchType.SM else 1
-        self.launch_tilt = 1 if self.launch_type == LaunchType.SM else 0
+        self.launch_random_set = 0 # if self.launch_type == LaunchType.SM else 1
+        self.launch_tilt = 1 # if self.launch_type == LaunchType.SM else 0
         self.launch_align_file = 1
-        self.launch_mode = 0 if self.launch_type == LaunchType.SM else "*"
-        self.launch_mode_radial = 1 if self.launch_type == LaunchType.SM else "*"
+        self.launch_mode = 0 # if self.launch_type == LaunchType.SM else "*"
+        self.launch_mode_radial = 1 # if self.launch_type == LaunchType.SM else "*"
         self.launch_normalization = 1
         self.grid_size = self.Dx
         self.grid_size_y = self.Dy
@@ -83,18 +83,6 @@ class RSoftSim:
         self.launch_field_width = self.core_beg_diam
 
         self.structure = Struct_type.FIBRE
-
-    # def refresh_taprat_from_json(self, json_file="variable_paras.json"):
-    #     with open(json_file, "r") as f:
-    #         data = json.load(f)
-    #     self.acore_taper_ratio = data.get("acore_taper_ratio", self.acore_taper_ratio)
-
-    # @property
-    # def core_beg_diam(self):
-    #     return self.Corediam / self.acore_taper_ratio # PROBLEM: not updaing with taper_ratio 
-    # @property
-    # def cladding_beg_diam(self):
-    #     return self.Claddiam / self.acore_taper_ratio # PROBLEM: not updaing with taper_ratio
     
     def taper_pos(self, x):
         taper = f"{x} / acore_taper_ratio"
@@ -237,7 +225,7 @@ class RSoftSim:
         with open("launch_para.json", "r") as l:
             launch_params = json.load(l)
 
-        self.sym = {**param_v, **params}
+        self.sym = {**param_v, **params, **launch_params}
         self.launch_params = launch_params
 
     def generate_core_positions(self):
@@ -421,7 +409,7 @@ class RSoftSim:
         self.load_json_parameters()
 
         # generate the positions of the cores. 
-        core_positions = self.generate_core_positions()
+        self.generate_core_positions()
         
         self.build_circuit()
         if simulate:

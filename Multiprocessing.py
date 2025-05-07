@@ -16,6 +16,7 @@ with open("variable_paras.json", "r") as f:
     name = dat["Name"]
     background_index = dat["background_index"]
     core_num = dat["core_num"]
+    core_diam = dat["Corediam"]
     delta_expr = dat["Core_delta"]
     delta = dat["delta"]
 
@@ -66,9 +67,9 @@ def RunRsoft(params):
     lines = insert_after_match(lines, "comp_name = core", 
                         [f"\tbegin.delta = {delta_expr}\n",
                         f"\tend.delta = {delta_expr}\n" ])
-    # lines = insert_after_match(lines, "comp_name = Super Cladding", 
-    #                     [f"\tbegin.delta = {delta}\n",
-    #                     f"\tend.delta = {delta}\n" ])
+    lines = insert_after_match(lines, "comp_name = Super Cladding", 
+                        [f"\tbegin.delta = 0\n",
+                        f"\tend.delta = 0\n" ])
 
     # Insert delta after monitor segment starts
     # lines = insert_after_match(lines, "monitor ",f"\tmonitor_delta = {delta_expr}\n")
@@ -99,37 +100,20 @@ def RunRsoft(params):
         elif line_strip.startswith("comp_name ="):  # not a core
             in_core = False
         
-        # Insert delta only inside core segments
-        if in_core and line_strip.startswith("begin.width ="):
-            modified_lines.append(line)
-            modified_lines.append(f"\tbegin.delta = {delta_expr}\n")
-            continue  # skip to next line
-        elif in_core and line_strip.startswith("end.width ="):
-            modified_lines.append(line)
-            modified_lines.append(f"\tend.delta = {delta_expr}\n")
-            continue
+        # # Insert delta only inside core segments
+        # if in_core and line_strip.startswith("begin.width ="):
+        #     modified_lines.append(line)
+        #     modified_lines.append(f"\tbegin.delta = {delta_expr}\n")
+        #     continue  # skip to next line
+        # elif in_core and line_strip.startswith("end.width ="):
+        #     modified_lines.append(line)
+        #     modified_lines.append(f"\tend.delta = {delta_expr}\n")
+        #     continue
 
         for param, val in param_dict.items():
             if param == "Core_index":
                 continue
-            # dynamically replace the monitor/launch field dimensions
-            # if param == "Corediam":
-            #     if line_strip.startswith("monitor_height =") and in_core_monitor:
-            #         modified_lines.append(f"\tmonitor_height = {(val * 1.1):.6f}\n")
-            #         replaced = True
-            #         break
-            #     if line_strip.startswith("monitor_width =") and in_core_monitor:
-            #         modified_lines.append(f"\tmonitor_width = {(val * 1.1):.6f}\n")
-            #         replaced = True
-            #         break
-            #     if line_strip.startswith("launch_height ="):
-            #         modified_lines.append(f"\tlaunch_height = {(val):.6f}\n")
-            #         replaced = True
-            #         break
-            #     if line_strip.startswith("launch_width ="):
-            #         modified_lines.append(f"\tlaunch_width = {(val):.6f}\n")
-            #         replaced = True
-            #         break
+
             if line_strip.startswith(f"{param} ="):
                 modified_lines.append(f"{param} = {val:.6f}\n")
                 replaced = True
@@ -144,6 +128,14 @@ def RunRsoft(params):
                 if line_strip.startswith("begin.y =") and in_core:
                     _, y = core_positions[core_index]
                     modified_lines.append(f"\tbegin.y = {y / val:.6f}\n")
+                    replaced = True
+                    break
+                if line_strip.startswith("begin.height =") and in_core:
+                    modified_lines.append(f"\tbegin.height = {core_diam / val:.6f}\n")
+                    replaced = True
+                    break
+                if line_strip.startswith("begin.width =") and in_core:
+                    modified_lines.append(f"\tbegin.width = {core_diam / val:.6f}\n")
                     replaced = True
                     break
 
@@ -172,27 +164,20 @@ def RunRsoft(params):
     # Read .mon file
     uf = RSoftUserFunction()
     uf.read(f"{name_tag}.mon")
-    x_all, y_all = uf.get_arrays()
-    x = x_all
-    y = np.real(y_all)
-    # try:
-    #     x = x_all[0]
-    #     y = y_all[0]
-    #     # Ensure both are iterable
-    #     if not hasattr(x, '__len__') or not hasattr(y, '__len__'):
-    #         raise ValueError("Monitor data is not iterable.")
-    # except Exception as e:
-    #     print(f"[Error] Invalid monitor data in {name_tag}.mon: {e}")
-    #     return 1e6
+    x_all, y_all, z_all = uf.get_arrays()
+    num_monitors = z_all.shape[1]
+    # x = x_all # x-coordinates of the sampled data
+    # y = y_all # y-coordinates of the sampled data
+    # z = z_all # field data sampled at each point for each monitor (len(x), num_monitors)
 
-    # Save results, make a separate function here
-    results = {0: y}  # just one run per call
     csv_tag = f"Throughput_{name_tag}.csv"
     with open(csv_tag, mode="w", newline="") as file:
         writer = csv.writer(file)
-        writer.writerow(["x", name_tag])
-        for i in range(len(x)):
-            writer.writerow([x[i], y[i]])
+        header = ["x"] + [f"Monitor_{i}" for i in range(num_monitors)]
+        writer.writerow(header)
+        for i in range(z_all.shape[0]):
+            row = [x_all[i]] + [np.real(z_all[i, j]) for j in range(z_all.shape[1])]
+            writer.writerow(row)
 
     # Move files to results folder
     for file in os.listdir():
@@ -200,8 +185,10 @@ def RunRsoft(params):
             shutil.move(file, os.path.join(results_folder, file))
 
     df = pd.read_csv(csv_tag)
-    throughput_difference = abs(df[name_tag].iloc[0] - df[name_tag].iloc[-1])/df[name_tag].iloc[0]
-    average = df[name_tag].mean()
+    monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]
+    average = (df[monitor_columns].mean().sum())/core_num 
+    # throughput_difference = abs(df[name_tag].iloc[0] - df[name_tag].iloc[-1])/df[name_tag].iloc[0]
+    # average = df[name_tag].mean()
 
     for file in os.listdir():
         if file.startswith(csv_tag):
@@ -226,7 +213,8 @@ opt = Optimizer(
 if __name__ == "__main__":    
     # how many values in each parameter space to run simulation with
     total_calls = num_para
-    # this is the number of points to sample simultaneously. Increase to cycle through prior space quicker at the cost of CPU computation
+    # this is the number of points to sample simultaneously. 
+    # Increase to cycle through prior space quicker at the cost of CPU computation
     batch_size = batch_num
     all_results = []
 
@@ -255,7 +243,6 @@ if __name__ == "__main__":
         n_params = len(param_names)
 
         # Find best result
-        # best_idx = np.argmin(y_vals)
         best_idx = np.argmax(y_vals)
         best_params = x_iters[best_idx]
         best_throughput = y_vals[best_idx]

@@ -152,10 +152,11 @@ end monitor
 ''',
         "launch_field": '''
 launch_field {n}
-    launch_pathway = {central_index}
+    launch_pathway = {n}
     launch_type = {launch_type}
     launch_mode = {launch_mode}
     launch_mode_radial = {launch_mode_radial}
+    launch_normalization = {launch_normalization}
     launch_random_set = {launch_random_set}
 end launch_field
 '''
@@ -187,14 +188,14 @@ end launch_field
             # Write only one launch field (for the cladding (MMF case)/core (SMF case))
             text = block_text["launch_field"].format(
                 n=1,
-                central_index=1,
                 launch_type=launch_array["launch_type"],
                 launch_tilt=launch_array["launch_tilt"],
                 launch_normalization=launch_array["launch_normalization"],
-                launch_align_file = launch_array["launch_align_file"],
+                # launch_align_file = launch_array["launch_align_file"],
                 launch_mode=launch_array["launch_mode"],
                 launch_mode_radial=launch_array["launch_mode_radial"],
-                launch_random_set=launch_array["launch_random_set"]
+                launch_random_set=launch_array["launch_random_set"],
+                launch_port = launch_array["launch_port"]
             )
         f.write(text)
 #################################################################################
