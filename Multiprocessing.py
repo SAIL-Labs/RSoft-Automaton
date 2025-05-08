@@ -63,88 +63,78 @@ def RunRsoft(params):
     # delta_expr = param_dict["Core_index"] 
     # delta_expr = param_dict["Core_index"] - background_index
 
-    # Insert delta after core segment start
-    lines = insert_after_match(lines, "comp_name = core", 
-                        [f"\tbegin.delta = {delta_expr}\n",
-                        f"\tend.delta = {delta_expr}\n" ])
-    lines = insert_after_match(lines, "comp_name = Super Cladding", 
-                        [f"\tbegin.delta = 0\n",
-                        f"\tend.delta = 0\n" ])
+    # # Insert delta after core segment start
+    # lines = insert_after_match(lines, "comp_name = core", 
+    #                     [f"\tbegin.delta = {delta_expr}\n",
+    #                     f"\tend.delta = {delta_expr}\n" ])
+    # lines = insert_after_match(lines, "comp_name = Super Cladding", 
+    #                     [f"\tbegin.delta = 0\n",
+    #                     f"\tend.delta = 0\n" ])
 
     # Insert delta after monitor segment starts
     # lines = insert_after_match(lines, "monitor ",f"\tmonitor_delta = {delta_expr}\n")
 
-    # Build the updated lines
-    modified_lines = []
-    in_core = False
-    with open("core_positions.json", "r") as g:
-        core_positions = json.load(g)
-        core_index = -1
+    # # Build the updated lines
+    # modified_lines = []
+    # in_core = False
+    # with open("core_positions.json", "r") as g:
+    #     core_positions = json.load(g)
+    #     core_index = -1
 
-    for line in lines:
-        line_strip = line.strip()
-        replaced = False
-        '''
-        Might want to change this to self.core_position((0,0)) in the future
-        '''
-        # Detect start of a monitor block for the core (monitor 1)
-        if line_strip.startswith("monitor ") and "1" in line_strip:
-            in_core_monitor = True
-        elif line_strip.startswith("monitor "):  # any other monitor
-            in_core_monitor = False
+    # for line in lines:
+    #     line_strip = line.strip()
+    #     replaced = False
+    #     '''
+    #     Might want to change this to self.core_position((0,0)) in the future
+    #     '''
+    #     # Detect start of a monitor block for the core (monitor 1)
+    #     if line_strip.startswith("monitor ") and "1" in line_strip:
+    #         in_core_monitor = True
+    #     elif line_strip.startswith("monitor "):  # any other monitor
+    #         in_core_monitor = False
 
-        # Detect if the segment is the core or cladding
-        if line_strip.startswith("comp_name =") and "core_" in line_strip:
-            in_core = True
-            core_index += 1
-        elif line_strip.startswith("comp_name ="):  # not a core
-            in_core = False
-        
-        # # Insert delta only inside core segments
-        # if in_core and line_strip.startswith("begin.width ="):
-        #     modified_lines.append(line)
-        #     modified_lines.append(f"\tbegin.delta = {delta_expr}\n")
-        #     continue  # skip to next line
-        # elif in_core and line_strip.startswith("end.width ="):
-        #     modified_lines.append(line)
-        #     modified_lines.append(f"\tend.delta = {delta_expr}\n")
-        #     continue
+    #     # Detect if the segment is the core or cladding
+    #     if line_strip.startswith("comp_name =") and "core_" in line_strip:
+    #         in_core = True
+    #         core_index += 1
+    #     elif line_strip.startswith("comp_name ="):  # not a core
+    #         in_core = False
 
-        for param, val in param_dict.items():
-            if param == "Core_index":
-                continue
+    #     for param, val in param_dict.items():
+    #         if param == "Core_index":
+    #             continue
 
-            if line_strip.startswith(f"{param} ="):
-                modified_lines.append(f"{param} = {val:.6f}\n")
-                replaced = True
-                break
+    #         if line_strip.startswith(f"{param} ="):
+    #             modified_lines.append(f"{param} = {val:.6f}\n")
+    #             replaced = True
+    #             break
 
-            if param == "acore_taper_ratio" and in_core:
-                if line_strip.startswith("begin.x ="):
-                    x, _ = core_positions[core_index]
-                    modified_lines.append(f"\tbegin.x = {x / val:.6f}\n")
-                    replaced = True
-                    break
-                if line_strip.startswith("begin.y =") and in_core:
-                    _, y = core_positions[core_index]
-                    modified_lines.append(f"\tbegin.y = {y / val:.6f}\n")
-                    replaced = True
-                    break
-                if line_strip.startswith("begin.height =") and in_core:
-                    modified_lines.append(f"\tbegin.height = {core_diam / val:.6f}\n")
-                    replaced = True
-                    break
-                if line_strip.startswith("begin.width =") and in_core:
-                    modified_lines.append(f"\tbegin.width = {core_diam / val:.6f}\n")
-                    replaced = True
-                    break
+    #         if param == "acore_taper_ratio" and in_core:
+    #             if line_strip.startswith("begin.x ="):
+    #                 x, _ = core_positions[core_index]
+    #                 modified_lines.append(f"\tbegin.x = {x / val:.6f}\n")
+    #                 replaced = True
+    #                 break
+    #             if line_strip.startswith("begin.y =") and in_core:
+    #                 _, y = core_positions[core_index]
+    #                 modified_lines.append(f"\tbegin.y = {y / val:.6f}\n")
+    #                 replaced = True
+    #                 break
+    #             if line_strip.startswith("begin.height =") and in_core:
+    #                 modified_lines.append(f"\tbegin.height = {core_diam / val:.6f}\n")
+    #                 replaced = True
+    #                 break
+    #             if line_strip.startswith("begin.width =") and in_core:
+    #                 modified_lines.append(f"\tbegin.width = {core_diam / val:.6f}\n")
+    #                 replaced = True
+    #                 break
 
-        if not replaced:
-            modified_lines.append(line)
+    #     if not replaced:
+    #         modified_lines.append(line)
 
-    # Write the final .ind file with symbolic delta expression
-    with open(filename, "w") as out:
-        out.writelines(modified_lines)
+    # # Write the final .ind file with symbolic delta expression
+    # with open(filename, "w") as out:
+    #     out.writelines(modified_lines)
     
     # Set up folders
     user_home = os.path.expanduser("~")
@@ -153,22 +143,18 @@ def RunRsoft(params):
     results_folder = os.path.join(results_root, folder)
     os.makedirs(results_folder, exist_ok=True)
 
-    # Run simulation, if multiprocessing takes too long time it out and raise error
-    # try:
-        # os.environ["OMP_NUM_THREADS"] = "2" # my attempt at programmatically setting the number of threads BeamProp uses
+    # Run RSoft simulation, if multiprocessing takes too long time it out and raise error
         # there should be a way to make the outputs automatically be placed in a certain directory
     subprocess.run(["bsimw32", filename, prefix, "wait=0"], check=True) # put this else where
-    # except subprocess.TimeoutExpired:
-    #     print("RSoft timed out")
 
-    # Read .mon file
+    # Read .mon files
     uf = RSoftUserFunction()
     uf.read(f"{name_tag}.mon")
     x_all, y_all, z_all = uf.get_arrays()
     num_monitors = z_all.shape[1]
-    # x = x_all # x-coordinates of the sampled data
-    # y = y_all # y-coordinates of the sampled data
-    # z = z_all # field data sampled at each point for each monitor (len(x), num_monitors)
+    # x_all: x-coordinates of the sampled data
+    # y_all: y-coordinates of the sampled data
+    # z_all: field data sampled at each point for each monitor (len(x), num_monitors)
 
     csv_tag = f"Throughput_{name_tag}.csv"
     with open(csv_tag, mode="w", newline="") as file:
@@ -209,7 +195,8 @@ opt = Optimizer(
     random_state=42
 )
 
-# the multiprocessing in all its glory. The first if __name__ == "__main__" is required 
+# the multiprocessing in all its glory. 
+# The first if __name__ == "__main__" is required 
 if __name__ == "__main__":    
     # how many values in each parameter space to run simulation with
     total_calls = num_para

@@ -1,189 +1,100 @@
 
-Claddiam = 150
-Core_delta = 0.0034
-Core_sep = 60
-Corediam = 8.2
-Dx = 1
-Dy = 1
-Dz = 2
-H = 5
-Length = 1000
-Name = MCF_Test
-Phase = 0
-acore_taper_ratio = 10
-alpha = 0
-background_index = 1.456
-batch_number = 6
-boundary_gap_x = 10
-boundary_gap_y = 10
-boundary_gap_z = 0
-bpm_pathway = 1
-bpm_pathway_monitor = 1
-cad_aspectratio = 1
-cad_aspectratio_x = -1
-cad_aspectratio_y = -1
-cad_aspectratio_z = -1
-cladd_monitor_height = 165
-cladd_monitor_width = 165
-cladding_beg_diam = Claddiam / acore_taper_ratio
-comp = COMPONENT_MAJOR
-core_beg_diam = Corediam / acore_taper_ratio
-core_monitor_height = 9.02
-core_monitor_width = 9.02
-core_num = 7
-delta = 0.012
-dimension = 3
-eim = 0
-free_space_wavelength = 1.55
-grid_size = 0.1
-grid_size_y = 0.1
-grid_uniform = 0
-height = 5
-k0 = 4.05366794
-lambda = free_space_wavelength
-launch_align_file = 1
-launch_field_height = Corediam / acore_taper_ratio
-launch_field_width = Corediam / acore_taper_ratio
-launch_file = 0
-launch_mode = 0
-launch_mode_radial = 1
-launch_normalization = 1
-launch_port = 0
-launch_random_set = 0
-launch_tilt = 1
-launch_type = LAUNCH_GAUSSIAN
-monitor_type = MONITOR_TOTAL_POWER
-num_paras = 72
-polarization = 0
-sim_tool = ST_BEAMPROP
-slice_display_mode = DISPLAY_CONTOURMAPXZ
-slice_position_z = 100
-step_size = 0.2
-structure = STRUCT_FIBER
-sym_tool = ST_BEAMPROP
-width = 5
+pathway 1
+    1
+end pathway
 
+pathway 2
+    2
+end pathway
 
-segment 1
-	comp_name = Super Cladding
-	extended = 1
-	begin.x = 0
-	begin.z = 0
-	begin.height = Claddiam / acore_taper_ratio
-	begin.width = Claddiam / acore_taper_ratio
-	end.x = 0 rel begin segment 1
-	end.y = 0 rel begin segment 1
-	end.z = Length rel begin segment 1
-	end.height = Claddiam
-	end.width = Claddiam
-end segment
+pathway 3
+    3
+end pathway
 
-segment 2
-	comp_name = core_01
-	extended = 1
-	begin.x = -3
-	begin.y = -5.196152423
-	begin.z = 0
-	begin.height = Corediam / acore_taper_ratio
-	begin.width = Corediam / acore_taper_ratio
-	end.x = -30 rel begin segment 2
-	end.y = -51.96152423 rel begin segment 2
-	end.z = Length rel begin segment 2
-	end.height = Corediam
-	end.width = Corediam
-end segment
+pathway 4
+    4
+end pathway
 
-segment 3
-	comp_name = core_02
-	extended = 1
-	begin.x = 3
-	begin.y = -5.196152423
-	begin.z = 0
-	begin.height = Corediam / acore_taper_ratio
-	begin.width = Corediam / acore_taper_ratio
-	end.x = 30 rel begin segment 3
-	end.y = -51.96152423 rel begin segment 3
-	end.z = Length rel begin segment 3
-	end.height = Corediam
-	end.width = Corediam
-end segment
+pathway 5
+    5
+end pathway
 
-segment 4
-	comp_name = core_03
-	extended = 1
-	begin.x = -6
-	begin.z = 0
-	begin.height = Corediam / acore_taper_ratio
-	begin.width = Corediam / acore_taper_ratio
-	end.x = -60 rel begin segment 4
-	end.y = 0 rel begin segment 4
-	end.z = Length rel begin segment 4
-	end.height = Corediam
-	end.width = Corediam
-end segment
+pathway 6
+    6
+end pathway
 
-segment 5
-	comp_name = core_04
-	extended = 1
-	begin.x = 0
-	begin.z = 0
-	begin.height = Corediam / acore_taper_ratio
-	begin.width = Corediam / acore_taper_ratio
-	end.x = 0 rel begin segment 5
-	end.y = 0 rel begin segment 5
-	end.z = Length rel begin segment 5
-	end.height = Corediam
-	end.width = Corediam
-end segment
+pathway 7
+    7
+end pathway
 
-segment 6
-	comp_name = core_05
-	extended = 1
-	begin.x = 6
-	begin.z = 0
-	begin.height = Corediam / acore_taper_ratio
-	begin.width = Corediam / acore_taper_ratio
-	end.x = 60 rel begin segment 6
-	end.y = 0 rel begin segment 6
-	end.z = Length rel begin segment 6
-	end.height = Corediam
-	end.width = Corediam
-end segment
+pathway 8
+    8
+end pathway
 
-segment 7
-	comp_name = core_06
-	extended = 1
-	begin.x = -3
-	begin.y = 5.196152423
-	begin.z = 0
-	begin.height = Corediam / acore_taper_ratio
-	begin.width = Corediam / acore_taper_ratio
-	end.x = -30 rel begin segment 7
-	end.y = 51.96152423 rel begin segment 7
-	end.z = Length rel begin segment 7
-	end.height = Corediam
-	end.width = Corediam
-end segment
+monitor 1
+    pathway = 1
+    monitor_type = MONITOR_WG_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
 
-segment 8
-	comp_name = core_07
-	extended = 1
-	begin.x = 3
-	begin.y = 5.196152423
-	begin.z = 0
-	begin.height = Corediam / acore_taper_ratio
-	begin.width = Corediam / acore_taper_ratio
-	end.x = 30 rel begin segment 8
-	end.y = 51.96152423 rel begin segment 8
-	end.z = Length rel begin segment 8
-	end.height = Corediam
-	end.width = Corediam
-end segment
+monitor 2
+    pathway = 2
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
 
+monitor 3
+    pathway = 3
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
 
+monitor 4
+    pathway = 4
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
 
+monitor 5
+    pathway = 5
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
 
+monitor 6
+    pathway = 6
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
 
+monitor 7
+    pathway = 7
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 8
+    pathway = 8
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+launch_field 1
+    launch_pathway = 1
+    launch_type = LAUNCH_MULTIMODE
+    launch_mode = 0
+    launch_mode_radial = 1
+    launch_normalization = 1
+    launch_random_set = 0
+end launch_field
 
 pathway 1
     1
@@ -220,62 +131,450 @@ end pathway
 monitor 1
     pathway = 1
     monitor_type = MONITOR_WG_POWER
-    monitor_tilt = 1
-    monitor_component = COMPONENT_MAJOR
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
 end monitor
 
 monitor 2
     pathway = 2
-    monitor_type = MONITOR_TOTAL_POWER
-    monitor_tilt = 1
-    monitor_component = COMPONENT_MAJOR
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
 end monitor
 
 monitor 3
     pathway = 3
-    monitor_type = MONITOR_TOTAL_POWER
-    monitor_tilt = 1
-    monitor_component = COMPONENT_MAJOR
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
 end monitor
 
 monitor 4
     pathway = 4
-    monitor_type = MONITOR_TOTAL_POWER
-    monitor_tilt = 1
-    monitor_component = COMPONENT_MAJOR
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
 end monitor
 
 monitor 5
     pathway = 5
-    monitor_type = MONITOR_TOTAL_POWER
-    monitor_tilt = 1
-    monitor_component = COMPONENT_MAJOR
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
 end monitor
 
 monitor 6
     pathway = 6
-    monitor_type = MONITOR_TOTAL_POWER
-    monitor_tilt = 1
-    monitor_component = COMPONENT_MAJOR
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
 end monitor
 
 monitor 7
     pathway = 7
-    monitor_type = MONITOR_TOTAL_POWER
-    monitor_tilt = 1
-    monitor_component = COMPONENT_MAJOR
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
 end monitor
 
 monitor 8
     pathway = 8
-    monitor_type = MONITOR_TOTAL_POWER
-    monitor_tilt = 1
-    monitor_component = COMPONENT_MAJOR
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
 end monitor
 
 launch_field 1
     launch_pathway = 1
-    launch_type = LAUNCH_GAUSSIAN
+    launch_type = LAUNCH_MULTIMODE
+    launch_mode = 0
+    launch_mode_radial = 1
+    launch_normalization = 1
+    launch_random_set = 0
+end launch_field
+
+pathway 1
+    1
+end pathway
+
+pathway 2
+    2
+end pathway
+
+pathway 3
+    3
+end pathway
+
+pathway 4
+    4
+end pathway
+
+pathway 5
+    5
+end pathway
+
+pathway 6
+    6
+end pathway
+
+pathway 7
+    7
+end pathway
+
+pathway 8
+    8
+end pathway
+
+monitor 1
+    pathway = 1
+    monitor_type = MONITOR_WG_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 2
+    pathway = 2
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 3
+    pathway = 3
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 4
+    pathway = 4
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 5
+    pathway = 5
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 6
+    pathway = 6
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 7
+    pathway = 7
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 8
+    pathway = 8
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+launch_field 1
+    launch_pathway = 1
+    launch_type = LAUNCH_MULTIMODE
+    launch_mode = 0
+    launch_mode_radial = 1
+    launch_normalization = 1
+    launch_random_set = 0
+end launch_field
+
+pathway 1
+    1
+end pathway
+
+pathway 2
+    2
+end pathway
+
+pathway 3
+    3
+end pathway
+
+pathway 4
+    4
+end pathway
+
+pathway 5
+    5
+end pathway
+
+pathway 6
+    6
+end pathway
+
+pathway 7
+    7
+end pathway
+
+pathway 8
+    8
+end pathway
+
+monitor 1
+    pathway = 1
+    monitor_type = MONITOR_WG_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 2
+    pathway = 2
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 3
+    pathway = 3
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 4
+    pathway = 4
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 5
+    pathway = 5
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 6
+    pathway = 6
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 7
+    pathway = 7
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 8
+    pathway = 8
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+launch_field 1
+    launch_pathway = 1
+    launch_type = LAUNCH_MULTIMODE
+    launch_mode = 0
+    launch_mode_radial = 1
+    launch_normalization = 1
+    launch_random_set = 0
+end launch_field
+
+pathway 1
+    1
+end pathway
+
+pathway 2
+    2
+end pathway
+
+pathway 3
+    3
+end pathway
+
+pathway 4
+    4
+end pathway
+
+pathway 5
+    5
+end pathway
+
+pathway 6
+    6
+end pathway
+
+pathway 7
+    7
+end pathway
+
+pathway 8
+    8
+end pathway
+
+monitor 1
+    pathway = 1
+    monitor_type = MONITOR_WG_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 2
+    pathway = 2
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 3
+    pathway = 3
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 4
+    pathway = 4
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 5
+    pathway = 5
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 6
+    pathway = 6
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 7
+    pathway = 7
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 8
+    pathway = 8
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+launch_field 1
+    launch_pathway = 1
+    launch_type = LAUNCH_MULTIMODE
+    launch_mode = 0
+    launch_mode_radial = 1
+    launch_normalization = 1
+    launch_random_set = 0
+end launch_field
+
+pathway 1
+    1
+end pathway
+
+pathway 2
+    2
+end pathway
+
+pathway 3
+    3
+end pathway
+
+pathway 4
+    4
+end pathway
+
+pathway 5
+    5
+end pathway
+
+pathway 6
+    6
+end pathway
+
+pathway 7
+    7
+end pathway
+
+pathway 8
+    8
+end pathway
+
+monitor 1
+    pathway = 1
+    monitor_type = MONITOR_WG_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 2
+    pathway = 2
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 3
+    pathway = 3
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 4
+    pathway = 4
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 5
+    pathway = 5
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 6
+    pathway = 6
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 7
+    pathway = 7
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 8
+    pathway = 8
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+launch_field 1
+    launch_pathway = 1
+    launch_type = LAUNCH_MULTIMODE
     launch_mode = 0
     launch_mode_radial = 1
     launch_normalization = 1

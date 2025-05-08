@@ -1,5 +1,5 @@
 import numpy as np
-
+import json
 # Function to extract parameters from the .ind file
 def Extract_params(param=""):
     with open("MCF_Test.ind", "r") as r:
@@ -133,10 +133,10 @@ end launch_field
             launch_normalization=launch_array["launch_normalization"])
         f.write(text)
 #################################################################################
-def AddHack(file_name, json, core_num, central_index):
-    launch_array = {k: json[k] for k in json}
+def AddHack(file_name, json_file, core_num, param_dict):
+    launch_array = {k: json_file[k] for k in json_file}
 
-    block_text = { # 10.2
+    block_text = { 
         "pathway": '''
 pathway {n}
     {n}
@@ -172,14 +172,14 @@ end launch_field
 
         # Write all monitors
         for i in range(1, core_num + 2):
-            monitor_width = launch_array["cladd_monitor_width"] if i == 1 else launch_array["core_monitor_width"]
-            monitor_height = launch_array["cladd_monitor_height"] if i == 1 else launch_array["core_monitor_height"]
+            # monitor_width = launch_array["cladd_monitor_width"] if i == 1 else launch_array["core_monitor_width"]
+            # monitor_height = launch_array["cladd_monitor_height"] if i == 1 else launch_array["core_monitor_height"]
             monitor_type = "MONITOR_WG_POWER" if i == 1 else launch_array["monitor_type"]
 
             text = block_text["monitor"].format(
                 n=i,
-                monitor_width=monitor_width,
-                monitor_height=monitor_height,
+                # monitor_width=monitor_width,
+                # monitor_height=monitor_height,
                 monitor_type=monitor_type,
                 comp=launch_array["comp"],
                 launch_tilt=launch_array["launch_tilt"]
@@ -191,13 +191,56 @@ end launch_field
                 launch_type=launch_array["launch_type"],
                 launch_tilt=launch_array["launch_tilt"],
                 launch_normalization=launch_array["launch_normalization"],
-                # launch_align_file = launch_array["launch_align_file"],
+                launch_align_file = launch_array["launch_align_file"],
                 launch_mode=launch_array["launch_mode"],
                 launch_mode_radial=launch_array["launch_mode_radial"],
                 launch_random_set=launch_array["launch_random_set"],
-                launch_port = launch_array["launch_port"]
+                # launch_port = launch_array["launch_port"]
             )
         f.write(text)
+
+    # Open file in read mode
+    with open(f"{file_name}.ind", "r") as f:
+        lines = f.readlines()
+    # Insert delta after core and cladding segment start
+    lines = insert_after_match(lines, "comp_name = core", 
+                        [f"\tbegin.delta = {launch_array['delta']}\n",
+                        f"\tend.delta = {launch_array['delta']}\n" ])
+    lines = insert_after_match(lines, "comp_name = Super Cladding", 
+                        [f"\tbegin.delta = {launch_array['cladding_delta']}\n",
+                        f"\tend.delta = {launch_array['cladding_delta']}\n" ])
+
+    # Build the updated lines
+    modified_lines = []
+    in_core = False
+    with open("core_positions.json", "r") as g:
+        core_positions = json.load(g)
+        core_index = -1
+    
+    for line in lines:
+        line_strip = line.strip()
+        replaced = False
+
+        # Detect if the segment is the core or cladding
+        if line_strip.startswith("comp_name =") and "core_" in line_strip:
+            in_core = True
+            core_index += 1
+        elif line_strip.startswith("comp_name ="):  # not a core
+            in_core = False
+
+        for param, val in param_dict.items():
+
+            if line_strip.startswith(f"{param} ="):
+                modified_lines.append(f"{param} = {val:.6f}\n")
+                replaced = True
+                break
+
+        if not replaced:
+            modified_lines.append(line)
+
+    # Write the final .ind file with symbolic delta expression
+    with open(file_name, "w") as out:
+        out.writelines(modified_lines)
 #################################################################################
 # Calculate the V-number from available parameters
 def calc_V(core_diam, n_core, n_cladd, wavelength):

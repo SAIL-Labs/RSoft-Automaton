@@ -1,0 +1,8 @@
+{
+  "launch_type": "LAUNCH_WGMODE",
+  "monitor_type": "MONITOR_TOTAL_POWER",
+  "comp": "COMPONENT_MAJOR",
+  "launch_tilt": 1,
+  "launch_mode": 1,
+  "launch_mode_radial": 1
+}

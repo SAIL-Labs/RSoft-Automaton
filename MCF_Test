@@ -1,0 +1,582 @@
+
+pathway 1
+    1
+end pathway
+
+pathway 2
+    2
+end pathway
+
+pathway 3
+    3
+end pathway
+
+pathway 4
+    4
+end pathway
+
+pathway 5
+    5
+end pathway
+
+pathway 6
+    6
+end pathway
+
+pathway 7
+    7
+end pathway
+
+pathway 8
+    8
+end pathway
+
+monitor 1
+    pathway = 1
+    monitor_type = MONITOR_WG_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 2
+    pathway = 2
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 3
+    pathway = 3
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 4
+    pathway = 4
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 5
+    pathway = 5
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 6
+    pathway = 6
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 7
+    pathway = 7
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 8
+    pathway = 8
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+launch_field 1
+    launch_pathway = 1
+    launch_type = LAUNCH_MULTIMODE
+    launch_mode = 0
+    launch_mode_radial = 1
+    launch_normalization = 1
+    launch_random_set = 0
+end launch_field
+
+pathway 1
+    1
+end pathway
+
+pathway 2
+    2
+end pathway
+
+pathway 3
+    3
+end pathway
+
+pathway 4
+    4
+end pathway
+
+pathway 5
+    5
+end pathway
+
+pathway 6
+    6
+end pathway
+
+pathway 7
+    7
+end pathway
+
+pathway 8
+    8
+end pathway
+
+monitor 1
+    pathway = 1
+    monitor_type = MONITOR_WG_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 2
+    pathway = 2
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 3
+    pathway = 3
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 4
+    pathway = 4
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 5
+    pathway = 5
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 6
+    pathway = 6
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 7
+    pathway = 7
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 8
+    pathway = 8
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+launch_field 1
+    launch_pathway = 1
+    launch_type = LAUNCH_MULTIMODE
+    launch_mode = 0
+    launch_mode_radial = 1
+    launch_normalization = 1
+    launch_random_set = 0
+end launch_field
+
+pathway 1
+    1
+end pathway
+
+pathway 2
+    2
+end pathway
+
+pathway 3
+    3
+end pathway
+
+pathway 4
+    4
+end pathway
+
+pathway 5
+    5
+end pathway
+
+pathway 6
+    6
+end pathway
+
+pathway 7
+    7
+end pathway
+
+pathway 8
+    8
+end pathway
+
+monitor 1
+    pathway = 1
+    monitor_type = MONITOR_WG_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 2
+    pathway = 2
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 3
+    pathway = 3
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 4
+    pathway = 4
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 5
+    pathway = 5
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 6
+    pathway = 6
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 7
+    pathway = 7
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 8
+    pathway = 8
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+launch_field 1
+    launch_pathway = 1
+    launch_type = LAUNCH_MULTIMODE
+    launch_mode = 0
+    launch_mode_radial = 1
+    launch_normalization = 1
+    launch_random_set = 0
+end launch_field
+
+pathway 1
+    1
+end pathway
+
+pathway 2
+    2
+end pathway
+
+pathway 3
+    3
+end pathway
+
+pathway 4
+    4
+end pathway
+
+pathway 5
+    5
+end pathway
+
+pathway 6
+    6
+end pathway
+
+pathway 7
+    7
+end pathway
+
+pathway 8
+    8
+end pathway
+
+monitor 1
+    pathway = 1
+    monitor_type = MONITOR_WG_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 2
+    pathway = 2
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 3
+    pathway = 3
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 4
+    pathway = 4
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 5
+    pathway = 5
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 6
+    pathway = 6
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 7
+    pathway = 7
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 8
+    pathway = 8
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+launch_field 1
+    launch_pathway = 1
+    launch_type = LAUNCH_MULTIMODE
+    launch_mode = 0
+    launch_mode_radial = 1
+    launch_normalization = 1
+    launch_random_set = 0
+end launch_field
+
+pathway 1
+    1
+end pathway
+
+pathway 2
+    2
+end pathway
+
+pathway 3
+    3
+end pathway
+
+pathway 4
+    4
+end pathway
+
+pathway 5
+    5
+end pathway
+
+pathway 6
+    6
+end pathway
+
+pathway 7
+    7
+end pathway
+
+pathway 8
+    8
+end pathway
+
+monitor 1
+    pathway = 1
+    monitor_type = MONITOR_WG_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 2
+    pathway = 2
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 3
+    pathway = 3
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 4
+    pathway = 4
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 5
+    pathway = 5
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 6
+    pathway = 6
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 7
+    pathway = 7
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 8
+    pathway = 8
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+launch_field 1
+    launch_pathway = 1
+    launch_type = LAUNCH_MULTIMODE
+    launch_mode = 0
+    launch_mode_radial = 1
+    launch_normalization = 1
+    launch_random_set = 0
+end launch_field
+
+pathway 1
+    1
+end pathway
+
+pathway 2
+    2
+end pathway
+
+pathway 3
+    3
+end pathway
+
+pathway 4
+    4
+end pathway
+
+pathway 5
+    5
+end pathway
+
+pathway 6
+    6
+end pathway
+
+pathway 7
+    7
+end pathway
+
+pathway 8
+    8
+end pathway
+
+monitor 1
+    pathway = 1
+    monitor_type = MONITOR_WG_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 2
+    pathway = 2
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 3
+    pathway = 3
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 4
+    pathway = 4
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 5
+    pathway = 5
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 6
+    pathway = 6
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 7
+    pathway = 7
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+monitor 8
+    pathway = 8
+    monitor_type = MONITOR_WGMODE_POWER
+    monitor_tilt = 0
+    monitor_component = COMPONENT_BOTH
+end monitor
+
+launch_field 1
+    launch_pathway = 1
+    launch_type = LAUNCH_MULTIMODE
+    launch_mode = 0
+    launch_mode_radial = 1
+    launch_normalization = 1
+    launch_random_set = 0
+end launch_field
