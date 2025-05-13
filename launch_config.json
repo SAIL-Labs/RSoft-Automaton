@@ -1,8 +1,11 @@
 {
-  "launch_type": "LAUNCH_WGMODE",
-  "monitor_type": "MONITOR_TOTAL_POWER",
+  "launch_type": "LAUNCH_MULTIMODE",
+  "monitor_type": "MONITOR_WGMODE_POWER",
   "comp": "COMPONENT_MAJOR",
-  "launch_tilt": 1,
-  "launch_mode": 1,
-  "launch_mode_radial": 1
+  "launch_tilt": 0,
+  "launch_mode": "*",
+  "launch_mode_radial": "*",
+  "launch_random_set": 1,
+  "num_paras": 144,
+  "batch_num": 6
 }

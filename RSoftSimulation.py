@@ -1,5 +1,6 @@
 import numpy as np, os, shutil, csv, matplotlib.pyplot as plt
 import subprocess, json, Template
+from pathlib import Path
 from skopt import gp_minimize, Optimizer
 from skopt.space import Real
 from skopt.utils import dump
@@ -236,6 +237,8 @@ class RSoftSim:
                 json.dump(self.core_positions, g)
 
     def RunRSoftSim(self, name_tag):
+        import time
+
         filename = f"{name_tag}.ind"
         prefix   = f"prefix={name_tag}"
         folder   = f"Sim_{name_tag}"
@@ -246,21 +249,47 @@ class RSoftSim:
         results_root = os.path.join(desktop_path, "Results")
         results_folder = os.path.join(results_root, folder)
         os.makedirs(results_folder, exist_ok=True)
-        # Run RSoft simulation, if multiprocessing takes too long time it out and raise error
-            # there should be a way to make the outputs automatically be placed in a certain directory
-        subprocess.run(["bsimw32", filename, prefix, "wait=0"], check=True) # put this else where
 
-        # Read .mon files
+        # Run RSoft simulation
+        try:
+            subprocess.run(
+                ["bsimw32", filename, prefix, "wait=0"],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Command failed with code {e.returncode}")
+            print("Command:", e.cmd)
+            print("stdout:\n", e.stdout)
+            print("stderr:\n", e.stderr)
+            return -1e6
+
+        # Move all output files immediately after simulation
+        for file in os.listdir():
+            if file.startswith(name_tag) or file == filename:
+                shutil.move(file, os.path.join(results_folder, file))
+
+        # Safely access the .mon file in its new location
+        mon_path = Path(results_folder) / f"{name_tag}.mon"
+        timeout = 10
+        t_start = time.time()
+        while not mon_path.exists():
+            if time.time() - t_start > timeout:
+                raise FileNotFoundError(f"{mon_path} not found within {timeout} seconds after simulation.")
+            time.sleep(0.1)
+
+        # Read .mon file from moved location
         uf = RSoftUserFunction()
-        uf.read(f"{name_tag}.mon")
+        uf.read(str(mon_path))
         x_all, y_all, z_all = uf.get_arrays()
         num_monitors = z_all.shape[1]
-        # x_all: x-coordinates of the sampled data
-        # y_all: y-coordinates of the sampled data
-        # z_all: field data sampled at each point for each monitor (len(x), num_monitors)
 
+        # Write throughput CSV to same folder
         csv_tag = f"Throughput_{name_tag}.csv"
-        with open(csv_tag, mode="w", newline="") as file:
+        csv_path = Path(results_folder) / csv_tag
+
+        with open(csv_path, mode="w", newline="") as file:
             writer = csv.writer(file)
             header = ["x"] + [f"Monitor_{i}" for i in range(num_monitors)]
             writer.writerow(header)
@@ -268,15 +297,11 @@ class RSoftSim:
                 row = [x_all[i]] + [np.real(z_all[i, j]) for j in range(z_all.shape[1])]
                 writer.writerow(row)
 
-        df = pd.read_csv(csv_tag)
+        df = pd.read_csv(csv_path)
         monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]
-        average = (df[monitor_columns].mean().sum())/Template.Simulation_params["core_num"]
+        throughput = df[monitor_columns[1:]].tail(10).mean().sum()
 
-        # Move all matching files to results folder
-        for file in os.listdir():
-            if file.startswith(name_tag) or file == filename or file == csv_tag:
-                shutil.move(file, os.path.join(results_folder, file))
-        return -average
+        return -throughput
 
     def build_circuit(self, params):
         """
@@ -284,10 +309,12 @@ class RSoftSim:
         write to separate .ind file. Also contains function to run BeamProp
         and scikit Optimize
         """
-        # write in the values within simulation_val
         with open("launch_config.json", "r") as launch_config:
             simulation_val = json.load(launch_config)
+        
+        # launch_keys = [lkeys for lkeys, _ in Template.Launch_params.items()]
         for key, val in simulation_val.items():
+            # if key in launch_keys:
             Template.Launch_params[key] = val
 
         # load prior space
@@ -309,7 +336,7 @@ class RSoftSim:
                     **Template.Launch_params}
         for key, val in self.sym.items():
             self.circuit.set_symbol(key, val)
-        
+
         # extract taper ratio, length, core number, 
         # core and cladding diameter
         fixed = Template.fixed_params
@@ -323,7 +350,6 @@ class RSoftSim:
         cladd_diam = fixed["MCFCladd"]
         core_num = sim_param["core_num"]
 
-        name = self.sym["Name"]
         core_beg_dims = (core_diam / taper, core_diam / taper)
         core_end_dims = (core_diam , core_diam)
         cladding_beg_dims = (cladd_diam / taper, cladd_diam / taper)
@@ -362,15 +388,18 @@ class RSoftSim:
                     dimensions_end = core_end_dims
                 )
                 core.set_name(core_name[j])
-        
+        # Detect if using the template as an initial guess (NOTE: this name cannot change, else you must replace it here)
+        # is_initial_run = self.sym.get("Name", "") == "MCF_Test"
+
+        # if is_initial_run:
+        #     name_tag = self.sym["Name"]
+        # else:
         name_tag = "_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
         self.sym["Name"] = name_tag
         self.circuit.write(f"{name_tag}.ind")
         """
         Append all pathway, monitor, and launch field blocks based 
         on launch parameters. 
-
-        TO DO: include stray hacking parts that appear in MultiProcessing.py
         """ 
         
         AddHack(name_tag, launch, path_num -1, param_dict)
@@ -381,14 +410,11 @@ class RSoftSim:
         '''
         average_throughput = self.RunRSoftSim(name_tag)
         return average_throughput
-
-    # initialises multiprocessing function that runs the RSoft simulation
-    def mp_eval(self, params):
-        # just for tracking purposes if running from the terminal
-        print(f"[PID {os.getpid()}] Starting Rsoft with {params}")
-        return self.build_circuit(params)
     
     def MultProc(self):
+        images_dir = Path(os.path.expanduser("~/Desktop/Results/Images"))
+        images_dir.mkdir(parents=True, exist_ok=True)
+
         # load prior space
         with open("prior_space.json", "r") as read:
             param_range = json.load(read)
@@ -401,18 +427,25 @@ class RSoftSim:
             acq_func = "EI",
             random_state=42
         )
-        sim_param = Template.Simulation_params
 
-        # the multiprocessing in all its glory. 
-        # The first if __name__ == "__main__" is required 
-         
+        sim_param = Template.Simulation_params
         # how many values in each parameter space to run simulation with
         total_calls = sim_param["num_paras"]
+
         # this is the number of points to sample simultaneously. 
         # Increase to cycle through prior space quicker at the cost of CPU computation
         batch_size = sim_param["batch_num"]
         all_results = []
+        # initialise the optimizer with template solutions
+        # param_names = [dim.name for dim in para_space]
+        # seed_params = [Template.variable_params[k] for k in param_names]
 
+        # self.sym["Name"] = "MCF_Test"
+        # seed_result = self.build_circuit(seed_params)
+        # opt.tell(seed_params, seed_result)
+        # all_results.append((seed_params, seed_result))
+
+        # run optimizer as normal
         for i in range(0, total_calls, batch_size):
             
             # Suggest next batch of points
@@ -421,7 +454,7 @@ class RSoftSim:
             # Evaluate in parallel
             ctx = mp.get_context("spawn")
             with ctx.Pool(batch_size) as pool:
-                result_batch = pool.map(self.mp_eval, param_batch)
+                result_batch = pool.map(run_rsoft_sim, param_batch)
 
             # Feed results back to optimizer
             opt.tell(param_batch, result_batch)
@@ -467,31 +500,19 @@ class RSoftSim:
                 cbar = plt.colorbar(scatter, cax=cax)
                 cbar.set_label("Iteration")
 
-            plt.tight_layout()
-            plt.savefig(f"plot_iteration_{i//batch_size + 1}.png", dpi=300)
-
             # move images to prevent clumping
             user_home = os.path.expanduser("~")
             desktop_path = os.path.join(user_home, "Desktop")
             results_root = os.path.join(desktop_path, "Results")
-            images_dir = os.path.join(results_root, "Images")
-
-            os.makedirs(images_dir, exist_ok = True)
-            for file in os.listdir():
-                if file.startswith("plot_iteration_"):
-                    shutil.move(file, os.path.join(images_dir, file))
+            images_dir = Path(results_root) / "Images"
+            plt.tight_layout()
+            plt.savefig(images_dir / f"plot_iteration_{i//batch_size + 1}.png", dpi=300)
+            plt.close()
             
             para_tag = "best_params_log.csv"
             with open(para_tag, "w", newline="") as log:
                 writer = csv.writer(log)
                 writer.writerow([i // batch_size + 1] + list(best_params) + [best_throughput])
-    
-    # def print_core_log(self):
-    #     for core_name, core_info in self.core_log.items():
-    #         print(f"{core_name}")
-    #         for key, val in core_info.items():
-    #             print(f"{key}: {val}")
-    #         print("") 
 
     def RunRSoft(self, simulate = True):
         '''
@@ -499,12 +520,14 @@ class RSoftSim:
         fail/infinitely loop on the first batch
         '''
 
-        # # initialise prior space
-        # self.init_priors(custom_priors)
-        # # save all parameters to JSON files and load them
-        # self.save_all_json()
-        # # load prior spaces in json format
-        # self.load_json_parameters()
+        # write in the values within simulation_val
+        with open("launch_config.json", "r") as launch_config:
+            simulation_val = json.load(launch_config)
+        sim_keys = [keys for keys,_ in Template.Simulation_params.items()] 
+
+        for key, val in simulation_val.items():
+            if key in sim_keys:
+                Template.Simulation_params[key] = val
 
         # generate the positions of the cores. 
         self.generate_core_positions()
@@ -512,4 +535,9 @@ class RSoftSim:
         # self.build_circuit()
         if simulate:
             self.MultProc()
-            # subprocess.run(["python", "Multiprocessing.py"], check=True)
+
+def run_rsoft_sim(params):
+    from RSoftSimulation import RSoftSim  
+    sim = RSoftSim()
+    sim.generate_core_positions()
+    return sim.build_circuit(params)

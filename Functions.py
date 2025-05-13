@@ -11,16 +11,29 @@ def Extract_params(param=""):
                 break # <-- stop reading the file once found
     return val
 #################################################################################
-def insert_after_match(lines, match_string, insert_lines, strip=True):
+def insert_after_match(lines, match_string, insert_lines, strip=True, segment_filter=None):
     if isinstance(insert_lines, str):
         insert_lines = [insert_lines]
 
     modified = []
+    in_segment = False
+    matches_segment = False
 
     for line in lines:
         line_to_check = line.strip() if strip else line
         modified.append(line)
-        if line_to_check.startswith(match_string):
+
+        # Detect segment membership by comp_name
+        if line_to_check.startswith("comp_name ="):
+            if segment_filter is None:
+                matches_segment = True
+            elif segment_filter in line_to_check:
+                matches_segment = True
+            else:
+                matches_segment = False
+
+        # Insert only if inside the right segment
+        if matches_segment and line_to_check.startswith(match_string):
             for new_line in insert_lines:
                 modified.append(new_line if new_line.endswith("\n") else new_line + "\n")
 
@@ -133,6 +146,8 @@ end launch_field
             launch_normalization=launch_array["launch_normalization"])
         f.write(text)
 #################################################################################
+
+#################################################################################
 def AddHack(file_name, json_file, core_num, param_dict):
     launch_array = {k: json_file[k] for k in json_file}
 
@@ -203,31 +218,34 @@ end launch_field
     with open(f"{file_name}.ind", "r") as f:
         lines = f.readlines()
     # Insert delta after core and cladding segment start
-    lines = insert_after_match(lines, "comp_name = core", 
-                        [f"\tbegin.delta = {launch_array['delta']}\n",
-                        f"\tend.delta = {launch_array['delta']}\n" ])
-    lines = insert_after_match(lines, "comp_name = Super Cladding", 
-                        [f"\tbegin.delta = {launch_array['cladding_delta']}\n",
-                        f"\tend.delta = {launch_array['cladding_delta']}\n" ])
+    lines = insert_after_match(lines, "begin.width =", [
+        f"\tbegin.delta = {launch_array['core_delta']}\n",
+        f"\tend.delta = {launch_array['core_delta']}\n"
+    ], segment_filter="core_")
+
+    lines = insert_after_match(lines, "begin.width =", [
+        f"\tbegin.delta = {launch_array['cladding_delta']}\n",
+        f"\tend.delta = {launch_array['cladding_delta']}\n"
+    ], segment_filter="Super Cladding")
 
     # Build the updated lines
     modified_lines = []
     in_core = False
-    with open("core_positions.json", "r") as g:
-        core_positions = json.load(g)
-        core_index = -1
+    # with open("core_positions.json", "r") as g:
+    #     core_positions = json.load(g)
+    #     core_index = -1
     
     for line in lines:
         line_strip = line.strip()
         replaced = False
 
         # Detect if the segment is the core or cladding
-        if line_strip.startswith("comp_name =") and "core_" in line_strip:
+        if line_strip.startswith("comp_name = core_0 "):
             in_core = True
             core_index += 1
-        elif line_strip.startswith("comp_name ="):  # not a core
+        elif line_strip.startswith("comp_name = Super Cladding "):  # not a core
             in_core = False
-
+        
         for param, val in param_dict.items():
 
             if line_strip.startswith(f"{param} ="):
@@ -239,7 +257,7 @@ end launch_field
             modified_lines.append(line)
 
     # Write the final .ind file with symbolic delta expression
-    with open(file_name, "w") as out:
+    with open(f"{file_name}.ind", "w") as out:
         out.writelines(modified_lines)
 #################################################################################
 # Calculate the V-number from available parameters

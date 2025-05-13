@@ -4,15 +4,14 @@ from Circuit_Properties import *
 fixed_params = {
     "core_sep": 80,
     "MCFCladd": 300,
-    "background_index": 1.456,
+    # "background_index": 1.456,
     "cladding_delta": 0.0015,
-    "delta": 0.015,
+    "core_delta": 0.015,
     "core_diam": 8.2,
-    "free_space_wavelength": 1.55,
     "alpha": 0,
     }
 
-fixed_params["k0"] = (2 * np.pi) / fixed_params["free_space_wavelength"]
+# fixed_params["k0"] = (2 * np.pi) / fixed_params["free_space_wavelength"]
 
 RSoft_params = {
     "Name": "MCF_Test",
@@ -25,7 +24,8 @@ RSoft_params = {
     "dimension": 3,
     "eim": 0,
     "field_output_format": "OUTPUT_REAL_IMAG",
-    "lambda": fixed_params["free_space_wavelength"],
+    "background_index": 1.456,
+    "free_space_wavelength": 1.55,
     "sim_tool": Sim_tool.BP,
     "slice_display_mode": "DISPLAY_CONTOURMAPXZ",
     "launch_align_file": 1,
@@ -35,9 +35,10 @@ RSoft_params = {
     "grid_size_y": 1,
     "step_size": 2,
     "structure": Struct_type.FIBRE,
-    "width": 5
+    "width": 5,
+    "height": 5
 }
-RSoft_params["height"] = RSoft_params["width"]
+RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
 
 Launch_params = {
     "monitor_type": Monitor_Prop.FIBRE_MODE_POWER,
@@ -49,7 +50,7 @@ Launch_params = {
     "launch_mode": 0,
     "launch_mode_radial": 1,
     "launch_normalization": 1,
-    "delta": fixed_params["delta"],
+    "core_delta": fixed_params["core_delta"],
     "cladding_delta": fixed_params["cladding_delta"]
 }
 
