@@ -1,7 +1,5 @@
-Removed timeout process in RSoft subprocess.
+Added function to log each iteration of parameters into a csv file.
 
-Added dynamic calculation of beginning core and cladding diameter to be calculated within RSoft. These are listed\calculated in the symbols tab.
+Added a separate function in the Jupyter notebook to plot the parameters and their throughputs to remove the need to save each batch completion as their separate image.
 
-Fixed a bug whereby the positions of the cores at the multimode end were not tapering correctly, or were being positioned wrong.
-
-Added functionality for a square grid.
+Added support for running a singular BeamPROP simulation as a proxy for initial guesses prior to running the optimization loop.

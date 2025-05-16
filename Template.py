@@ -4,11 +4,11 @@ from Circuit_Properties import *
 fixed_params = {
     "core_sep": 80,
     "MCFCladd": 300,
-    # "background_index": 1.456,
     "cladding_delta": 0.0015,
     "core_delta": 0.015,
     "core_diam": 8.2,
     "alpha": 0,
+    "length_hyperparam": 0.01
     }
 
 # fixed_params["k0"] = (2 * np.pi) / fixed_params["free_space_wavelength"]
@@ -42,6 +42,7 @@ RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
 
 Launch_params = {
     "monitor_type": Monitor_Prop.FIBRE_MODE_POWER,
+    "cladding_monitor_type": Monitor_Prop.TOTAL_POWER,
     "comp": Monitor_comp.BOTH,
     "launch_tilt": 0,
     "launch_random_set": 0,
@@ -58,7 +59,8 @@ Simulation_params = {
     "core_num": 7,
     "num_paras": 72,
     "batch_num": 6,
-    "grid_type": "Hex"
+    "grid_type": "Hex",
+    "Structure": "PL"
 }
 variable_params= {
     "taper": 10,

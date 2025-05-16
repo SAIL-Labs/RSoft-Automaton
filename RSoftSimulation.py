@@ -1,174 +1,21 @@
-import numpy as np, os, shutil, csv, matplotlib.pyplot as plt
-import subprocess, json, Template
+import numpy as np, os, shutil, csv
+import subprocess, json, time
 from pathlib import Path
-from skopt import gp_minimize, Optimizer
+from skopt import Optimizer
 from skopt.space import Real
 from skopt.utils import dump
 import multiprocessing as mp
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 
 from Circuit_Properties import *
 from Functions import *
 from HexProperties import *
-from rstools import RSoftUserFunction, RSoftCircuit
+from template import * 
+from rstools import RSoftUserFunction, RSoftCircuit # type:ignore
 
 class RSoftSim:
     def __init__(self):
-        # self.name = name
         self.sym = {}
-        # self.core_log = {}
-
-        # # Generate Fibre Parameters
-        # self.length = 1000
-        # self.Corediam = 8.2
-        # self.Claddiam = 150
-        # self.acore_taper_ratio = 10
-        # self.Core_sep = 100
-        # self.core_num = 1
-        # self.Core_delta = 0.01
-        # self.background_index = 1.456 
-        # self.delta =  0.012 # 0.0036
-        # self.core_beg_diam = 'Corediam / acore_taper_ratio'
-        # self.cladding_beg_diam = 'Claddiam / acore_taper_ratio'
-
-        # # Cire geometry
-        # self.grid_type = "Hex"
-        # self.core_positions = [] # store tuples of (x, y)
-
-        # # Multiprocessing Parameters
-        # self.num_paras = 96
-        # self.batch_number = 12
-
-        # # Simulation Setup
-        # self.Dx = 0.1
-        # self.Dy = self.Dx
-        # self.Dz = 0.2
-        # self.Phase = 0
-        # self.boundary_gap_x = 10
-        # self.boundary_gap_y = self.boundary_gap_x
-        # self.boundary_gap_z = 0
-        # self.bpm_pathway = 1
-        # self.bpm_pathway_monitor = self.bpm_pathway
-        # self.sim_tool = Sim_tool.BP
-        # self.width = 5
-        # self.height = self.width
-        # self.H = self.height
-        # self.grid_uniform = 0
-        # self.eim = 0
-        # self.polarization = 0
-        # self.free_space_wavelength = 1.55
-        # self.k0 = 2 * np.pi / self.free_space_wavelength
-        # self.slice_display_mode = "DISPLAY_CONTOURMAPXZ"
-        # self.slice_position_z = 100
-        
-        # # CAD Stuff if you like the GUI or just want to check ind files
-        # self.cad_aspectratio_z = -1
-        # self.cad_aspectratio_y = -1
-        # self.cad_aspectratio_x = -1
-
-        # # Launch Properties
-        # self.monitor_type = Monitor_Prop.FIBRE_MODE_POWER 
-        # self.comp = Monitor_comp.BOTH
-        # self.launch_port = 0
-        # self.launch_type = ""
-        # self.launch_file = ""
-        # self.launch_random_set = 0 # if self.launch_type == LaunchType.SM else 1
-        # self.launch_tilt = 1 # if self.launch_type == LaunchType.SM else 0
-        # self.launch_align_file = 1
-        # self.launch_mode = 0 # if self.launch_type == LaunchType.SM else "*"
-        # self.launch_mode_radial = 1 # if self.launch_type == LaunchType.SM else "*"
-        # self.launch_normalization = 1
-        # self.grid_size = self.Dx
-        # self.grid_size_y = self.Dy
-        # self.step_size = self.Dz
-        # self.core_monitor_width = self.Corediam * 1.1
-        # self.core_monitor_height = self.core_monitor_width 
-        # self.cladd_monitor_width = self.Claddiam * 1.1
-        # self.cladd_monitor_height = self.cladd_monitor_width 
-        # self.launch_field_height = self.core_beg_diam
-        # self.launch_field_width = self.core_beg_diam
-
-        # self.structure = Struct_type.FIBRE
-    
-    # def taper_pos(self, x):
-    #     taper = f"{x} / acore_taper_ratio"
-    #     return taper
-
-    # def variable_parameters_dict(self):
-    #     return {
-    #         "Name": self.name,
-    #         "Length": self.length,
-    #         "Corediam": self.Corediam,
-    #         "Claddiam": self.Claddiam,
-    #         "Core_sep": self.Core_sep,
-    #         "acore_taper_ratio": self.acore_taper_ratio,
-    #         "core_beg_diam": self.core_beg_diam,
-    #         "cladding_beg_diam": self.cladding_beg_diam,
-    #         "core_num": self.core_num,
-    #         "Core_delta": self.Core_delta,
-    #         "background_index": self.background_index,
-    #         "delta": self.delta,
-    #         "core_monitor_width": self.core_monitor_width,
-    #         "core_monitor_height": self.core_monitor_height,
-    #         "cladd_monitor_width": self.cladd_monitor_width,
-    #         "cladd_monitor_height": self.cladd_monitor_height,
-    #         "launch_field_height": self.launch_field_height,
-    #         "launch_field_width": self.launch_field_width
-    #     }
-
-    # def fixed_parameters_dict(self):
-    #     return {
-    #         "Dx": self.Dx,
-    #         "Dy": self.Dy,
-    #         "Dz": self.Dz,
-    #         "Phase": self.Phase,
-    #         "boundary_gap_x": self.boundary_gap_x,
-    #         "boundary_gap_y": self.boundary_gap_y,
-    #         "boundary_gap_z": self.boundary_gap_z,
-    #         "bpm_pathway": self.bpm_pathway,
-    #         "bpm_pathway_monitor": self.bpm_pathway_monitor,
-    #         "sym_tool": self.sim_tool,
-    #         "width": self.width,
-    #         "height": self.height,
-    #         "H": self.H,
-    #         "grid_uniform": self.grid_uniform,
-    #         "eim": self.eim,
-    #         "polarization": self.polarization,
-    #         "free_space_wavelength": self.free_space_wavelength,
-    #         "k0": self.k0,
-    #         "slice_display_mode": self.slice_display_mode,
-    #         "slice_position_z": self.slice_position_z,
-    #         "cad_aspectratio_z": self.cad_aspectratio_z,
-    #         "cad_aspectratio_y": self.cad_aspectratio_y,
-    #         "cad_aspectratio_x": self.cad_aspectratio_x,
-    #         "grid_size": self.grid_size,
-    #         "grid_size_y": self.grid_size_y,
-    #         "step_size": self.step_size,
-    #         "structure": self.structure,
-    #         "num_paras": self.num_paras,
-    #         "batch_number": self.batch_number
-    #     }
-
-    # def launch_parameters_dict(self):
-    #     return {
-    #         "monitor_type": self.monitor_type,
-    #         "comp": self.comp,
-    #         "launch_tilt": self.launch_tilt,
-    #         "launch_port": self.launch_port,
-    #         "launch_align_file": self.launch_align_file,
-    #         "launch_mode": self.launch_mode,
-    #         "launch_file": self.launch_file,
-    #         "launch_type": self.launch_type,
-    #         "launch_random_set": self.launch_random_set,
-    #         "launch_mode_radial": self.launch_mode_radial,
-    #         "launch_normalization": self.launch_normalization,
-    #         "core_monitor_width": self.core_monitor_width,
-    #         "core_monitor_height": self.core_monitor_height,
-    #         "cladd_monitor_width": self.cladd_monitor_width,
-    #         "cladd_monitor_height": self.cladd_monitor_height,
-    #         "launch_field_height": self.launch_field_height,
-    #         "launch_field_width": self.launch_field_width
-    #     }
 
     def init_priors(self, custom = None):
         base_priors = {}
@@ -178,19 +25,10 @@ class RSoftSim:
         with open("prior_space.json", "w") as write:
             json.dump(self.prior_space, write)
         return base_priors
-    
-    # def load_parameters(self):
-    #     """
-    #     Load variable, fixed, and launch parameters from Template.py
-    #     and build symbol dictionary containing ONLY the parameters that
-    #     RSoft needs.
-    #     """
-    #     self.sym = {**Template.RSoft_params, 
-    #                 **Template.Launch_params}
 
     def generate_core_positions(self):
-        SimParam = Template.Simulation_params
-        core_sep = Template.fixed_params["core_sep"]
+        SimParam = Simulation_params
+        core_sep = fixed_params["core_sep"]
         grid_type = SimParam["grid_type"]
         if grid_type == "Hex":
             """
@@ -236,9 +74,7 @@ class RSoftSim:
             with open("core_positions.json", "w") as g:
                 json.dump(self.core_positions, g)
 
-    def RunRSoftSim(self, name_tag):
-        import time
-
+    def RunRSoftSim(self, name_tag, fixed, vars, fixed_length, param_range):
         filename = f"{name_tag}.ind"
         prefix   = f"prefix={name_tag}"
         folder   = f"Sim_{name_tag}"
@@ -297,58 +133,59 @@ class RSoftSim:
                 row = [x_all[i]] + [np.real(z_all[i, j]) for j in range(z_all.shape[1])]
                 writer.writerow(row)
 
-        df = pd.read_csv(csv_path)
-        monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]
-        throughput = df[monitor_columns[1:]].tail(10).mean().sum()
+        return -throughput_metric(csv_path, fixed_length, fixed, vars, param_range)
 
-        return -throughput
-
-    def build_circuit(self, params):
+    def build_circuit(self, params): # maybe put this into its own function. Make it universal.
         """
-        Create the design file using Template.py and 
+        Create the design file using template.py and 
         write to separate .ind file. Also contains function to run BeamProp
         and scikit Optimize
         """
         with open("launch_config.json", "r") as launch_config:
             simulation_val = json.load(launch_config)
         
-        # launch_keys = [lkeys for lkeys, _ in Template.Launch_params.items()]
         for key, val in simulation_val.items():
-            # if key in launch_keys:
-            Template.Launch_params[key] = val
+            Launch_params[key] = val
 
         # load prior space
         with open("prior_space.json", "r") as read:
             param_range = json.load(read)
         para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
         param_dict = {dim.name: val for dim, val in zip(para_space, params)}
+        
         # update template file with chosen values from scikit.Optimize()
-        Template.variable_params.update(param_dict)
+        variable_params.update(param_dict)
 
         self.circuit = RSoftCircuit()
 
         """
-        Load variable, fixed, and launch parameters from Template.py
+        Load variable, fixed, and launch parameters from template.py
         and build symbol dictionary containing ONLY the parameters that
         RSoft needs.
         """
-        self.sym = {**Template.RSoft_params, 
-                    **Template.Launch_params}
+        self.sym = {**RSoft_params, 
+                    **Launch_params}
         for key, val in self.sym.items():
             self.circuit.set_symbol(key, val)
 
         # extract taper ratio, length, core number, 
         # core and cladding diameter
-        fixed = Template.fixed_params
-        vars = Template.variable_params
-        sim_param = Template.Simulation_params
-        launch = Template.Launch_params
+        fixed = fixed_params
+        vars = variable_params
+        sim_param = Simulation_params
+        launch = Launch_params
 
         taper = vars["taper"]
-        Taper_L = vars["Taper_L"]
         core_diam = fixed["core_diam"]
         cladd_diam = fixed["MCFCladd"]
         core_num = sim_param["core_num"]
+
+        fixed_length = False
+        if "Taper_L" in fixed:
+            Taper_L = fixed["Taper_L"]
+            fixed_length = True
+        else:
+            Taper_L = vars["Taper_L"]
 
         core_beg_dims = (core_diam / taper, core_diam / taper)
         core_end_dims = (core_diam , core_diam)
@@ -357,43 +194,17 @@ class RSoftSim:
         core_name = [f"core_{n+1:02}" for n in range(core_num)]
 
         path_num = 0
+        structure = Simulation_params["Structure"]
+        if structure == "Fibre":
+            path_num = build_fibre(self.circuit, path_num, self.core_positions, 
+                        core_name, Taper_L, tuple(core * taper for core in core_beg_dims), core_end_dims)
 
-        if core_num == 1:
-            for j, (x, y) in enumerate(self.core_positions):
-                path_num += 1
-                core = self.circuit.add_segment(
-                    position=(x / taper, y / taper, 0),
-                    offset=(x, y, Taper_L),
-                    dimensions= core_beg_dims,
-                    dimensions_end= core_end_dims
-                )
-                core.set_name(core_name[j])
+        elif structure == "PL":
+            path_num = build_PL(self.circuit, path_num, self.core_positions, 
+                     core_name, taper, Taper_L,
+                     cladding_beg_dims, cladding_end_dims,
+                     core_beg_dims, core_end_dims)
 
-        else:   
-            cladding = self.circuit.add_segment(
-                    position=(0, 0, 0),
-                    offset=(0, 0, Taper_L),
-                    dimensions = cladding_beg_dims,
-                    dimensions_end = cladding_end_dims
-                    )
-            cladding.set_name("Super Cladding")
-            path_num += 1
-            
-            for j, (x, y) in enumerate(self.core_positions):
-                path_num += 1
-                core = self.circuit.add_segment(
-                    position=(x / taper, y / taper, 0),
-                    offset=(x, y, Taper_L),
-                    dimensions = core_beg_dims,
-                    dimensions_end = core_end_dims
-                )
-                core.set_name(core_name[j])
-        # Detect if using the template as an initial guess (NOTE: this name cannot change, else you must replace it here)
-        # is_initial_run = self.sym.get("Name", "") == "MCF_Test"
-
-        # if is_initial_run:
-        #     name_tag = self.sym["Name"]
-        # else:
         name_tag = "_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
         self.sym["Name"] = name_tag
         self.circuit.write(f"{name_tag}.ind")
@@ -404,11 +215,12 @@ class RSoftSim:
         
         AddHack(name_tag, launch, path_num -1, param_dict)
         '''
-        Manual setup to loop through a list of values
-        Runs the terminal line that will initiate RSoft. 
+        Manual setup to loop through a list of values. Runs the terminal line that will initiate RSoft and will calculate the 
+        metric to test.
         All output files will appear in a subfolder on the Desktop (windows)
         '''
-        average_throughput = self.RunRSoftSim(name_tag)
+        average_throughput = self.RunRSoftSim(name_tag, fixed, vars, fixed_length, param_range)
+
         return average_throughput
     
     def MultProc(self):
@@ -428,7 +240,7 @@ class RSoftSim:
             random_state=42
         )
 
-        sim_param = Template.Simulation_params
+        sim_param = Simulation_params
         # how many values in each parameter space to run simulation with
         total_calls = sim_param["num_paras"]
 
@@ -437,14 +249,24 @@ class RSoftSim:
         batch_size = sim_param["batch_num"]
         all_results = []
         # initialise the optimizer with template solutions
-        # param_names = [dim.name for dim in para_space]
-        # seed_params = [Template.variable_params[k] for k in param_names]
+        param_names = [dim.name for dim in para_space]
+        seed_params = [variable_params[k] for k in param_names]
 
-        # self.sym["Name"] = "MCF_Test"
-        # seed_result = self.build_circuit(seed_params)
-        # opt.tell(seed_params, seed_result)
-        # all_results.append((seed_params, seed_result))
-
+        self.sym["Name"] = "MCF_Test"
+        seed_result = self.build_circuit(seed_params)
+        opt.tell(seed_params, seed_result)
+        all_results.append((seed_params, seed_result))
+        
+        log_optimizer_results(
+            x_iters=[seed_params],
+            y_vals=[-seed_result],  
+            param_batch=[seed_params],
+            result_batch=[seed_result],
+            param_names=param_names,
+            iteration_start=0,
+            batch_size=1,
+            penalty_batch=None
+        )       
         # run optimizer as normal
         for i in range(0, total_calls, batch_size):
             
@@ -460,59 +282,21 @@ class RSoftSim:
             opt.tell(param_batch, result_batch)
             
             all_results.extend(zip(param_batch, result_batch))
-            # save results for plotting/analysis
-            dump(opt, "rsoft_opt_checkpoint.pkl", store_objective=False)
 
+            '''
+            save results for plotting/analysis
+            '''
+            
             # Unpack results
             x_iters = [r[0] for r in all_results]  # parameter sets
             y_vals = [-r[1] for r in all_results]  # throughput values
 
-            c_num = np.arange(len(x_iters))  # iteration counter
             param_names = [dim.name for dim in opt.space.dimensions]
-            n_params = len(param_names)
-
-            # Find best result
-            best_idx = np.argmax(y_vals)
-            best_params = x_iters[best_idx]
-            best_throughput = y_vals[best_idx]
-
-            # Create plots
-            fig, axes = plt.subplots(n_params, 1, figsize=(8, 4.5 + 1.5 * n_params), sharex=False)
-
-            if n_params == 1:
-                axes = [axes]
-
-            for k, (param_name, ax) in enumerate(zip(param_names, axes)):
-                x_vals = [x[k] for x in x_iters]
-
-                scatter = ax.scatter(x_vals, y_vals, c=c_num, cmap='viridis_r', s=60, edgecolor='k', label="Evaluations")
-                ax.scatter(best_params[k], best_throughput, c='red', s=100, label="Best", zorder=3, edgecolor='black')
-                
-                ax.set_ylabel("Throughput", fontsize=12)
-                ax.set_xlabel(param_name, fontsize=12)
-                ax.set_title(f"{param_name} vs Throughput", fontsize=14)
-                ax.grid(True, linestyle='--', alpha=0.5)
-                ax.legend()
-
-                # Add colorbar
-                divider = make_axes_locatable(ax)
-                cax = divider.append_axes("right", size="4%", pad=0.05)
-                cbar = plt.colorbar(scatter, cax=cax)
-                cbar.set_label("Iteration")
-
-            # move images to prevent clumping
-            user_home = os.path.expanduser("~")
-            desktop_path = os.path.join(user_home, "Desktop")
-            results_root = os.path.join(desktop_path, "Results")
-            images_dir = Path(results_root) / "Images"
-            plt.tight_layout()
-            plt.savefig(images_dir / f"plot_iteration_{i//batch_size + 1}.png", dpi=300)
-            plt.close()
-            
-            para_tag = "best_params_log.csv"
-            with open(para_tag, "w", newline="") as log:
-                writer = csv.writer(log)
-                writer.writerow([i // batch_size + 1] + list(best_params) + [best_throughput])
+            # log chosen values and penalties
+            log_optimizer_results(x_iters, y_vals,
+                                  param_batch, result_batch,
+                                  param_names, iteration_start=i,
+                                  batch_size = batch_size)
 
     def RunRSoft(self, simulate = True):
         '''
@@ -523,16 +307,20 @@ class RSoftSim:
         # write in the values within simulation_val
         with open("launch_config.json", "r") as launch_config:
             simulation_val = json.load(launch_config)
-        sim_keys = [keys for keys,_ in Template.Simulation_params.items()] 
+        sim_keys = [keys for keys,_ in Simulation_params.items()] 
 
         for key, val in simulation_val.items():
             if key in sim_keys:
-                Template.Simulation_params[key] = val
+                Simulation_params[key] = val
 
         # generate the positions of the cores. 
         self.generate_core_positions()
-        
-        # self.build_circuit()
+
+        # remove old results
+        csv_path = "optimizer_results.csv"
+        if os.path.exists(csv_path):
+            os.remove(csv_path)
+
         if simulate:
             self.MultProc()
 
