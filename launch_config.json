@@ -3,9 +3,40 @@
   "monitor_type": "MONITOR_WGMODE_POWER",
   "comp": "COMPONENT_MAJOR",
   "launch_tilt": 0,
-  "launch_mode": "*",
-  "launch_mode_radial": "*",
-  "launch_random_set": 1,
-  "num_paras": 144,
-  "batch_num": 6
+  "launch_mode": 0,
+  "launch_mode_radial": 1,
+  "num_paras": 72,
+  "batch_num": 10,
+  "core_to_monitor": 4,
+  "metric": "MS",
+  "mode_selective": 1,
+  "core_num": 7,
+  "core_1": {
+    "core_diam": 8.2,
+    "delta": 0.0122895
+  },
+  "core_2": {
+    "core_diam": 8.2,
+    "delta": 0.0122895
+  },
+  "core_3": {
+    "core_diam": 8.2,
+    "delta": 0.0122895
+  },
+  "core_4": {
+    "core_diam": null,
+    "delta": 0.0122895
+  },
+  "core_5": {
+    "core_diam": 8.2,
+    "delta": 0.0122895
+  },
+  "core_6": {
+    "core_diam": 8.2,
+    "delta": 0.0122895
+  },
+  "core_7": {
+    "core_diam": 8.2,
+    "delta": 0.0122895
+  }
 }

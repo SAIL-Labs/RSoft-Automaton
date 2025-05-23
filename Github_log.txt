@@ -1,5 +1,16 @@
-Added function to log each iteration of parameters into a csv file.
+Added Mode-Selective feature. Can select individual core numbers to optimize parameters to best enhance mode selectivity.
 
-Added a separate function in the Jupyter notebook to plot the parameters and their throughputs to remove the need to save each batch completion as their separate image.
+Added separate test metric specifically for mode-selective optimisation; takes the average of the last 10 monitor values for the chosen core.
 
-Added support for running a singular BeamPROP simulation as a proxy for initial guesses prior to running the optimization loop.
+Cleaned up section using the function overwrite_template_val() where values within simulation_val overwrite parameters in template file.
+
+Added option to not run optimisation and only run a single BeamPROP simulation using template/overwritten values.
+
+Fixed bug where for long simulations RSoft will prevent BeamPROP from completing a simulation due to constant refreshing of plots by disabling in-simulation plotting.
+
+Added check for taper length to raise an exception if it isnt' defined in template.py properly.
+
+Fixed bug where multimode source was not randomising the launch field by adding a random integer pulled between (0, 100).
+
+--WIP--
+Added function to calculate the maximum and minimum diameter to support the number of modes equal to the number of cores.

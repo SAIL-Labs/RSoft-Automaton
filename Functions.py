@@ -1,9 +1,11 @@
 import numpy as np, pandas as pd
-import json, os, csv
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import json, os, csv, ofiber, random
 from pathlib import Path
 import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from template import *
+#######################################################################################################################################################
 # Function to extract parameters from the .ind file
 def Extract_params(param=""):
     with open("MCF_Test.ind", "r") as r:
@@ -154,7 +156,7 @@ end launch_field
 #######################################################################################################################################################
 def AddHack(file_name, json_file, core_num, param_dict):
     launch_array = {k: json_file[k] for k in json_file}
-
+    
     block_text = { 
         "pathway": '''
 pathway {n}
@@ -167,6 +169,7 @@ monitor {n}
     monitor_type = {monitor_type}
     monitor_tilt = {launch_tilt}
     monitor_component = {comp}
+    monitor_mode = {monitor_mode}
 end monitor
 ''',
         "launch_field": '''
@@ -175,8 +178,9 @@ launch_field {n}
     launch_type = {launch_type}
     launch_mode = {launch_mode}
     launch_mode_radial = {launch_mode_radial}
-    launch_normalization = {launch_normalization}
     launch_random_set = {launch_random_set}
+    launch_normalization = {launch_normalization}
+    launch_align_file = {launch_align_file}
 end launch_field
 '''
     }
@@ -201,7 +205,8 @@ end launch_field
                 # monitor_height=monitor_height,
                 monitor_type=monitor_type,
                 comp=launch_array["comp"],
-                launch_tilt=launch_array["launch_tilt"]
+                launch_tilt=launch_array["launch_tilt"],
+                monitor_mode = launch_array["launch_mode"] if i == (launch_array["core_to_monitor"] + 1) else 0
             )
             f.write(text)
             # Write only one launch field (for the cladding (MMF case)/core (SMF case))
@@ -214,7 +219,6 @@ end launch_field
                 launch_mode=launch_array["launch_mode"],
                 launch_mode_radial=launch_array["launch_mode_radial"],
                 launch_random_set=launch_array["launch_random_set"],
-                # launch_port = launch_array["launch_port"]
             )
         f.write(text)
 
@@ -222,10 +226,13 @@ end launch_field
     with open(f"{file_name}.ind", "r") as f:
         lines = f.readlines()
     # Insert delta after core and cladding segment start
-    lines = insert_after_match(lines, "begin.width =", [
-        f"\tbegin.delta = {launch_array['core_delta']}\n",
-        f"\tend.delta = {launch_array['core_delta']}\n"
-    ], segment_filter="core_")
+
+    core_name = [f"core_{n}" for n in range(1, core_num+1)]
+    for core_key in core_name:
+        lines = insert_after_match(lines, "begin.width =", [
+            f"\tbegin.delta = {core_params[core_key]['delta']}\n",
+            f"\tend.delta = {core_params[core_key]['delta']}\n"
+        ], segment_filter=f"{core_key}")
 
     lines = insert_after_match(lines, "begin.width =", [
         f"\tbegin.delta = {launch_array['cladding_delta']}\n",
@@ -235,9 +242,6 @@ end launch_field
     # Build the updated lines
     modified_lines = []
     in_core = False
-    # with open("core_positions.json", "r") as g:
-    #     core_positions = json.load(g)
-    #     core_index = -1
     
     for line in lines:
         line_strip = line.strip()
@@ -344,10 +348,6 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
     with open(para_tag, "w", newline="") as log:
         writer = csv.writer(log)
         writer.writerow([iteration_start // batch_size + 1] + list(best_params) + [best_throughput])
-############################################################################################################################################
-import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def plotting_optimizer_results(df, param_names):
     """
@@ -398,25 +398,28 @@ def plotting_optimizer_results(df, param_names):
     fig.savefig("Optimization_results.png", dpi=300)
     plt.show()
 ############################################################################################################################################
-def build_fibre(circuit, path_num,core_positions, core_name, Taper_length, beginning_diam, final_diam):
+def build_fibre(circuit, path_num, core_positions, core_names, Taper_length, beginning_dims_list, final_dims_list):
     for j, (x, y) in enumerate(core_positions):
         path_num += 1
         core = circuit.add_segment(
             position=(x, y , 0),
             offset=(x, y, Taper_length),
-            dimensions= beginning_diam,
-            dimensions_end= final_diam
+            dimensions=beginning_dims_list[j],
+            dimensions_end=final_dims_list[j]
         )
-        core.set_name(core_name[j])
+        core.set_name(core_names[j])
     return path_num
-############################################################################################################################################
-def build_PL(circuit, path_num,core_positions, core_name, taper, Taper_length, cladd_beginning_diam, cladd_final_diam, core_beginning_diam, core_final_diam):
+
+def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
+             cladd_beginning_diam, cladd_final_diam,
+             core_beginning_dims_list, core_final_dims_list):
+    
     cladding = circuit.add_segment(
-            position=(0, 0, 0),
-            offset=(0, 0, Taper_length),
-            dimensions = cladd_beginning_diam,
-            dimensions_end = cladd_final_diam
-            )
+        position=(0, 0, 0),
+        offset=(0, 0, Taper_length),
+        dimensions=cladd_beginning_diam,
+        dimensions_end=cladd_final_diam
+    )
     cladding.set_name("Super Cladding")
     path_num += 1
     
@@ -425,18 +428,18 @@ def build_PL(circuit, path_num,core_positions, core_name, taper, Taper_length, c
         core = circuit.add_segment(
             position=(x / taper, y / taper, 0),
             offset=(x - (x/taper), y - (y/taper), Taper_length),
-            dimensions = core_beginning_diam,
-            dimensions_end = core_final_diam
+            dimensions=core_beginning_dims_list[j],
+            dimensions_end=core_final_dims_list[j]
         )
-        core.set_name(core_name[j])
+        core.set_name(core_names[j])
     return path_num
 ############################################################################################################################################
-def throughput_metric(csv_path, fixed_length, fixed, vars, param_range):
+def throughput_metric(csv_path, fixed_length, fixed, vars, param_range, mode_selective):
     df = pd.read_csv(csv_path)
-
     monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]
     throughput = df[monitor_columns[1:]].tail(10).mean().sum()
-    # inject merit func here
+    
+    # this needs to be a separate function
     if "Taper_L" in vars and not fixed_length:
         taper_L = vars["Taper_L"]
         hyper_param = fixed["length_hyperparam"]
@@ -444,3 +447,91 @@ def throughput_metric(csv_path, fixed_length, fixed, vars, param_range):
         penalty = (taper_L / max_L)
         adjusted_throughput = throughput - hyper_param * penalty
         return adjusted_throughput
+    else:
+        return throughput
+
+def mode_selective_metric(csv_path, core_to_monitor, mode_type=""):
+    df = pd.read_csv(csv_path)
+    monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]
+
+    # Sanity check to prevent choosing invalid cores
+    if core_to_monitor < 1 or core_to_monitor > len(monitor_columns):
+        raise ValueError("Invalid core_to_monitor index.")
+
+    # Compute average monitor power over final 10 samples
+    ms_core = monitor_columns[Simulation_params["core_to_monitor"]]
+    avg_throughput = df[ms_core].tail(10).mean()
+    non_ms_cores = [col for col in monitor_columns if col != ms_core]
+
+    P_ms = avg_throughput
+    P_non_ms = df[non_ms_cores].tail(10).mean().sum()
+
+    # Select metric style
+    if mode_type == mode_type:
+        # We expect LP01 to go into the mode-selective core only
+        return P_ms / (P_non_ms + 1e-12)  # avoid divide-by-zero
+    else:
+        # For higher-order modes, we want leakage into the MS core to be small
+        return P_non_ms / (P_ms + 1e-12) # avoid divide-by-zero
+
+#######################################################################################################################################################
+def overwrite_template_val():
+    with open("launch_config.json", "r") as launch_config:
+        simulation_val = json.load(launch_config)
+
+    sim_keys = [keys for keys,_ in Simulation_params.items()] 
+    core_keys = [key for key,_ in core_params.items()]
+
+    for key, val in simulation_val.items():
+        # replace simulation parameters
+        if key in sim_keys:
+            Simulation_params[key] = val
+        # replace mode-selective core parameters
+        if key in core_keys:
+            core_params[key] = val
+#######################################################################################################################################################
+def diameter_limits(mode_num_low, mode_num_high, λ_low, λ_high, background_index, cladding_delta, core_num):
+    # r_core = np.linspace(r_low, r_high)  # in µm
+    λ = np.linspace(λ_low, λ_high) # in µm
+    mode_num_range = np.linspace(mode_num_low, mode_num_high)
+
+    # Meshgrid
+    num, wave = np.meshgrid(mode_num_range, λ, indexing='ij') 
+
+    # Material parameters
+    n_clad = background_index
+    n_core = background_index + cladding_delta # since we want a multimode diameter to support 7 modes
+    numerical_ap = ofiber.numerical_aperture(n_core, n_clad)
+    # mode_number = core_num # want to match the number of modes present to the number of cores
+
+    # Compute V-number and number of modes
+    v_num = np.sqrt(4 * mode_num_range)
+    diameter = (v_num * wave) / (np.pi * numerical_ap)
+    # V = 2 * np.pi / (LAMBDA * R *NA)
+    # num_modes = V**2 / 4
+
+    # num_modes = np.round(num_modes).astype(int)
+
+    # Plot
+    plt.figure(figsize=(8, 5))
+    c = plt.pcolormesh(wave, num, diameter, cmap='gist_ncar')
+    plt.colorbar(c, label="Estimated Mode Diameter")
+    # plt.contour(wave, num, diameter, levels=[mode_number], colors='k', linewidths=1.5, linestyles='--')
+    # contour_proxy = mlines.Line2D([], [], color='k', linestyle='--',label=f'Core to support {mode_number} modes')
+
+    # plt.legend(handles=[contour_proxy], loc='upper right')
+    plt.xlabel("Wavelength (µm)")
+    plt.ylabel("Number of Modes")
+    plt.title(f"MutliMode Core Radius to Support Modes")
+
+    plt.tight_layout()
+    plt.savefig(f"MutliMode Core Radius to Support Modes.png", dpi=300)
+
+    # Binary mask where number of modes is close to mode_number (within a tolerance)
+    # mask = np.isclose(num_modes, mode_number, atol=0.1)
+
+    # # Get all core radii where this condition is true
+    # radii_matching_modes = R[mask]
+    # min_radius = np.min(radii_matching_modes)
+    # max_radius = np.max(radii_matching_modes)
+    return #2*min_radius, 2*max_radius

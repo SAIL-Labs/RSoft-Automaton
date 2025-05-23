@@ -133,7 +133,13 @@ class RSoftSim:
                 row = [x_all[i]] + [np.real(z_all[i, j]) for j in range(z_all.shape[1])]
                 writer.writerow(row)
 
-        return -throughput_metric(csv_path, fixed_length, fixed, vars, param_range)
+        if Simulation_params["metric"] == 'TH':
+            return -throughput_metric(csv_path, fixed_length,
+                                       fixed, vars, 
+                                       param_range, Simulation_params["mode_selective"])
+        if Simulation_params['metric'] == 'MS':
+            return - mode_selective_metric(csv_path, Simulation_params["core_to_monitor"], 
+                                           f"LP{Launch_params['launch_mode']}{Launch_params['launch_mode_radial']}")
 
     def build_circuit(self, params): # maybe put this into its own function. Make it universal.
         """
@@ -163,9 +169,12 @@ class RSoftSim:
         and build symbol dictionary containing ONLY the parameters that
         RSoft needs.
         """
-        self.sym = {**RSoft_params, 
+        self.sym = {**RSoft_params,
                     **Launch_params}
         for key, val in self.sym.items():
+            # mode selective properties defined as ('string', ('string', float)) <- will throw C++ error
+            if not isinstance(val, (int, float, str)):
+                continue
             self.circuit.set_symbol(key, val)
 
         # extract taper ratio, length, core number, 
@@ -175,35 +184,47 @@ class RSoftSim:
         sim_param = Simulation_params
         launch = Launch_params
 
-        taper = vars["taper"]
-        core_diam = fixed["core_diam"]
-        cladd_diam = fixed["MCFCladd"]
-        core_num = sim_param["core_num"]
-
         fixed_length = False
+        if "Taper_L" not in fixed and "Taper_L" not in vars:
+            raise Exception("Taper Length defined as neither being fixed nor variable. Please specify 'Taper_L' in template.fixed_params or template.variable_params.")
+
         if "Taper_L" in fixed:
             Taper_L = fixed["Taper_L"]
             fixed_length = True
         else:
             Taper_L = vars["Taper_L"]
+        
+        taper = vars["taper"]
+        core_num = sim_param["core_num"]
+        core_name = [f"core_{n}" for n in range(1, core_num+1)]
+        structure = Simulation_params["Structure"]
 
-        core_beg_dims = (core_diam / taper, core_diam / taper)
-        core_end_dims = (core_diam , core_diam)
+        cladd_diam = fixed["MCFCladd"]
         cladding_beg_dims = (cladd_diam / taper, cladd_diam / taper)
         cladding_end_dims = (cladd_diam , cladd_diam)
-        core_name = [f"core_{n+1:02}" for n in range(core_num)]
+
+        core_beg_dims_list = []
+        core_end_dims_list = []
+
+        for core_key in core_name:
+            if core_key == f"core_{Simulation_params['core_to_monitor']}":
+                core_diam = variable_params["core_diam"]
+            else:
+                core_diam = core_params[core_key]["core_diam"]
+            
+            core_beg_dims_list.append((core_diam / taper, core_diam / taper))
+            core_end_dims_list.append((core_diam , core_diam))
 
         path_num = 0
-        structure = Simulation_params["Structure"]
         if structure == "Fibre":
             path_num = build_fibre(self.circuit, path_num, self.core_positions, 
-                        core_name, Taper_L, tuple(core * taper for core in core_beg_dims), core_end_dims)
+                        core_name, Taper_L, tuple(core * taper for core in core_beg_dims_list), core_end_dims_list)
 
         elif structure == "PL":
             path_num = build_PL(self.circuit, path_num, self.core_positions, 
-                     core_name, taper, Taper_L,
-                     cladding_beg_dims, cladding_end_dims,
-                     core_beg_dims, core_end_dims)
+                    core_name, taper, Taper_L,
+                    cladding_beg_dims, cladding_end_dims,
+                    core_beg_dims_list, core_end_dims_list)
 
         name_tag = "_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
         self.sym["Name"] = name_tag
@@ -219,7 +240,9 @@ class RSoftSim:
         metric to test.
         All output files will appear in a subfolder on the Desktop (windows)
         '''
-        average_throughput = self.RunRSoftSim(name_tag, fixed, vars, fixed_length, param_range)
+        average_throughput = self.RunRSoftSim(name_tag, fixed, 
+                                              vars, fixed_length, 
+                                              param_range)
 
         return average_throughput
     
@@ -305,14 +328,8 @@ class RSoftSim:
         '''
 
         # write in the values within simulation_val
-        with open("launch_config.json", "r") as launch_config:
-            simulation_val = json.load(launch_config)
-        sim_keys = [keys for keys,_ in Simulation_params.items()] 
-
-        for key, val in simulation_val.items():
-            if key in sim_keys:
-                Simulation_params[key] = val
-
+        overwrite_template_val()
+        
         # generate the positions of the cores. 
         self.generate_core_positions()
 
@@ -323,9 +340,23 @@ class RSoftSim:
 
         if simulate:
             self.MultProc()
+        else:
+            # load prior space
+            with open("prior_space.json", "r") as read:
+                param_range = json.load(read)
+            para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
+            param_names = [dim.name for dim in para_space]
+            seed_params = [variable_params[k] for k in param_names]
+
+            # build circuit with template/overwritten values and run a single simulation
+            self.build_circuit(seed_params)
 
 def run_rsoft_sim(params):
     from RSoftSimulation import RSoftSim  
+    from Functions import overwrite_template_val
+
+    # this needs to be defined here as well or else some paras won't be updated for some reason???
+    overwrite_template_val()
     sim = RSoftSim()
     sim.generate_core_positions()
     return sim.build_circuit(params)
