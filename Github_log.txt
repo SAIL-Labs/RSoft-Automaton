@@ -1,16 +1,7 @@
-Added Mode-Selective feature. Can select individual core numbers to optimize parameters to best enhance mode selectivity.
+Added function to calculate the maximum and minimum diameter to support the number of modes equal to the number of cores. Generates image showing max/min diameters for a range of wavelengths and the modes supported within.
 
-Added separate test metric specifically for mode-selective optimisation; takes the average of the last 10 monitor values for the chosen core.
+Wrote function to assign core properties before dumping simulation_val as a json.
 
-Cleaned up section using the function overwrite_template_val() where values within simulation_val overwrite parameters in template file.
-
-Added option to not run optimisation and only run a single BeamPROP simulation using template/overwritten values.
-
-Fixed bug where for long simulations RSoft will prevent BeamPROP from completing a simulation due to constant refreshing of plots by disabling in-simulation plotting.
-
-Added check for taper length to raise an exception if it isnt' defined in template.py properly.
-
-Fixed bug where multimode source was not randomising the launch field by adding a random integer pulled between (0, 100).
-
---WIP--
-Added function to calculate the maximum and minimum diameter to support the number of modes equal to the number of cores.
+Bug fixes:
+- every core diameter was being assigned the template value in template.py instead of the fixed value in Data_manip.ipynb. This made the mode_selective feature redundant as ever core held the same core diam and delta n
+	Now only the mode selective core is assigned the custom values whereas other cores have fixed values

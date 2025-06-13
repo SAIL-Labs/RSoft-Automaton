@@ -1,4 +1,4 @@
-import numpy as np, pandas as pd
+import numpy as np, pandas as pd, math
 import json, os, csv, ofiber, random
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -170,6 +170,7 @@ monitor {n}
     monitor_tilt = {launch_tilt}
     monitor_component = {comp}
     monitor_mode = {monitor_mode}
+    monitor_normalization = {monitor_normalization}
 end monitor
 ''',
         "launch_field": '''
@@ -181,6 +182,7 @@ launch_field {n}
     launch_random_set = {launch_random_set}
     launch_normalization = {launch_normalization}
     launch_align_file = {launch_align_file}
+    launch_phase = {launch_phase}
 end launch_field
 '''
     }
@@ -206,7 +208,8 @@ end launch_field
                 monitor_type=monitor_type,
                 comp=launch_array["comp"],
                 launch_tilt=launch_array["launch_tilt"],
-                monitor_mode = launch_array["launch_mode"] if i == (launch_array["core_to_monitor"] + 1) else 0
+                monitor_mode = 0, #launch_array["launch_mode"] if i == (launch_array["core_to_monitor"] + 1) else 0
+                monitor_normalization = launch_array["monitor_normalization"]
             )
             f.write(text)
             # Write only one launch field (for the cladding (MMF case)/core (SMF case))
@@ -219,6 +222,7 @@ end launch_field
                 launch_mode=launch_array["launch_mode"],
                 launch_mode_radial=launch_array["launch_mode_radial"],
                 launch_random_set=launch_array["launch_random_set"],
+                launch_phase = launch_array["launch_phase"]
             )
         f.write(text)
 
@@ -228,6 +232,7 @@ end launch_field
     # Insert delta after core and cladding segment start
 
     core_name = [f"core_{n}" for n in range(1, core_num+1)]
+
     for core_key in core_name:
         lines = insert_after_match(lines, "begin.width =", [
             f"\tbegin.delta = {core_params[core_key]['delta']}\n",
@@ -242,18 +247,36 @@ end launch_field
     # Build the updated lines
     modified_lines = []
     in_core = False
+    in_segment_header = False
+    current_segment_is_super_cladding = False
+    core_index = 0
     
     for line in lines:
         line_strip = line.strip()
         replaced = False
 
-        # Detect if the segment is the core or cladding
-        if line_strip.startswith("comp_name = core_0 "):
-            in_core = True
-            core_index += 1
-        elif line_strip.startswith("comp_name = Super Cladding "):  # not a core
-            in_core = False
+        if line_strip.startswith("comp_name = Super Cladding"):
+            current_segment_is_super_cladding = True
+            in_segment_header = True
+            modified_lines.append(line)
+            continue
+        elif line_strip.startswith("comp_name = core_"):
+            current_segment_is_super_cladding = False
+            in_segment_header = True
+            modified_lines.append(line)
+            continue
         
+        if line_strip.startswith("extended ="):
+            if not current_segment_is_super_cladding:
+                continue
+
+        if in_segment_header and not line_strip.startswith("begin."):
+            modified_lines.append("\twidth_taper = TAPER_LINEAR\n")
+            modified_lines.append("\theight_taper = TAPER_LINEAR\n")
+            modified_lines.append("\tposition_taper = TAPER_LINEAR\n")
+            modified_lines.append("\tposition_y_taper = TAPER_LINEAR\n")
+            in_segment_header = False
+
         for param, val in param_dict.items():
 
             if line_strip.startswith(f"{param} ="):
@@ -302,7 +325,10 @@ def filter_parameter_space_by_v_number(para_space, background_index, wavelength,
         # "Core_index": (min(coreindex_vals), max(coreindex_vals))
     }
 ############################################################################################################################################
-def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_names, iteration_start, batch_size, penalty_batch=None, csv_path="optimizer_results.csv"):
+def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_names,
+                          iteration_start, batch_size,
+                          penalty_batch=None, transfer_vector_batch=None,
+                          csv_path="optimizer_results.csv"):
     """
     Save a batch of scikit-optimize parameter evaluations to CSV, and plot the results.
 
@@ -312,22 +338,26 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
         param_names (list of str): Names of the parameters in order
         iteration_start (int): Index of the first sample in this batch (zero-based)
         penalty_batch (list of floats, optional): Penalties applied to each evaluation
-        csv_path (str): Path to CSV file (default = optimizer_results.csv)
+        transfer_vector_batch (list of np.array, optional): Transfer vectors to log
+        csv_path (str): Path to CSV file
     """
 
     include_penalty = penalty_batch is not None
+    include_tf = transfer_vector_batch is not None and transfer_vector_batch[0] is not None
+
+    # Setup dynamic header
     header = ["Iteration"] + param_names + ["Throughput"]
     if include_penalty:
         header.append("penalty")
+    if include_tf:
+        tf_len = len(transfer_vector_batch[0])
+        header += [f"TF_{k+1}" for k in range(tf_len)]
 
-    # Ensure the directory exists
     os.makedirs(os.path.dirname(csv_path) or ".", exist_ok=True)
-
     write_header = not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0
-    
+
     with open(csv_path, "a", newline="") as f:
         writer = csv.writer(f)
-
         if write_header:
             writer.writerow(header)
 
@@ -337,19 +367,25 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
             row = [iteration_number] + list(params) + [throughput]
             if include_penalty:
                 row.append(penalty_batch[j])
+            if include_tf:
+                row.extend(transfer_vector_batch[j])
             writer.writerow(row)
 
-    # Find best result
+    # Log best point
     best_idx = np.argmax(y_vals)
     best_params = x_iters[best_idx]
     best_throughput = y_vals[best_idx]
-    
+    best_tf = transfer_vector_batch[best_idx] if include_tf else []
+
     para_tag = "best_params_log.csv"
     with open(para_tag, "w", newline="") as log:
         writer = csv.writer(log)
-        writer.writerow([iteration_start // batch_size + 1] + list(best_params) + [best_throughput])
+        writer.writerow(["Iteration"] + param_names + ["Throughput"] +
+                        ([f"TF_{i+1}" for i in range(len(best_tf))] if include_tf else []))
+        writer.writerow([iteration_start // batch_size + 1] + list(best_params) + [best_throughput] +
+                        (list(best_tf) if include_tf else []))
 
-def plotting_optimizer_results(df, param_names):
+def plotting_optimizer_results(df, param_names, tf = None, plot = True):
     """
     Plots optimizer results from a DataFrame, assuming columns:
     - 'Iteration'
@@ -364,39 +400,61 @@ def plotting_optimizer_results(df, param_names):
     best_idx = np.argmax(y_vals)
     best_params = x_iters[best_idx]
     best_throughput = y_vals[best_idx]
+    if tf is not None:
+        best_transfer_vector = tf[best_idx]
+        print("Best transfer vector:", best_transfer_vector)
     c_num = df["Iteration"].values
 
-    print("Best fitting values:")
-    for param_name, val, in zip(param_names, best_params):
-        print(f"{param_name}: {val:.3f}")
-    print(f"Throughput: {best_throughput:.3f}")
-    
-    fig, axes = plt.subplots(n_params, 1, figsize=(8, 4.5 + 1.5 * n_params), sharex=False)
+    if plot:
+        print("Best fitting values:")
+        for param_name, val, in zip(param_names, best_params):
+            print(f"{param_name}: {val:.3f}")
+        print(f"Throughput: {best_throughput:.3f}")
 
-    if n_params == 1:
-        axes = [axes]
+        interim_data = pd.read_csv("optimizer_results.csv")
+        interim_x_iters = interim_data[param_names].values.tolist()
+        interim_y_vals = interim_data["Throughput"].values
+        interim_idx = np.argmax(interim_y_vals)
+        interim_c_num = interim_data["Iteration"].values
 
-    for k, (param_name, ax) in enumerate(zip(param_names, axes)):
-        x_vals = df[param_name].values
+        interim_best_params = interim_x_iters[interim_idx]
+        interim_best_throughput = interim_y_vals[interim_idx] 
 
-        scatter = ax.scatter(x_vals, y_vals, c=c_num, cmap='viridis_r', s=60, edgecolor='k', label="Evaluations")
-        ax.scatter(best_params[k], best_throughput, c='red', s=100, label="Best", zorder=3, edgecolor='black')
-        
-        ax.set_ylabel("Throughput", fontsize=12)
-        ax.set_xlabel(param_name, fontsize=12)
-        ax.set_title(f"{param_name} vs Throughput", fontsize=14)
-        ax.grid(True, linestyle='--', alpha=0.5)
-        ax.legend()
+        fig, axes = plt.subplots(n_params, 1, figsize=(8, 4.5 + 1.5 * n_params), sharex=False)
 
-        # Add colorbar
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="4%", pad=0.05)
-        cbar = plt.colorbar(scatter, cax=cax)
-        cbar.set_label("Iteration")
+        if n_params == 1:
+            axes = [axes]
 
-    plt.tight_layout()
-    fig.savefig("Optimization_results.png", dpi=300)
-    plt.show()
+        for k, (param_name, ax) in enumerate(zip(param_names, axes)):
+            x_vals = interim_data[param_name].values
+
+            scatter = ax.scatter(x_vals, interim_y_vals, c=interim_c_num, cmap='viridis_r', s=60, edgecolor='k', label="Evaluations")
+            ax.scatter(interim_best_params[k], interim_best_throughput, c='red', s=100, label="Best", zorder=3, edgecolor='black')
+            
+            ax.set_ylabel("Throughput", fontsize=12)
+            if param_name == "core_diam":
+                ax.set_xlabel(param_name + r" ($\mu$m)", fontsize = 12)
+            elif param_name == "core_delta":
+                ax.set_xlabel(param_name + r" ($n_{\mathrm{eff}}$)", fontsize = 12)
+            elif param_name == "taper":
+                ax.set_xlabel(param_name + " ratio (MCF Diam/ MMF Diam)", fontsize = 12)
+            elif param_name == "Taper_L":
+                ax.set_xlabel(param_name + r" ($\mu$m)", fontsize = 12)
+            else:
+                ax.set_xlabel(param_name, fontsize=12)
+            ax.set_title(f"{param_name} vs Throughput", fontsize=14)
+            ax.grid(True, linestyle='--', alpha=0.5)
+            ax.legend()
+
+            # Add colorbar
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="4%", pad=0.05)
+            cbar = plt.colorbar(scatter, cax=cax)
+            cbar.set_label("Iteration")
+
+        plt.tight_layout()
+        fig.savefig("Optimization_results.png", dpi=300)
+        plt.show()
 ############################################################################################################################################
 def build_fibre(circuit, path_num, core_positions, core_names, Taper_length, beginning_dims_list, final_dims_list):
     for j, (x, y) in enumerate(core_positions):
@@ -424,6 +482,7 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
     path_num += 1
     
     for j, (x, y) in enumerate(core_positions):
+        # if Simulation_params["mode_selective"] == 1:
         path_num += 1
         core = circuit.add_segment(
             position=(x / taper, y / taper, 0),
@@ -439,7 +498,6 @@ def throughput_metric(csv_path, fixed_length, fixed, vars, param_range, mode_sel
     monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]
     throughput = df[monitor_columns[1:]].tail(10).mean().sum()
     
-    # this needs to be a separate function
     if "Taper_L" in vars and not fixed_length:
         taper_L = vars["Taper_L"]
         hyper_param = fixed["length_hyperparam"]
@@ -449,7 +507,20 @@ def throughput_metric(csv_path, fixed_length, fixed, vars, param_range, mode_sel
         return adjusted_throughput
     else:
         return throughput
+    
+def transfer_matrix_component(csv_path):
+    df = pd.read_csv(csv_path)
+    transfer_vector = []
 
+    monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]        
+    ms_col = f"Monitor_{Simulation_params['core_to_monitor']}"
+    
+    for cl in monitor_columns:
+        transfer_vector.append(df[cl].tail(10).mean())
+    throughput = df[ms_col].tail(10).mean()
+
+    return np.array(transfer_vector), throughput
+            
 def mode_selective_metric(csv_path, core_to_monitor, mode_type=""):
     df = pd.read_csv(csv_path)
     monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]
@@ -478,6 +549,10 @@ def mode_selective_metric(csv_path, core_to_monitor, mode_type=""):
 def overwrite_template_val():
     with open("launch_config.json", "r") as launch_config:
         simulation_val = json.load(launch_config)
+    for k,_ in simulation_val.items():
+        if k in fixed_params.keys():
+            raise Warning(f"Cannot change {k} using simulation_val. Change directly within template.py instead")
+
 
     sim_keys = [keys for keys,_ in Simulation_params.items()] 
     core_keys = [key for key,_ in core_params.items()]
@@ -489,49 +564,179 @@ def overwrite_template_val():
         # replace mode-selective core parameters
         if key in core_keys:
             core_params[key] = val
+    
+    # generate core property dictionaries
+    core_params.clear()
+    for i in range(1, Simulation_params["core_num"] + 1):
+        core_key = f"core_{i}"
+        if core_key in simulation_val:
+            core_params[core_key] = simulation_val[core_key]
+        elif "core_diam" in fixed_params and "core_delta" in fixed_params:
+            core_params[core_key] = {
+                "core_diam": fixed_params["core_diam"],
+                "delta": fixed_params["core_delta"]
+            }
+        elif "core_diam" in variable_params and "core_delta" in variable_params:
+            core_params[core_key] = {
+                "core_diam": variable_params["core_diam"],
+                "delta": variable_params["core_delta"]
+            }
 #######################################################################################################################################################
-def diameter_limits(mode_num_low, mode_num_high, λ_low, λ_high, background_index, cladding_delta, core_num):
-    # r_core = np.linspace(r_low, r_high)  # in µm
-    λ = np.linspace(λ_low, λ_high) # in µm
-    mode_num_range = np.linspace(mode_num_low, mode_num_high)
+def plot_lp_modes(V):
+    r_over_a = np.linspace(0, 1.5, 50) # changes the position of the maxima points
+    phi = np.linspace(0, 2 * np.pi, 40) 
+    clevs = np.linspace(-4, 4, 9)
+    
+    fig, axs = plt.subplots(3, 3, figsize=(8, 8), subplot_kw={'polar': True})  # Use subplot_kw to specify polar
 
-    # Meshgrid
-    num, wave = np.meshgrid(mode_num_range, λ, indexing='ij') 
+    axs = axs.flatten()  # Flatten the array to simplify index access
 
-    # Material parameters
-    n_clad = background_index
-    n_core = background_index + cladding_delta # since we want a multimode diameter to support 7 modes
-    numerical_ap = ofiber.numerical_aperture(n_core, n_clad)
-    # mode_number = core_num # want to match the number of modes present to the number of cores
+    for idx, ax in enumerate(axs):
+        ell = idx // 3
+        em = idx % 3 + 1
 
-    # Compute V-number and number of modes
-    v_num = np.sqrt(4 * mode_num_range)
-    diameter = (v_num * wave) / (np.pi * numerical_ap)
-    # V = 2 * np.pi / (LAMBDA * R *NA)
-    # num_modes = V**2 / 4
+        b = ofiber.LP_mode_value(V, ell, em)
+        if b is None:
+            ax.set_title(r"LP$_{%d%d}$ Field" % (ell, em))
+            ax.axis('off')  # Turn off axis if no mode exists
+            ax.annotate('No such mode', xy=(0.5, 0.5), ha='center', va='center')  # Use transAxes for positioning
+            continue
 
-    # num_modes = np.round(num_modes).astype(int)
+        r_field = ofiber.LP_radial_field(V, b, ell, r_over_a)
+        phi_field = np.cos(ell * phi)
+        R, PHI = np.meshgrid(r_over_a, phi)
+        R_FIELD, PHI_FIELD = np.meshgrid(phi_field, r_field)
+        Z = R_FIELD * PHI_FIELD
 
-    # Plot
-    plt.figure(figsize=(8, 5))
-    c = plt.pcolormesh(wave, num, diameter, cmap='gist_ncar')
-    plt.colorbar(c, label="Estimated Mode Diameter")
-    # plt.contour(wave, num, diameter, levels=[mode_number], colors='k', linewidths=1.5, linestyles='--')
-    # contour_proxy = mlines.Line2D([], [], color='k', linestyle='--',label=f'Core to support {mode_number} modes')
+        cax = ax.contourf(phi, r_over_a, Z, levels=clevs)
+        ax.set_xticklabels([])  # Remove x tick labels
+        ax.set_yticklabels([])  # Remove y tick labels
+        ax.set_title(r"LP$_{%d%d}$ Field" % (ell, em))
+        ax.grid(False)
 
-    # plt.legend(handles=[contour_proxy], loc='upper right')
-    plt.xlabel("Wavelength (µm)")
-    plt.ylabel("Number of Modes")
-    plt.title(f"MutliMode Core Radius to Support Modes")
+        fig.colorbar(cax, ax=ax)
 
-    plt.tight_layout()
-    plt.savefig(f"MutliMode Core Radius to Support Modes.png", dpi=300)
+    plt.tight_layout()  # Adjust layout
+    plt.savefig(f"Plotted_LP_Modes_for_V_{V:.3f}.png", dpi = 300)
 
-    # Binary mask where number of modes is close to mode_number (within a tolerance)
-    # mask = np.isclose(num_modes, mode_number, atol=0.1)
+def plot_available_modes(diam, wave, ell_num, NA):
+    for d in diam:
+        r = d / 2
+        V = ofiber.V_parameter(r, NA, wave)
 
-    # # Get all core radii where this condition is true
-    # radii_matching_modes = R[mask]
-    # min_radius = np.min(radii_matching_modes)
-    # max_radius = np.max(radii_matching_modes)
-    return #2*min_radius, 2*max_radius
+        m0_list = []
+        m1_list = []
+        ell_list = []
+
+        # Number of mode orders you want to plot
+        ell_range = range(ell_num)  
+        n_plots = len(ell_range)
+
+        # Determine plot size 
+        n_cols = 2
+        n_rows = math.ceil(n_plots / n_cols)
+
+        plt.figure(figsize=(8,5))
+
+        ell_list = []
+        m0_list = []
+        m1_list = []
+
+        for i, ell in enumerate(ell_range):
+
+            plt.subplot(n_rows, n_cols, i + 1)
+            
+            aplt = ofiber.plot_LP_modes(V, ell)
+            b_vals = ofiber.LP_mode_values(V, ell)
+
+            ell_list.append(ell)
+            m0_list.append(b_vals[0] if len(b_vals) > 0 else np.nan)
+            m1_list.append(b_vals[1] if len(b_vals) > 1 else np.nan)
+        
+        # Construct DataFrame
+        title = f"Propagation constants (d = {2*r:.3f} µm, λ = {wave:.3f} µm)"
+        columns = pd.MultiIndex.from_product([[title], ["l", "m=1", "m=2"]])
+        data = list(zip(ell_list, m0_list, m1_list))
+        b_df = pd.DataFrame(data, columns=columns)
+        
+        plt.suptitle(title)
+        print(b_df.to_string(index=False))
+        plt.tight_layout()
+        plt.savefig(f"Available_LP_Modes_for_V_{V:.3f}.png", dpi = 300)
+        plot_lp_modes(V)
+
+def print_paras(radii, wavelengths, mode_count, mode_desired, l_modes_to_consider, NA):
+    rad_range = []
+    for i, r in enumerate(radii):
+        for j, wl in enumerate(wavelengths):
+            if mode_count[i, j] == mode_desired:
+                rad_range.append((r, wl))
+
+    df_range = pd.DataFrame(rad_range, columns = ["Core Radius (µm)", "Wavelength (µm)"])
+    df_filtered = df_range[(df_range["Wavelength (µm)"] >= 1.55) & (df_range["Wavelength (µm)"] < 1.56)]
+
+    min_diam = 2 * min(df_filtered["Core Radius (µm)"])
+    max_diam = 2 * max(df_filtered["Core Radius (µm)"])
+    diam = [min_diam, max_diam]
+
+    taper_max = fixed_params["MCFCladd"] / min_diam
+    taper_min = fixed_params["MCFCladd"] / max_diam
+
+    wave = df_filtered["Wavelength (µm)"].iloc[np.argmin(df_filtered["Core Radius (µm)"])]                 
+    plot_available_modes(diam, wave, l_modes_to_consider, NA)
+
+    return df_filtered, taper_min, taper_max
+
+LP_mode_dict = {
+    "LP01": 1,
+    "LP11": 2,
+    "LP21": 2,
+    "LP02": 1,
+    "LP31": 2,
+    "LP12": 2,
+    "LP41": 2,
+    "LP22": 2,
+    "LP51": 2
+}
+
+def mode_wanted_considering_mode_orientations(LP_mode_dict, mode_desired):
+    '''
+    LP_mode_dict: dictionary where values indicate how many degenerate orientations a mode has
+    mode_desired: total mode index counting orientations 
+    
+    Returns:
+        index (1-based) of the LP mode group containing the desired mode
+    '''
+    mode_number = 0
+    for i, (_, val) in enumerate(LP_mode_dict.items()):
+        mode_number += val
+        if mode_desired <= mode_number:
+            return i + 1 
+
+    raise ValueError(f"Desired mode {mode_desired} exceeds total number of available mode orientations ({mode_number}).")
+#######################################################################################################################################################
+def assign_core_properties(simulation_val):
+    '''
+    Function that takes in the dictionary simulation_val and assigns template parameters such as 
+    core diameter and core delta prior to dumping json. If mode selective (=1) then the monitored core
+    will be set to None so that skopt may optimise its parameters alone.
+    '''
+    if "core_num" in simulation_val and "core_delta" in simulation_val:
+        ms_diam = [8.2] * simulation_val["core_num"]
+        ms_delta = [simulation_val["core_delta"]] * simulation_val["core_num"]
+
+        if len(ms_diam) != simulation_val["core_num"] or len(ms_delta) != simulation_val["core_num"]:
+            raise Exception("Number of specified core properties does not match the number of modelled cores")
+
+        for i, (diam, delta) in enumerate(zip(ms_diam, ms_delta), start=1):
+            if simulation_val["mode_selective"] == 1 and i == simulation_val["core_to_monitor"]:
+                simulation_val[f"core_{i}"] = {
+                    "core_diam": None,
+                    "delta": None
+                }
+            else:
+                simulation_val[f"core_{i}"] = {
+                    "core_diam": diam,
+                    "delta": delta
+                }
+#######################################################################################################################################################

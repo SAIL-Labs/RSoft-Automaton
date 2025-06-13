@@ -1,14 +1,20 @@
 {
-  "launch_type": "LAUNCH_MULTIMODE",
+  "launch_type": "LAUNCH_WGMODE",
   "monitor_type": "MONITOR_WGMODE_POWER",
-  "comp": "COMPONENT_MAJOR",
-  "launch_tilt": 0,
+  "comp": "COMPONENT_BOTH",
+  "grid_size": 0.5,
+  "grid_size_y": 0.5,
+  "step_size": 1,
+  "launch_tilt": 1,
   "launch_mode": 0,
-  "launch_mode_radial": 1,
-  "num_paras": 72,
-  "batch_num": 10,
+  "launch_mode_radial": 2,
+  "monitor_normalization": 1,
+  "launch_normalization": 0,
   "core_to_monitor": 4,
-  "metric": "MS",
+  "metric": "TF",
+  "num_paras": 144,
+  "batch_num": 6,
+  "core_delta": 0.0122895,
   "mode_selective": 1,
   "core_num": 7,
   "core_1": {
@@ -25,7 +31,7 @@
   },
   "core_4": {
     "core_diam": null,
-    "delta": 0.0122895
+    "delta": null
   },
   "core_5": {
     "core_diam": 8.2,

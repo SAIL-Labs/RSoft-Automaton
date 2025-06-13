@@ -30,11 +30,12 @@ class RSoftSim:
         SimParam = Simulation_params
         core_sep = fixed_params["core_sep"]
         grid_type = SimParam["grid_type"]
+        core_num = SimParam["core_num"]
         if grid_type == "Hex":
             """
             Generate hexagonal core coordinates and store internally.
             """
-            core_num = SimParam["core_num"]
+            
             if core_num % 2 == 0:
                 raise ValueError(f"The number of cores must be odd to perfectly fit inside the hex grid. Received: {core_num}")
 
@@ -140,6 +141,9 @@ class RSoftSim:
         if Simulation_params['metric'] == 'MS':
             return - mode_selective_metric(csv_path, Simulation_params["core_to_monitor"], 
                                            f"LP{Launch_params['launch_mode']}{Launch_params['launch_mode_radial']}")
+        if Simulation_params["metric"] == "TF":
+            transfer_vector, throughput = transfer_matrix_component(csv_path)
+            return transfer_vector, -throughput
 
     def build_circuit(self, params): # maybe put this into its own function. Make it universal.
         """
@@ -169,8 +173,15 @@ class RSoftSim:
         and build symbol dictionary containing ONLY the parameters that
         RSoft needs.
         """
-        self.sym = {**RSoft_params,
-                    **Launch_params}
+        if simulation_val["launch_type"] == "LAUNCH_MULTIMODE":
+            # Remove problematic launch symbols temporarily
+            launch_skip_keys = {"launch_mode", "launch_mode_radial"}
+            self.sym = {**RSoft_params,
+                        **{k: v for k, v in Launch_params.items() if k not in launch_skip_keys}}
+        else:
+            self.sym = {**RSoft_params,
+                        **Launch_params}
+
         for key, val in self.sym.items():
             # mode selective properties defined as ('string', ('string', float)) <- will throw C++ error
             if not isinstance(val, (int, float, str)):
@@ -194,7 +205,10 @@ class RSoftSim:
         else:
             Taper_L = vars["Taper_L"]
         
-        taper = vars["taper"]
+        if "taper" in fixed:
+            taper = fixed["taper"]
+        else:
+            taper = vars["taper"]
         core_num = sim_param["core_num"]
         core_name = [f"core_{n}" for n in range(1, core_num+1)]
         structure = Simulation_params["Structure"]
@@ -206,14 +220,34 @@ class RSoftSim:
         core_beg_dims_list = []
         core_end_dims_list = []
 
-        for core_key in core_name:
-            if core_key == f"core_{Simulation_params['core_to_monitor']}":
-                core_diam = variable_params["core_diam"]
-            else:
+        if sim_param["mode_selective"] == 1:
+            for j, core_key in enumerate(core_name, start=1):
+                if j == Simulation_params["core_to_monitor"]:
+                    # core to be optimized by skopt
+                    core_diam = variable_params["core_diam"]
+                    core_delta = variable_params["core_delta"]
+                else:
+                    # use preconfigured values to specify core parameters
+                    core_diam = core_params[core_key]["core_diam"]
+                    core_delta = core_params[core_key]["delta"]
+
+                # Store dimensions for this core
+                core_beg_dims_list.append((core_diam / taper, core_diam / taper))
+                core_end_dims_list.append((core_diam, core_diam))
+
+                core_params[core_key]["core_diam"] = core_diam
+                core_params[core_key]["delta"] = core_delta
+        else: 
+            for j, core_key in enumerate(core_name, start=1):
                 core_diam = core_params[core_key]["core_diam"]
-            
-            core_beg_dims_list.append((core_diam / taper, core_diam / taper))
-            core_end_dims_list.append((core_diam , core_diam))
+                core_delta = core_params[core_key]["delta"]
+
+                # Store dimensions for this core
+                core_beg_dims_list.append((core_diam / taper, core_diam / taper))
+                core_end_dims_list.append((core_diam, core_diam))
+
+                core_params[core_key]["core_diam"] = core_diam
+                core_params[core_key]["delta"] = core_delta
 
         path_num = 0
         if structure == "Fibre":
@@ -240,11 +274,17 @@ class RSoftSim:
         metric to test.
         All output files will appear in a subfolder on the Desktop (windows)
         '''
-        average_throughput = self.RunRSoftSim(name_tag, fixed, 
+
+        if Simulation_params['metric'] != 'TF':
+            average_throughput = self.RunRSoftSim(name_tag, fixed, 
                                               vars, fixed_length, 
                                               param_range)
-
-        return average_throughput
+            return average_throughput
+        else: 
+            transfer_vector, average_throughput = self.RunRSoftSim(name_tag, fixed, 
+                                              vars, fixed_length, 
+                                              param_range)
+            return transfer_vector, average_throughput
     
     def MultProc(self):
         images_dir = Path(os.path.expanduser("~/Desktop/Results/Images"))
@@ -276,10 +316,20 @@ class RSoftSim:
         seed_params = [variable_params[k] for k in param_names]
 
         self.sym["Name"] = "MCF_Test"
-        seed_result = self.build_circuit(seed_params)
-        opt.tell(seed_params, seed_result)
-        all_results.append((seed_params, seed_result))
-        
+        if Simulation_params['metric'] != 'TF':
+            seed_result = self.build_circuit(seed_params)
+            opt.tell(seed_params, seed_result)
+            tf_vector = None
+        else:
+            tf_vector, seed_result = self.build_circuit(seed_params)
+            opt.tell(seed_params, seed_result)
+
+        all_results.append({
+            "params": seed_params,
+            "result": seed_result,
+            "transfer_vector": tf_vector
+        })
+
         log_optimizer_results(
             x_iters=[seed_params],
             y_vals=[-seed_result],  
@@ -288,8 +338,9 @@ class RSoftSim:
             param_names=param_names,
             iteration_start=0,
             batch_size=1,
-            penalty_batch=None
-        )       
+            penalty_batch=None,
+            transfer_vector_batch=[tf_vector]
+        )
         # run optimizer as normal
         for i in range(0, total_calls, batch_size):
             
@@ -302,24 +353,45 @@ class RSoftSim:
                 result_batch = pool.map(run_rsoft_sim, param_batch)
 
             # Feed results back to optimizer
-            opt.tell(param_batch, result_batch)
+            # opt.tell(param_batch, result_batch)
+            if Simulation_params['metric'] == 'TF':
+                scores_only = [score for _, score in result_batch]
+                opt.tell(param_batch, scores_only)
+            else:
+                opt.tell(param_batch, result_batch)
             
-            all_results.extend(zip(param_batch, result_batch))
+            for p, r in zip(param_batch, result_batch):
+                if Simulation_params['metric'] == 'TF':
+                    tf_vector, score = r
+                else:
+                    tf_vector = None
+                    score = r
+                all_results.append({
+                    "params": p,
+                    "result": score,
+                    "transfer_vector": tf_vector
+                })
+                
+            # all_results.extend(zip(param_batch, result_batch))
 
             '''
             save results for plotting/analysis
             '''
             
             # Unpack results
-            x_iters = [r[0] for r in all_results]  # parameter sets
-            y_vals = [-r[1] for r in all_results]  # throughput values
+            x_iters = [r["params"] for r in all_results]  # parameter sets
+            y_vals = [-r["result"] for r in all_results]  # throughput values
+            tf_vector_val = [r["transfer_vector"] for r in all_results]
 
             param_names = [dim.name for dim in opt.space.dimensions]
             # log chosen values and penalties
             log_optimizer_results(x_iters, y_vals,
-                                  param_batch, result_batch,
+                                  param_batch, 
+                                  [r["result"] for r in all_results[-batch_size:]],
                                   param_names, iteration_start=i,
-                                  batch_size = batch_size)
+                                  batch_size = batch_size,
+                                  penalty_batch= None,
+                                  transfer_vector_batch=tf_vector_val)
 
     def RunRSoft(self, simulate = True):
         '''
@@ -349,13 +421,30 @@ class RSoftSim:
             seed_params = [variable_params[k] for k in param_names]
 
             # build circuit with template/overwritten values and run a single simulation
-            self.build_circuit(seed_params)
+            if Simulation_params['metric'] != 'TF':
+                seed_result = self.build_circuit(seed_params)
+                tf_vector = None
+            else:
+                tf_vector, seed_result = self.build_circuit(seed_params)
+                
+            log_optimizer_results(
+                x_iters=[seed_params],
+                y_vals=[-seed_result],
+                param_batch=[seed_params],
+                result_batch=[seed_result],
+                param_names=param_names,
+                iteration_start=0,
+                batch_size=1,
+                penalty_batch=None,
+                transfer_vector_batch=[tf_vector]
+            )
 
 def run_rsoft_sim(params):
     from RSoftSimulation import RSoftSim  
     from Functions import overwrite_template_val
 
-    # this needs to be defined here as well or else some paras won't be updated for some reason???
+    # this needs to be defined here as well or 
+    # else some paras won't be updated for some reason???
     overwrite_template_val()
     sim = RSoftSim()
     sim.generate_core_positions()
