@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from template import *
+import matplotlib.animation as animation
+import glob
+import ehtplot.color
 #######################################################################################################################################################
 # Function to extract parameters from the .ind file
 def Extract_params(param=""):
@@ -696,7 +699,15 @@ LP_mode_dict = {
     "LP12": 2,
     "LP41": 2,
     "LP22": 2,
-    "LP51": 2
+    "LP03": 1,
+    "LP51": 2,
+    "LP32": 2,
+    "LP13": 2,
+    "LP61": 2,
+    "LP42": 2,
+    "LP23": 2,
+    "LP04": 1,
+    "LP71": 2
 }
 
 def mode_wanted_considering_mode_orientations(LP_mode_dict, mode_desired):
@@ -722,7 +733,7 @@ def assign_core_properties(simulation_val):
     will be set to None so that skopt may optimise its parameters alone.
     '''
     if "core_num" in simulation_val and "core_delta" in simulation_val:
-        ms_diam = [8.2] * simulation_val["core_num"]
+        ms_diam = [variable_params["core_diam"]] * simulation_val["core_num"]
         ms_delta = [simulation_val["core_delta"]] * simulation_val["core_num"]
 
         if len(ms_diam) != simulation_val["core_num"] or len(ms_delta) != simulation_val["core_num"]:
@@ -739,4 +750,131 @@ def assign_core_properties(simulation_val):
                     "core_diam": diam,
                     "delta": delta
                 }
+#######################################################################################################################################################
+def plot_rsoft_femsim__output(num_modes, results_folder = "", name = "", title = "", polarization = "", save = True, false_mode = True):
+    '''
+    Function to search for femsim mode files in the ex polarization.
+
+    num_modes: number of modes accounting for orientations but NOT polarization
+    results_folder: string locating the directory of the FemSIM results
+    name: prefix of FemSIM files
+    title: name of the saved image
+    save: Determines whether the combined mode image is saved or not with 'title' as the filename
+    false_mode: if true plots a mode with no zoom where in most cases is a false solution determined by FemSIM
+
+    Returns:
+        collated image of all the modes supported by the fibre calculated by FemSIM
+    '''
+    
+    mode_desired = mode_wanted_considering_mode_orientations(LP_mode_dict, num_modes) 
+    print(f"{num_modes} ({mode_desired} distinct) modes with their orientations and polarizations have been plotted")
+    if false_mode:
+        total_subplots = mode_desired * 3 + 1 # total number of modes including orientations of polarisation, and the false mode
+    else:
+        total_subplots = mode_desired * 3
+    cols = 6
+    rows = total_subplots // cols
+
+    # check if additional row is needed
+    if total_subplots % cols !=0:
+        rows +=1
+
+    fig, axes = plt.subplots(rows, cols, figsize=(20,15), constrained_layout = True)
+
+    im_list = []
+
+    for i, ax in enumerate(axes.flat):
+        if i >= total_subplots:
+            ax.axis('off')  # Hide extra axes if grid is larger than data
+            continue
+        
+        if i < 10:
+            field = f"{name}_{polarization}.m0{i}"
+        else:
+            field = f"{name}_{polarization}.m{i}"
+
+        dat = pd.read_csv(results_folder + "\\" + field, skiprows = 4, sep=r'\s+', header = None)
+        Nx, Ny = dat.shape
+        new_x = np.linspace(-Nx//2, Nx//2, Nx)
+        new_y = np.linspace(-Ny//2, Ny//2, Ny)
+
+        im = ax.imshow(np.abs(np.rot90(dat.values)),
+                    extent=[new_x[0], new_x[-1], new_y[0], new_y[-1]],
+                    aspect='auto', cmap='afmhot_10u')
+
+        im_list.append(im)
+
+        ax.set_xlabel("X ($\mu m$)")
+        ax.set_ylabel("Y ($\mu m$)")
+
+        if false_mode and i != total_subplots-1:
+            ax.set_xlim(-100,100)
+            ax.set_ylim(-200,200)
+        else:
+            continue
+            
+    plt.suptitle(title)
+    cbar = fig.colorbar(im_list[-1], ax=axes.ravel().tolist(), location='right')
+    cbar.ax.tick_params(labelsize=14)
+    cbar.set_label(label='Amplitude', size=14, weight='bold')
+
+    if save:
+        plt.savefig(results_folder + "\\" + title + ".png", dpi=1000)
+    plt.show()
+
+def make_animation(data_folder="", file_pattern="", output_gif="", interval=100, plot="amp"):
+    '''
+    Function that collates individual field files into a single GIF animation.
+    data_folder: location of the individual field files. NOTE: this must only contain the field files to animate and nothing else
+    file_pattern: prefix of the field files
+    output_gif: string determining the output filename of the GIF
+    interval: time in milliseconds between each frame
+    plot: string to determined what part of the field values to plot. Use either "amp" (default) or "ph"
+
+    Returns:
+        GIF animation of the evolution of field files
+    '''
+    file_list = sorted(glob.glob(f"{data_folder}/{file_pattern}"))
+
+    print(f"Found {len(file_list)} files.")
+
+    # Load first frame
+    first_file = file_list[0]
+    dat = pd.read_csv(first_file, skiprows=4, sep=r'\s+', header=None)
+    dat = np.asarray(dat)
+    amp, phase = dat[:, ::2], dat[:, 1::2]
+    Nx, Ny = dat.shape
+    new_x = np.linspace(-Nx//2, Nx//2, Nx)
+    new_y = np.linspace(-Ny//2, Ny//2, Ny)
+
+    fig, ax = plt.subplots(figsize=(6,6))
+    if plot == "amp":
+        im = ax.imshow(amp, extent=[new_x[0], new_x[-1], new_y[0], new_y[-1]], aspect='auto', cmap='afmhot_10u')
+        cbar = fig.colorbar(im, ax=ax, label='Amplitude')
+        plotting_phase = False
+    elif plot == "ph":
+        im = ax.imshow(phase, extent=[new_x[0], new_x[-1], new_y[0], new_y[-1]], aspect='auto', cmap='afmhot_10u')
+        cbar = fig.colorbar(im, ax=ax, label='Phase')
+        plotting_phase = True
+
+    ax.set_ylabel("X ($\mu m$)")
+    ax.set_xlabel("Y ($\mu m$)")
+    
+    def update(frame_idx, plotting_phase):
+        filename = file_list[frame_idx]
+        dat = pd.read_csv(filename, skiprows=4, sep=r'\s+', header=None)
+        dat = np.asarray(dat)
+        amp, phase = dat[:, ::2], dat[:, 1::2]
+        im.set_array(phase if plotting_phase else amp)
+        ax.set_title(f"Frame {frame_idx}")
+        return [im]
+
+    ani = animation.FuncAnimation(
+        fig, update, frames=len(file_list), fargs=(plotting_phase,), blit=True, interval=interval, repeat=True #(plotting_phase,) is a 1-element tuple, required by FuncAnimation
+    )
+
+    ani.save(output_gif, writer='pillow')
+    print(f"Saved animation to {output_gif}")
+
+    plt.close(fig) 
 #######################################################################################################################################################

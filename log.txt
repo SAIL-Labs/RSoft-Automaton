@@ -12798,6 +12798,7 @@ SimTool: BeamPROP
 Version: 2024.09-SP1 Build 20241203
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 
 SimTool: BeamPROP
 Version: 2024.09-SP1 Build 20241203
@@ -12861,10 +12862,13 @@ setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14
 SimTool: BeamPROP
 Version: 2024.09-SP1 Build 20241203
 
+=======
+>>>>>>> Stashed changes
 Message: NZ=20001, NX=321, NY=321, Estimated Time = 2.657 min
 setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
 setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
 setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+<<<<<<< Updated upstream
 
 SimTool: BeamPROP
 Version: 2024.09-SP1 Build 20241203
@@ -32962,3 +32966,21 @@ Error: can't open user data file C:\Users\justinvella\Desktop\Results\MMF Testin
 Error: can't open user data file C:\Users\justinvella\Desktop\Results\MMF Testingfemtmp_ex.p10.
 
 Error: can't open user data file C:\Users\justinvella\Desktop\Results\MMF Testingfemtmp_ex.m10.
+=======
+>>>>>>> Stashed changes
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=40001, NX=697, NY=697, Estimated Time = 18.726 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+
+SimTool: BeamPROP
+Version: 2024.09-SP1 Build 20241203
+
+Message: NZ=40001, NX=697, NY=697, Estimated Time = 18.726 min
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]

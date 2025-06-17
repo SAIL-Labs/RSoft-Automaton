@@ -74,7 +74,7 @@ variable_params= {
     "taper": 16.53475828,#16.2854291417165, # taken from rough calculation of diameter required to support 7 modes
     # # "Taper_L": 40000,
     "core_delta": 0.0122895,#0.0132929599265003,
-    "core_diam": 8.2#19.4994673523175,
+    "core_diam": 6.5#19.4994673523175,
 }
 Launch_params["core_delta"] = variable_params["core_delta"
                                               ]
