@@ -5,7 +5,7 @@ NOTE: Using values from 19CorePL_July2021_noOuter_MMtoSM_extraMM.ind
 '''
 fixed_params = {
     "core_sep": 80,
-    "MCFCladd": 328,
+    "MCFCladd": 328, #400
     "cladding_delta": 0.0055,
     "Taper_L": 40000,
     # "taper": 10,
@@ -55,6 +55,10 @@ Launch_params = {
     "launch_normalization": 1,
     "launch_phase": 0,
     "monitor_normalization": 0, # 0 == Input Power, 1 == Local Power
+    "mon_type": "pathway_mon",
+    # "monitor_output": 0,
+    # "monitor_step_size": 10,
+    # "monitoroutputformat": "OUTPUT_AMP_PHASE",
     # "core_delta": fixed_params["core_delta"],
     "cladding_delta": fixed_params["cladding_delta"]
 }

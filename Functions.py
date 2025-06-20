@@ -8,6 +8,7 @@ from template import *
 import matplotlib.animation as animation
 import glob
 import ehtplot.color
+import cmocean
 #######################################################################################################################################################
 # Function to extract parameters from the .ind file
 def Extract_params(param=""):
@@ -158,8 +159,18 @@ end launch_field
 
 #######################################################################################################################################################
 def AddHack(file_name, json_file, core_num, param_dict):
+    '''
+    Hacking function to add text that will import segments to RSoft that the Python API does not currently handle.
+
+    file_name: name tag for the ind file to be hacked
+    json_file: contains a dictionary of parameters to be used by the launch field and pathway monitors
+    core_num: number of cores in ind file
+    param_dict: json file contain the names and values of all the parameters to be modified during simulations
+    mon_type: specifies the type of monitor to use. 
+        "pathway_mon" records the throughput at each iteration making the simulation time scale with Z and grid spacing,
+        "port_mon" (default) records only the throughput at the end of the fibre, or the position at which the monitor is placed.
+    '''
     launch_array = {k: json_file[k] for k in json_file}
-    
     block_text = { 
         "pathway": '''
 pathway {n}
@@ -483,17 +494,33 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
     )
     cladding.set_name("Super Cladding")
     path_num += 1
-    
+
+    # Store segments and monitors for attachment
+    core_segments = []
+    port_monitors = []
+
     for j, (x, y) in enumerate(core_positions):
-        # if Simulation_params["mode_selective"] == 1:
         path_num += 1
         core = circuit.add_segment(
             position=(x / taper, y / taper, 0),
-            offset=(x - (x/taper), y - (y/taper), Taper_length),
+            offset=(x - (x / taper), y - (y / taper), Taper_length),
             dimensions=core_beginning_dims_list[j],
             dimensions_end=core_final_dims_list[j]
         )
         core.set_name(core_names[j])
+        core_segments.append(core)
+
+    if Launch_params["mon_type"] == "port_mon":
+        for j, (x, y) in enumerate(core_positions):
+            # Place monitor at the end of the segment
+            port = circuit.add_portmonitor(position=(x, y, Taper_length))
+            port_monitors.append(port)
+
+    # Attach port monitors to core segments
+    if Launch_params["mon_type"] == "port_mon":
+        for core_seg, port_mon in zip(core_segments, port_monitors):
+            # Attach monitor to the *output end* of the segment
+            circuit.attach(port_mon, core_seg) 
     return path_num
 ############################################################################################################################################
 def throughput_metric(csv_path, fixed_length, fixed, vars, param_range, mode_selective):
@@ -517,10 +544,14 @@ def transfer_matrix_component(csv_path):
 
     monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]        
     ms_col = f"Monitor_{Simulation_params['core_to_monitor']}"
-    
-    for cl in monitor_columns:
-        transfer_vector.append(df[cl].tail(10).mean())
-    throughput = df[ms_col].tail(10).mean()
+    if Launch_params["mon_type"] == "pathway_mon":
+        for cl in monitor_columns:
+            transfer_vector.append(df[cl].tail(10).mean())
+        throughput = df[ms_col].tail(10).mean()
+    elif Launch_params["mon_type"] == "port_mon":
+        for cl in monitor_columns:
+            transfer_vector.append(df[cl].tail(10).mean())  # FIXED
+        throughput = df[ms_col].tail(10).mean()
 
     return np.array(transfer_vector), throughput
             
@@ -725,6 +756,23 @@ def mode_wanted_considering_mode_orientations(LP_mode_dict, mode_desired):
             return i + 1 
 
     raise ValueError(f"Desired mode {mode_desired} exceeds total number of available mode orientations ({mode_number}).")
+
+def plot_tf_matrix(LP01_vec, LP11a_vec, LP11b_vec, LP21a_vec, LP21b_vec, LP02_vec, simulation_val):
+    core_num = simulation_val["core_num"]
+    geo = simulation_val.get("grid_type", Simulation_params["grid_type"]) 
+    tf_matrix = np.vstack([LP01_vec[0][1:], LP11a_vec[0][1:], LP11b_vec[0][1:], LP21a_vec[0][1:], LP21b_vec[0][1:], LP02_vec[0][1:]])
+    plt.figure(figsize=(10,8))
+    plt.imshow(tf_matrix, cmap='viridis')
+    plt.colorbar(label = "Throughput")
+    # plt.xlabel("LP Mode")
+    plt.xlabel("Core No.")
+    plt.yticks(ticks=np.arange(tf_matrix.shape[0]), labels=np.arange(1, tf_matrix.shape[0] + 1))
+    ylabels = ["LP01", "LP11a", "LP11b", "LP21a", "LP21b", "LP02"]
+    xlabels = np.arange(1, len(tf_matrix[0]) + 1)
+    plt.title(f"Transfer matrix for {core_num} core {geo} PL")
+    plt.yticks(ticks=np.arange(len(ylabels)), labels=ylabels)
+    plt.xticks(ticks = np.arange(len(xlabels)), labels=xlabels)
+    plt.show()
 #######################################################################################################################################################
 def assign_core_properties(simulation_val):
     '''
@@ -751,7 +799,65 @@ def assign_core_properties(simulation_val):
                     "delta": delta
                 }
 #######################################################################################################################################################
-def plot_rsoft_femsim__output(num_modes, results_folder = "", name = "", title = "", polarization = "", save = True, false_mode = True):
+def apply_complex_map(field, cmap, power=1.0, normalise=True, shift=0.0):
+    """
+    Maps a complex-valued 2D array to an RGB image using a colormap.
+
+    The hue is determined by the phase (angle) of each complex value, and the brightness
+    is scaled by the magnitude (absolute value) raised to the given power. The result is
+    normalized to the [0, 1] range for display.
+
+    Parameters
+    ----------
+    field : np.ndarray
+        2D array of complex values to visualize.
+    cmap : callable
+        A matplotlib colormap function (e.g., plt.cm.hsv).
+    power : float, optional
+        Exponent to apply to the magnitude for brightness scaling/gamma (default is 1.0).
+
+    Returns
+    -------
+    np.ndarray
+        3D array representing the RGB image (shape: field.shape + (3,)).
+    """
+    angles = np.angle(field)
+    angles_norm = np.mod(angles + shift, 2 * np.pi) / (2 * np.pi)
+
+    if normalise:
+        amp = np.abs(field) ** power / np.max(np.abs(field) ** power)
+    else:
+        amp = np.abs(field) ** power
+
+    img = cmap(angles_norm) * (amp)[:, :, None]
+
+    if normalise:
+        img = img[..., :3] / np.max(img[..., 0:3])
+    else:
+        img = img[..., :3]
+
+    return img
+
+def generate_complex_colorbar(power=1.0, shift=0.0, cmap=cmocean.cm.phase, resolution=300):
+    """
+    Create an RGB image for a hue-brightness colorbar: hue = phase, brightness = amplitude.
+    """
+    phase_vals = np.linspace(-np.pi, np.pi, resolution)
+    amp_vals = np.linspace(0, 1, resolution)
+    phase_grid, amp_grid = np.meshgrid(phase_vals, amp_vals)
+
+    field = amp_grid * np.exp(1j * (phase_grid + shift))
+
+    rgb_img = cmap((np.angle(field) + np.pi) / (2 * np.pi))[:, :, :3]
+    brightness = (np.abs(field) ** power)[:, :, None]
+    rgb_img *= brightness
+
+    # Transpose it to rotate for vertical display
+    colorbar_img_vertical = np.transpose(rgb_img, (1, 0, 2))  # shape becomes (phase, amp, 3)
+
+    return colorbar_img_vertical
+
+def plot_rsoft_femsim_output(num_modes, results_folder = "", name = "", title = "", polarization = "", save = True, false_mode = True):
     '''
     Function to search for femsim mode files in the ex polarization.
 
@@ -822,7 +928,8 @@ def plot_rsoft_femsim__output(num_modes, results_folder = "", name = "", title =
         plt.savefig(results_folder + "\\" + title + ".png", dpi=1000)
     plt.show()
 
-def make_animation(data_folder="", file_pattern="", output_gif="", interval=100, plot="amp"):
+
+def make_animation(data_folder="", file_pattern="", output_gif="", interval=100):
     '''
     Function that collates individual field files into a single GIF animation.
     data_folder: location of the individual field files. NOTE: this must only contain the field files to animate and nothing else
@@ -843,34 +950,41 @@ def make_animation(data_folder="", file_pattern="", output_gif="", interval=100,
     dat = pd.read_csv(first_file, skiprows=4, sep=r'\s+', header=None)
     dat = np.asarray(dat)
     amp, phase = dat[:, ::2], dat[:, 1::2]
+    Z = amp*np.exp(1j * phase)
+
     Nx, Ny = dat.shape
     new_x = np.linspace(-Nx//2, Nx//2, Nx)
     new_y = np.linspace(-Ny//2, Ny//2, Ny)
 
-    fig, ax = plt.subplots(figsize=(6,6))
-    if plot == "amp":
-        im = ax.imshow(amp, extent=[new_x[0], new_x[-1], new_y[0], new_y[-1]], aspect='auto', cmap='afmhot_10u')
-        cbar = fig.colorbar(im, ax=ax, label='Amplitude')
-        plotting_phase = False
-    elif plot == "ph":
-        im = ax.imshow(phase, extent=[new_x[0], new_x[-1], new_y[0], new_y[-1]], aspect='auto', cmap='afmhot_10u')
-        cbar = fig.colorbar(im, ax=ax, label='Phase')
-        plotting_phase = True
+    fig, (ax, ax_cb) = plt.subplots(1,2, figsize=(10, 6), width_ratios=[4, 1])
+
+    im = ax.imshow(apply_complex_map(Z, cmocean.cm.phase), extent=[new_x[0], new_x[-1], new_y[0], new_y[-1]], aspect='auto')
 
     ax.set_ylabel("X ($\mu m$)")
     ax.set_xlabel("Y ($\mu m$)")
+
+    ax_cb.imshow(generate_complex_colorbar(resolution=Z.shape[0]), extent=[0, 1, -np.pi, np.pi], origin='lower')
+    ax_cb.set_xlabel("$|E|$")
+    ax_cb.set_ylabel("$\phi$ [rad]")
+    ax_cb.set_yticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi])
+    ax_cb.set_yticklabels([r"$-\pi$", r"$-\frac{\pi}{2}$", "0", r"$\frac{\pi}{2}$", r"$\pi$"])
+    ax_cb.tick_params(axis='y', right=True, labelright=True, left=False, labelleft=False)
+    ax_cb.yaxis.set_label_position("right")
+    ax_cb.set_xticks([0, 1])
     
-    def update(frame_idx, plotting_phase):
+    def update(frame_idx):
         filename = file_list[frame_idx]
         dat = pd.read_csv(filename, skiprows=4, sep=r'\s+', header=None)
         dat = np.asarray(dat)
         amp, phase = dat[:, ::2], dat[:, 1::2]
-        im.set_array(phase if plotting_phase else amp)
+        Z = amp*np.exp(1j * phase)
+
+        im.set_data(apply_complex_map(Z, cmocean.cm.phase))
         ax.set_title(f"Frame {frame_idx}")
         return [im]
 
     ani = animation.FuncAnimation(
-        fig, update, frames=len(file_list), fargs=(plotting_phase,), blit=True, interval=interval, repeat=True #(plotting_phase,) is a 1-element tuple, required by FuncAnimation
+        fig, update, frames=len(file_list), blit=True, interval=interval, repeat=True #(plotting_phase,) is a 1-element tuple, required by FuncAnimation
     )
 
     ani.save(output_gif, writer='pillow')

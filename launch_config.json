@@ -1,13 +1,14 @@
 {
   "launch_type": "LAUNCH_WGMODE",
   "monitor_type": "MONITOR_WGMODE_POWER",
+  "grid_type": "Pent",
   "comp": "COMPONENT_BOTH",
   "grid_size": 0.5,
   "grid_size_y": 0.5,
   "step_size": 1,
   "launch_tilt": 1,
   "launch_mode": 0,
-  "launch_mode_radial": 1,
+  "launch_mode_radial": 2,
   "monitor_normalization": 1,
   "launch_normalization": 0,
   "core_to_monitor": 4,
@@ -16,7 +17,7 @@
   "batch_num": 6,
   "core_delta": 0.0122895,
   "mode_selective": 1,
-  "core_num": 7,
+  "core_num": 6,
   "core_1": {
     "core_diam": 6.5,
     "delta": 0.0122895
@@ -38,10 +39,6 @@
     "delta": 0.0122895
   },
   "core_6": {
-    "core_diam": 6.5,
-    "delta": 0.0122895
-  },
-  "core_7": {
     "core_diam": 6.5,
     "delta": 0.0122895
   }

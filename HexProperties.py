@@ -72,7 +72,7 @@ def estimate_circle_radius_with_autofit(n_points, grid_spacing, tolerance=0):
 Functions to generate a pentagon grid
 '''
 
-def generate_filled_pentagon_grid(radius, grid_spacing):
+def generate_filled_pentagon_grid(radius, grid_spacing, y_shift_factor = 0.5):
     """
     Generate a filled pentagon grid, row-by-row.
     
@@ -134,6 +134,10 @@ def generate_filled_pentagon_grid(radius, grid_spacing):
 
         y += dy
         row_num += 1
+
+    y_shift = y_shift_factor * grid_spacing
+    for c in coord:
+        c[2] -= y_shift
 
     hcoord = [c[1] for c in coord]
     vcoord = [c[2] for c in coord]
