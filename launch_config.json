@@ -1,14 +1,15 @@
 {
-  "launch_type": "LAUNCH_WGMODE",
+  "launch_type": "LAUNCH_MULTIMODE",
   "monitor_type": "MONITOR_WGMODE_POWER",
-  "grid_type": "Pent",
+  "mon_type": "port_mon",
+  "grid_type": "Hex",
   "comp": "COMPONENT_BOTH",
-  "grid_size": 0.5,
-  "grid_size_y": 0.5,
+  "grid_size": 0.1,
+  "grid_size_y": 0.1,
   "step_size": 1,
-  "launch_tilt": 1,
-  "launch_mode": 0,
-  "launch_mode_radial": 2,
+  "launch_tilt": 0,
+  "launch_mode": "0-4",
+  "launch_mode_radial": "1-2",
   "monitor_normalization": 1,
   "launch_normalization": 0,
   "core_to_monitor": 4,
@@ -17,7 +18,7 @@
   "batch_num": 6,
   "core_delta": 0.0122895,
   "mode_selective": 1,
-  "core_num": 6,
+  "core_num": 19,
   "core_1": {
     "core_diam": 6.5,
     "delta": 0.0122895
@@ -39,6 +40,58 @@
     "delta": 0.0122895
   },
   "core_6": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_7": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_8": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_9": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_10": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_11": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_12": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_13": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_14": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_15": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_16": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_17": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_18": {
+    "core_diam": 6.5,
+    "delta": 0.0122895
+  },
+  "core_19": {
     "core_diam": 6.5,
     "delta": 0.0122895
   }

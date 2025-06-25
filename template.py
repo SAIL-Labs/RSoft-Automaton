@@ -4,8 +4,8 @@ import random, numpy as np
 NOTE: Using values from 19CorePL_July2021_noOuter_MMtoSM_extraMM.ind
 '''
 fixed_params = {
-    "core_sep": 80,
-    "MCFCladd": 328, #400
+    "core_sep": 60,
+    "MCFCladd": 328, #328
     "cladding_delta": 0.0055,
     "Taper_L": 40000,
     # "taper": 10,
@@ -23,10 +23,13 @@ RSoft_params = {
     "boundary_gap_x": 10,
     "boundary_gap_y": 10,
     "boundary_gap_z": 0,
+    "bpm_output_monitors": 1,
+    "bpm_output_monitors_warned": 1,
     "dimension": 3,
     "eim": 0,
     "field_output_format": "OUTPUT_AMP_PHASE",
     "slice_output_format": "OUTPUT_AMP_PHASE",
+    "slice_output_individual": "None", # OUTPUT_AMP_PHASE_3D
     "background_index": 1.4345,
     "free_space_wavelength": 1.551,
     "sim_tool": Sim_tool.BP,
@@ -55,7 +58,7 @@ Launch_params = {
     "launch_normalization": 1,
     "launch_phase": 0,
     "monitor_normalization": 0, # 0 == Input Power, 1 == Local Power
-    "mon_type": "pathway_mon",
+    "mon_type": "pathway_mon", # port_mon
     # "monitor_output": 0,
     # "monitor_step_size": 10,
     # "monitoroutputformat": "OUTPUT_AMP_PHASE",
@@ -75,7 +78,7 @@ Simulation_params = {
 }
 
 variable_params= {
-    "taper": 16.53475828,#16.2854291417165, # taken from rough calculation of diameter required to support 7 modes
+    "taper": 10, #16.53475828, # taken from rough calculation of diameter required to support 7 modes
     # # "Taper_L": 40000,
     "core_delta": 0.0122895,#0.0132929599265003,
     "core_diam": 6.5#19.4994673523175,

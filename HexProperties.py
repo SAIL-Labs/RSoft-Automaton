@@ -71,8 +71,54 @@ def estimate_circle_radius_with_autofit(n_points, grid_spacing, tolerance=0):
 '''
 Functions to generate a pentagon grid
 '''
+def generate_pentagon_grid(max_radius, core_spacing, core_number, include_center=True):
+    """
+    Generate a pentagon-based ring grid of points. Note this does not completely fill the grid, rather just points along the vertices.
+    
+    Parameters:
+        max_radius (float): Maximum radial extent of the grid (e.g., cladding radius).
+        core_spacing (float): Spacing between concentric pentagonal rings.
+        core_number (int): Desired number of total cores (approximate).
+        include_center (bool): Whether to include a center core.
 
-def generate_filled_pentagon_grid(radius, grid_spacing, y_shift_factor = 0.5):
+    Returns:
+        Xarrs, Yarrs: Lists of x and y coordinates.
+    """
+    theta = 72  
+    Xarrs, Yarrs = [], []
+
+    # Estimate max number of rings based on radius and spacing
+    num_rings = int(max_radius // core_spacing)
+
+    # Adjust number of rings if fewer cores are requested
+    if include_center:
+        rings_required = min(num_rings, max(1, (core_number - 1) // 5))
+    else:
+        rings_required = min(num_rings, max(1, core_number // 5))
+
+    def gen_ring(radius):
+        xs, ys = [], []
+        for i in range(5):
+            angle = i * theta - 54  # rotate flat side down
+            x = radius * np.cos(np.deg2rad(angle))
+            y = radius * np.sin(np.deg2rad(angle))
+            xs.append(x)
+            ys.append(y)
+        return xs, ys
+
+    for j in range(1, rings_required + 1):
+        radius = j * core_spacing
+        xs, ys = gen_ring(radius)
+        Xarrs.extend(xs)
+        Yarrs.extend(ys)
+
+    if include_center:
+        Xarrs.append(0)
+        Yarrs.append(0)
+
+    return Xarrs, Yarrs
+
+def old_generate_filled_pentagon_grid(radius, grid_spacing, y_shift_factor = 0.5):
     """
     Generate a filled pentagon grid, row-by-row.
     

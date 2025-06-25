@@ -50,8 +50,8 @@ class RSoftSim:
             """
             Generate pentagon core coordinates and store internally.
             """
-            estimated_radius = estimate_pentagon_radius(core_num,core_sep)
-            hcoord, vcoord= generate_filled_pentagon_grid(estimated_radius, core_sep)
+            # estimated_radius = estimate_pentagon_radius(core_num,core_sep)
+            hcoord, vcoord = generate_pentagon_grid(fixed_params["MCFCladd"] / 2, core_sep, Simulation_params["core_num"])
             self.core_positions = list(zip(hcoord, vcoord))
             with open("core_positions.json", "w") as g:
                 json.dump(self.core_positions, g)
@@ -259,8 +259,14 @@ class RSoftSim:
                     core_name, taper, Taper_L,
                     cladding_beg_dims, cladding_end_dims,
                     core_beg_dims_list, core_end_dims_list)
-
-        name_tag = "_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
+            
+        if simulation_val["launch_type"] == LaunchType.SM:
+            launch_mode = simulation_val["launch_mode"]
+            launch_mode_radial = simulation_val["launch_mode"]
+            name_tag = f"_LP{launch_mode}{launch_mode_radial}_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
+        else:
+            grid = simulation_val["grid_size"]
+            name_tag = f"_Grid{grid}_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
         self.sym["Name"] = name_tag
         self.circuit.write(f"{name_tag}.ind")
         """
@@ -268,7 +274,7 @@ class RSoftSim:
         on launch parameters. 
         """ 
         
-        AddHack(name_tag, launch, path_num -1, param_dict)
+        AddHack(name_tag, launch, path_num - 1, param_dict, simulation_val.get("mon_type", Launch_params["mon_type"]) )
         '''
         Manual setup to loop through a list of values. Runs the terminal line that will initiate RSoft and will calculate the 
         metric to test.

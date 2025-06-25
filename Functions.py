@@ -1,11 +1,13 @@
 import numpy as np, pandas as pd, math
 import json, os, csv, ofiber, random
 from pathlib import Path
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from template import *
 import matplotlib.animation as animation
+from matplotlib.animation import FFMpegWriter
 import glob
 import ehtplot.color
 import cmocean
@@ -158,7 +160,7 @@ end launch_field
 #######################################################################################################################################################
 
 #######################################################################################################################################################
-def AddHack(file_name, json_file, core_num, param_dict):
+def AddHack(file_name, json_file, core_num, param_dict, mon_type = ""):
     '''
     Hacking function to add text that will import segments to RSoft that the Python API does not currently handle.
 
@@ -171,7 +173,8 @@ def AddHack(file_name, json_file, core_num, param_dict):
         "port_mon" (default) records only the throughput at the end of the fibre, or the position at which the monitor is placed.
     '''
     launch_array = {k: json_file[k] for k in json_file}
-    block_text = { 
+    if mon_type == "pathway_mon":
+        block_text = { 
         "pathway": '''
 pathway {n}
     {n}
@@ -201,32 +204,98 @@ end launch_field
 '''
     }
 
-    # Open file in append mode
-    with open(f"{file_name}.ind", "a") as f:
+        # Open file in append mode
+        with open(f"{file_name}.ind", "a") as f:
 
-        # Write all pathways
-        for i in range(1, core_num + 2):  # +1 for cladding
-            text = block_text["pathway"].format(n=i)
+            # Write all pathways
+            for i in range(1, core_num + 2):  # +1 for cladding
+                text = block_text["pathway"].format(n=i)
+                f.write(text)
+
+            # Write all monitors
+            for i in range(1, core_num + 2):
+                monitor_type = launch_array["cladding_monitor_type"] if i == 1 else launch_array["monitor_type"]
+
+                text = block_text["monitor"].format(
+                    n=i,
+                    # monitor_width=monitor_width,
+                    # monitor_height=monitor_height,
+                    monitor_type=monitor_type,
+                    comp=launch_array["comp"],
+                    launch_tilt=launch_array["launch_tilt"],
+                    monitor_mode = 0, #launch_array["launch_mode"] if i == (launch_array["core_to_monitor"] + 1) else 0
+                    monitor_normalization = launch_array["monitor_normalization"]
+                )
+                f.write(text)
+                # Write only one launch field (for the cladding (MMF case)/core (SMF case))
+                text = block_text["launch_field"].format(
+                    n=1,
+                    launch_type=launch_array["launch_type"],
+                    launch_tilt=launch_array["launch_tilt"],
+                    launch_normalization=launch_array["launch_normalization"],
+                    launch_align_file = launch_array["launch_align_file"],
+                    launch_mode=launch_array["launch_mode"],
+                    launch_mode_radial=launch_array["launch_mode_radial"],
+                    launch_random_set=launch_array["launch_random_set"],
+                    launch_phase = launch_array["launch_phase"]
+                )
             f.write(text)
+    elif mon_type == "port_mon":
+        block_text = { 
+#         "monitor": '''
+# time_monitor {n}
+#     profile_type = PROF_INACTIVE
+#     color = 2
+#     type = TIMEMON_EXTENDED
+#     timeaverage = 2
+#     monitoroutputmask = 1024
+# 	monitoroutputformat = OUTPUT_AMP_PHASE
+# ''',
+        "pathway": '''
+pathway {n}
+    {n}
+end pathway
+''',
+        "launch_field": '''
+launch_field {n}
+    launch_pathway = {n}
+    launch_type = {launch_type}
+    launch_mode = {launch_mode}
+    launch_mode_radial = {launch_mode_radial}
+    launch_random_set = {launch_random_set}
+    launch_normalization = {launch_normalization}
+    launch_align_file = {launch_align_file}
+    launch_phase = {launch_phase}
+end launch_field
+'''
+    }
 
-        # Write all monitors
-        for i in range(1, core_num + 2):
-            # monitor_width = launch_array["cladd_monitor_width"] if i == 1 else launch_array["core_monitor_width"]
-            # monitor_height = launch_array["cladd_monitor_height"] if i == 1 else launch_array["core_monitor_height"]
-            monitor_type = launch_array["cladding_monitor_type"] if i == 1 else launch_array["monitor_type"]
+        # Open file in append mode
+        with open(f"{file_name}.ind", "a") as f:
 
-            text = block_text["monitor"].format(
-                n=i,
-                # monitor_width=monitor_width,
-                # monitor_height=monitor_height,
-                monitor_type=monitor_type,
-                comp=launch_array["comp"],
-                launch_tilt=launch_array["launch_tilt"],
-                monitor_mode = 0, #launch_array["launch_mode"] if i == (launch_array["core_to_monitor"] + 1) else 0
-                monitor_normalization = launch_array["monitor_normalization"]
-            )
-            f.write(text)
-            # Write only one launch field (for the cladding (MMF case)/core (SMF case))
+            # Write all pathways
+            for i in range(1, core_num + 2):  # +1 for cladding
+                text = block_text["pathway"].format(n=i)
+                f.write(text)
+
+            # Write all monitors
+            # for i in range(1, core_num + 2):
+                # monitor_width = launch_array["cladd_monitor_width"] if i == 1 else launch_array["core_monitor_width"]
+                # monitor_height = launch_array["cladd_monitor_height"] if i == 1 else launch_array["core_monitor_height"]
+                # monitor_type = launch_array["cladding_monitor_type"] if i == 1 else launch_array["monitor_type"]
+
+                # text = block_text["monitor"].format(
+                #     n=i,
+                #     # monitor_width=monitor_width,
+                #     # monitor_height=monitor_height,
+                #     monitor_type=monitor_type,
+                #     comp=launch_array["comp"],
+                #     launch_tilt=launch_array["launch_tilt"],
+                #     monitor_mode = 0, #launch_array["launch_mode"] if i == (launch_array["core_to_monitor"] + 1) else 0
+                #     monitor_normalization = launch_array["monitor_normalization"]
+                # )
+                # f.write(text)
+                # Write only one launch field (for the cladding (MMF case)/core (SMF case))
             text = block_text["launch_field"].format(
                 n=1,
                 launch_type=launch_array["launch_type"],
@@ -238,7 +307,7 @@ end launch_field
                 launch_random_set=launch_array["launch_random_set"],
                 launch_phase = launch_array["launch_phase"]
             )
-        f.write(text)
+            f.write(text)
 
     # Open file in read mode
     with open(f"{file_name}.ind", "r") as f:
@@ -520,7 +589,7 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
     if Launch_params["mon_type"] == "port_mon":
         for core_seg, port_mon in zip(core_segments, port_monitors):
             # Attach monitor to the *output end* of the segment
-            circuit.attach(port_mon, core_seg) 
+            circuit.attach(port_mon, core_seg, 1, 1, 1) 
     return path_num
 ############################################################################################################################################
 def throughput_metric(csv_path, fixed_length, fixed, vars, param_range, mode_selective):
@@ -757,21 +826,39 @@ def mode_wanted_considering_mode_orientations(LP_mode_dict, mode_desired):
 
     raise ValueError(f"Desired mode {mode_desired} exceeds total number of available mode orientations ({mode_number}).")
 
-def plot_tf_matrix(LP01_vec, LP11a_vec, LP11b_vec, LP21a_vec, LP21b_vec, LP02_vec, simulation_val):
+def plot_tf_matrix(tf_vectors, simulation_val):
+    '''
+    Plot the transfer matrix for a given number of cores in some geometry AFTER running RSoftSimulation.py
+
+    Parameters:
+        tf_vectors: array of transfer vectors and their labels, organised as (label, vector), produced by RSoftSimulation.py. Each vector is a 1D array
+        simulation_val: dictionary of values set to overwrite preset definitions in RSoftSimulation.py. Must contain core_num and optionally grid_type
+    Returns:
+        Plot of the transfer matrix
+    '''
     core_num = simulation_val["core_num"]
     geo = simulation_val.get("grid_type", Simulation_params["grid_type"]) 
-    tf_matrix = np.vstack([LP01_vec[0][1:], LP11a_vec[0][1:], LP11b_vec[0][1:], LP21a_vec[0][1:], LP21b_vec[0][1:], LP02_vec[0][1:]])
-    plt.figure(figsize=(10,8))
-    plt.imshow(tf_matrix, cmap='viridis')
-    plt.colorbar(label = "Throughput")
-    # plt.xlabel("LP Mode")
-    plt.xlabel("Core No.")
-    plt.yticks(ticks=np.arange(tf_matrix.shape[0]), labels=np.arange(1, tf_matrix.shape[0] + 1))
-    ylabels = ["LP01", "LP11a", "LP11b", "LP21a", "LP21b", "LP02"]
-    xlabels = np.arange(1, len(tf_matrix[0]) + 1)
-    plt.title(f"Transfer matrix for {core_num} core {geo} PL")
-    plt.yticks(ticks=np.arange(len(ylabels)), labels=ylabels)
-    plt.xticks(ticks = np.arange(len(xlabels)), labels=xlabels)
+    labels = []
+    tf_matrix = []
+
+    for label, vec in tf_vectors:
+        labels.append(label)
+        tf_matrix.append(vec[0][1:] if isinstance(vec[0], (list, np.ndarray)) else vec[1:])
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+    im = plt.imshow(tf_matrix, cmap='viridis')
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="4%", pad=0.05)  
+    cbar = fig.colorbar(im, cax=cax)
+    cbar.set_label("Amplitude")
+
+    ax.set_xlabel("Core No.")
+    ax.set_ylabel("Excited Mode")
+    ax.set_xticks(ticks=np.arange(core_num), labels=np.arange(1, core_num + 1))
+    ax.set_yticks(ticks=np.arange(len(tf_vectors)), labels=labels)
+    ax.set_title(f"Transfer Matrix for {core_num} core {geo} Grid")
+    plt.tight_layout()
+    plt.savefig(f"Transfer Matrix for {core_num} core {geo} Grid", dpi=500)
     plt.show()
 #######################################################################################################################################################
 def assign_core_properties(simulation_val):
@@ -900,11 +987,12 @@ def plot_rsoft_femsim_output(num_modes, results_folder = "", name = "", title = 
             field = f"{name}_{polarization}.m{i}"
 
         dat = pd.read_csv(results_folder + "\\" + field, skiprows = 4, sep=r'\s+', header = None)
+        dat = np.asarray(dat)
         Nx, Ny = dat.shape
         new_x = np.linspace(-Nx//2, Nx//2, Nx)
         new_y = np.linspace(-Ny//2, Ny//2, Ny)
-
-        im = ax.imshow(np.abs(np.rot90(dat.values)),
+        amp, phase = dat[:, ::2], dat[:, 1::2]
+        im = ax.imshow(amp,
                     extent=[new_x[0], new_x[-1], new_y[0], new_y[-1]],
                     aspect='auto', cmap='afmhot_10u')
 
@@ -941,7 +1029,7 @@ def make_animation(data_folder="", file_pattern="", output_gif="", interval=100)
     Returns:
         GIF animation of the evolution of field files
     '''
-    file_list = sorted(glob.glob(f"{data_folder}/{file_pattern}"))
+    file_list = sorted(glob.glob(os.path.join(data_folder, file_pattern)))
 
     print(f"Found {len(file_list)} files.")
 
@@ -986,8 +1074,10 @@ def make_animation(data_folder="", file_pattern="", output_gif="", interval=100)
     ani = animation.FuncAnimation(
         fig, update, frames=len(file_list), blit=True, interval=interval, repeat=True #(plotting_phase,) is a 1-element tuple, required by FuncAnimation
     )
-
-    ani.save(output_gif, writer='pillow')
+    matplotlib.rcParams['animation.ffmpeg_path'] = r"C:\Users\justinvella\Desktop\Git_Repos\ffmpeg-7.1.1-essentials_build\ffmpeg-7.1.1-essentials_build\bin\ffmpeg.exe"
+    writer = animation.FFMpegWriter(fps = 30, metadata=dict(artist = "Justin Vella"))
+    # ani.save(output_gif, writer='pillow')
+    ani.save(f"{output_gif}.mp4", writer = writer)
     print(f"Saved animation to {output_gif}")
 
     plt.close(fig) 
