@@ -75,32 +75,60 @@ class RSoftSim:
             with open("core_positions.json", "w") as g:
                 json.dump(self.core_positions, g)
 
-    def RunRSoftSim(self, name_tag, fixed, vars, fixed_length, param_range):
+    def RunRSoftSim(self, name_tag, fixed, vars, fixed_length, param_range, simulation_val):
         filename = f"{name_tag}.ind"
-        prefix   = f"prefix={name_tag}"
-        folder   = f"Sim_{name_tag}"
-
-        # Set up folders
-        user_home = os.path.expanduser("~")
-        desktop_path = os.path.join(user_home, "Desktop")
-        results_root = os.path.join(desktop_path, "Results")
-        results_folder = os.path.join(results_root, folder)
-        os.makedirs(results_folder, exist_ok=True)
-
+        sim_tool = simulation_val.get("sim_tool", RSoft_params["sim_tool"])
         # Run RSoft simulation
-        try:
-            subprocess.run(
-                ["bsimw32", filename, prefix, "wait=0"],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-        except subprocess.CalledProcessError as e:
-            print(f"Command failed with code {e.returncode}")
-            print("Command:", e.cmd)
-            print("stdout:\n", e.stdout)
-            print("stderr:\n", e.stderr)
-            return -1e6
+        if sim_tool == "ST_BEAMPROP":
+            prefix   = f"prefix={name_tag}"
+            folder   = f"BP_{name_tag}"
+
+            results_folder = create_folders(folder)
+            # # Set up folders
+            # user_home = os.path.expanduser("~")
+            # desktop_path = os.path.join(user_home, "Desktop")
+            # results_root = os.path.join(desktop_path, "Results")
+            # results_folder = os.path.join(results_root, folder)
+            # os.makedirs(results_folder, exist_ok=True)
+
+            try:
+                subprocess.run(
+                    ["bsimw32", filename, prefix, "wait=0"],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+            except subprocess.CalledProcessError as e:
+                print(f"Command failed with code {e.returncode}")
+                print("Command:", e.cmd)
+                print("stdout:\n", e.stdout)
+                print("stderr:\n", e.stderr)
+                return -1e6
+        elif sim_tool == "ST_FEMSIM":
+            prefix   = f"prefix=FS_{name_tag}"
+            folder   = f"FS_{name_tag}"
+
+            results_folder = create_folders(folder)
+            # # Set up folders
+            # user_home = os.path.expanduser("~")
+            # desktop_path = os.path.join(user_home, "Desktop")
+            # results_root = os.path.join(desktop_path, "Results")
+            # results_folder = os.path.join(results_root, folder)
+            # os.makedirs(results_folder, exist_ok=True)
+
+            try:
+                subprocess.run(
+                    ["femsim", filename, prefix, "wait=0"],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+            except subprocess.CalledProcessError as e:
+                print(f"Command failed with code {e.returncode}")
+                print("Command:", e.cmd)
+                print("stdout:\n", e.stdout)
+                print("stderr:\n", e.stderr)
+                return -1e6
 
         # Move all output files immediately after simulation
         for file in os.listdir():
@@ -108,31 +136,59 @@ class RSoftSim:
                 shutil.move(file, os.path.join(results_folder, file))
 
         # Safely access the .mon file in its new location
-        mon_path = Path(results_folder) / f"{name_tag}.mon"
-        timeout = 10
-        t_start = time.time()
-        while not mon_path.exists():
-            if time.time() - t_start > timeout:
-                raise FileNotFoundError(f"{mon_path} not found within {timeout} seconds after simulation.")
-            time.sleep(0.1)
+        if Launch_params["mon_type"] == "pathway_mon" and sim_tool != "ST_FEMSIM":
+            mon_path = Path(results_folder) / f"{name_tag}.mon"
+            timeout = 10
+            t_start = time.time()
+            while not mon_path.exists():
+                if time.time() - t_start > timeout:
+                    raise FileNotFoundError(f"{mon_path} not found within {timeout} seconds after simulation.")
+                time.sleep(0.1)
+
+        elif Launch_params["mon_type"] == "port_mon" and sim_tool != "ST_FEMSIM":
+            mon_path = Path(results_folder) / f"{name_tag}_mon.dat"
+            timeout = 10
+            t_start = time.time()
+            while not mon_path.exists():
+                if time.time() - t_start > timeout:
+                    raise FileNotFoundError(f"{mon_path} not found within {timeout} seconds after simulation.")
+                time.sleep(0.1)
 
         # Read .mon file from moved location
         uf = RSoftUserFunction()
         uf.read(str(mon_path))
-        x_all, y_all, z_all = uf.get_arrays()
-        num_monitors = z_all.shape[1]
+        if Launch_params["mon_type"] == "pathway_mon":
+            x_all, y_all, z_all = uf.get_arrays()
+            num_monitors = z_all.shape[1]
 
-        # Write throughput CSV to same folder
-        csv_tag = f"Throughput_{name_tag}.csv"
-        csv_path = Path(results_folder) / csv_tag
+            # Write throughput CSV to same folder
+            csv_tag = f"Throughput_{name_tag}.csv"
+            csv_path = Path(results_folder) / csv_tag
 
-        with open(csv_path, mode="w", newline="") as file:
-            writer = csv.writer(file)
-            header = ["x"] + [f"Monitor_{i}" for i in range(num_monitors)]
-            writer.writerow(header)
-            for i in range(z_all.shape[0]):
-                row = [x_all[i]] + [np.real(z_all[i, j]) for j in range(z_all.shape[1])]
-                writer.writerow(row)
+            with open(csv_path, mode="w", newline="") as file:
+                writer = csv.writer(file)
+                header = ["x"] + [f"Monitor_{i}" for i in range(num_monitors)]
+                writer.writerow(header)
+                for i in range(z_all.shape[0]):
+                    row = [x_all[i]] + [np.real(z_all[i, j]) for j in range(z_all.shape[1])]
+                    writer.writerow(row)
+        
+        elif Launch_params["mon_type"] == "port_mon":
+            x_all, y_all, z_all = uf.get_arrays()
+            num_monitors = (z_all.shape[1] - Simulation_params["core_num"])
+
+            # Write throughput CSV to same folder
+            csv_tag = f"Throughput_{name_tag}.csv"
+            csv_path = Path(results_folder) / csv_tag
+
+            with open(csv_path, mode="w", newline="") as file:
+                writer = csv.writer(file)
+                header = ["x"] + [f"Monitor_{i}" for i in range(num_monitors)]
+                writer.writerow(header)
+                for i in range(z_all.shape[0]):
+                    row = [x_all[i]] + [np.real(z_all[i, j]) for j in range(z_all.shape[1])] #NOTE: by default row contains amplitude and phase values, should expect 2*core_num entries
+                    # filtered_row = [val for val in row[1:] if val < 1.0] # only want numbers less than 1. Get numbers in the hundreds as well here!!
+                    writer.writerow(row)
 
         if Simulation_params["metric"] == 'TH':
             return -throughput_metric(csv_path, fixed_length,
@@ -142,7 +198,7 @@ class RSoftSim:
             return - mode_selective_metric(csv_path, Simulation_params["core_to_monitor"], 
                                            f"LP{Launch_params['launch_mode']}{Launch_params['launch_mode_radial']}")
         if Simulation_params["metric"] == "TF":
-            transfer_vector, throughput = transfer_matrix_component(csv_path)
+            transfer_vector, throughput = transfer_matrix_component(csv_path, row)
             return transfer_vector, -throughput
 
     def build_circuit(self, params): # maybe put this into its own function. Make it universal.
@@ -262,11 +318,11 @@ class RSoftSim:
             
         if simulation_val["launch_type"] == LaunchType.SM:
             launch_mode = simulation_val["launch_mode"]
-            launch_mode_radial = simulation_val["launch_mode"]
+            launch_mode_radial = simulation_val["launch_mode_radial"]
             name_tag = f"_LP{launch_mode}{launch_mode_radial}_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
         else:
-            grid = simulation_val["grid_size"]
-            name_tag = f"_Grid{grid}_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
+            # grid = simulation_val["grid_size"] # use only when trying to find the optimal gridding to run BeamPROP in.
+            name_tag = f"_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
         self.sym["Name"] = name_tag
         self.circuit.write(f"{name_tag}.ind")
         """
@@ -284,12 +340,12 @@ class RSoftSim:
         if Simulation_params['metric'] != 'TF':
             average_throughput = self.RunRSoftSim(name_tag, fixed, 
                                               vars, fixed_length, 
-                                              param_range)
+                                              param_range, simulation_val)
             return average_throughput
         else: 
             transfer_vector, average_throughput = self.RunRSoftSim(name_tag, fixed, 
                                               vars, fixed_length, 
-                                              param_range)
+                                              param_range, simulation_val)
             return transfer_vector, average_throughput
     
     def MultProc(self):

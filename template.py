@@ -42,7 +42,9 @@ RSoft_params = {
     "structure": Struct_type.FIBRE,
     "width": 5,
     "height": 5,
-    "slice_display_mode": "DISPLAY_CONTOURMAPXZ"
+    "slice_display_mode": "DISPLAY_CONTOURMAPXZ",
+    "fem_iterations": 1000,
+    "fem_nev": 45
 }
 RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
 
@@ -58,7 +60,7 @@ Launch_params = {
     "launch_normalization": 1,
     "launch_phase": 0,
     "monitor_normalization": 0, # 0 == Input Power, 1 == Local Power
-    "mon_type": "pathway_mon", # port_mon
+    "mon_type": "port_mon", # pathway_mon
     # "monitor_output": 0,
     # "monitor_step_size": 10,
     # "monitoroutputformat": "OUTPUT_AMP_PHASE",

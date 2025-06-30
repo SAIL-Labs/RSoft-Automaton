@@ -23,6 +23,7 @@ class Struct_type:
 
 class Sim_tool:
     BP = "ST_BEAMPROP"
+    FS = "ST_FEMSIM"
 
 class LaunchType:
     LF = "LAUNCH_FILE"

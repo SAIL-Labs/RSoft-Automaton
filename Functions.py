@@ -8,6 +8,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from template import *
 import matplotlib.animation as animation
 from matplotlib.animation import FFMpegWriter
+from matplotlib import colors
 import glob
 import ehtplot.color
 import cmocean
@@ -158,7 +159,23 @@ end launch_field
             launch_normalization=launch_array["launch_normalization"])
         f.write(text)
 #######################################################################################################################################################
+def create_folders(folder_name):
+    '''
+    Creates folder to be placed within the 'Results' folder on the desktop.
 
+    Arguments:
+        - folder_name: string entry that will become the name of the folder
+    
+    Returns:
+        - pathway to results folder
+    '''
+
+    user_home = os.path.expanduser("~")
+    desktop_path = os.path.join(user_home, "Desktop")
+    results_root = os.path.join(desktop_path, "Results")
+    results_folder = os.path.join(results_root, folder_name)
+    os.makedirs(results_folder, exist_ok=True)
+    return results_folder
 #######################################################################################################################################################
 def AddHack(file_name, json_file, core_num, param_dict, mon_type = ""):
     '''
@@ -373,6 +390,32 @@ end launch_field
     # Write the final .ind file with symbolic delta expression
     with open(f"{file_name}.ind", "w") as out:
         out.writelines(modified_lines)
+
+    # hack in the port monitor stuff to monitor femSIM files rather than the launch field
+    if mon_type == "port_mon":
+        final_lines = []
+        in_time_monitor = False
+        inserted = False
+
+        for line in modified_lines:
+            final_lines.append(line)
+            line_strip = line.strip()
+
+            if line_strip.startswith("time_monitor"):
+                in_time_monitor = True
+                inserted = False  # reset insertion flag for each time_monitor
+
+            if in_time_monitor and line_strip.startswith("monitoroutputmask") and not inserted:
+                final_lines.append("\toverlap_type = 1\n")
+                final_lines.append("\tmonitor_file = LP01_19cPL.m00\n")
+                inserted = True
+
+            if in_time_monitor and line_strip.startswith("end monitor"):
+                in_time_monitor = False
+
+        with open(f"{file_name}.ind", "w") as out:
+            out.writelines(final_lines)
+        
 #######################################################################################################################################################
 # Calculate the V-number from available parameters
 def calc_V(core_diam, n_core, n_cladd, wavelength):
@@ -607,22 +650,23 @@ def throughput_metric(csv_path, fixed_length, fixed, vars, param_range, mode_sel
     else:
         return throughput
     
-def transfer_matrix_component(csv_path):
+def transfer_matrix_component(csv_path, row):
     df = pd.read_csv(csv_path)
     transfer_vector = []
 
     monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]        
     ms_col = f"Monitor_{Simulation_params['core_to_monitor']}"
+    
     if Launch_params["mon_type"] == "pathway_mon":
         for cl in monitor_columns:
             transfer_vector.append(df[cl].tail(10).mean())
         throughput = df[ms_col].tail(10).mean()
+        return np.array(transfer_vector), throughput
+    
     elif Launch_params["mon_type"] == "port_mon":
-        for cl in monitor_columns:
-            transfer_vector.append(df[cl].tail(10).mean())  # FIXED
         throughput = df[ms_col].tail(10).mean()
+        return row, throughput
 
-    return np.array(transfer_vector), throughput
             
 def mode_selective_metric(csv_path, core_to_monitor, mode_type=""):
     df = pd.read_csv(csv_path)
@@ -648,6 +692,11 @@ def mode_selective_metric(csv_path, core_to_monitor, mode_type=""):
         # For higher-order modes, we want leakage into the MS core to be small
         return P_non_ms / (P_ms + 1e-12) # avoid divide-by-zero
 
+def read_port_mon_file(filepath = ""):
+    dat = pd.read_csv(filepath, skiprows = 3, sep=r'\s+', header = None)
+    all_vals = dat.values.flatten()
+    filtered = all_vals[ all_vals < 1]
+    return filtered
 #######################################################################################################################################################
 def overwrite_template_val():
     with open("launch_config.json", "r") as launch_config:
@@ -655,7 +704,6 @@ def overwrite_template_val():
     for k,_ in simulation_val.items():
         if k in fixed_params.keys():
             raise Warning(f"Cannot change {k} using simulation_val. Change directly within template.py instead")
-
 
     sim_keys = [keys for keys,_ in Simulation_params.items()] 
     core_keys = [key for key,_ in core_params.items()]
@@ -826,7 +874,41 @@ def mode_wanted_considering_mode_orientations(LP_mode_dict, mode_desired):
 
     raise ValueError(f"Desired mode {mode_desired} exceeds total number of available mode orientations ({mode_number}).")
 
-def plot_tf_matrix(tf_vectors, simulation_val):
+def extract_portmon_amp_phase(tf_list):
+    tf_result = []
+    amp = []
+    phase = []
+
+    for _, tf in enumerate(tf_list):
+        arrs = np.array(tf[1:])
+        tf_result.append(arrs)
+        amp.append(arrs[arrs < 1.0])
+        phase.append(arrs[arrs > 1.0])
+    return amp, phase, tf_result
+
+def assign_17modes_to_tflist(tf_list):
+    tf_vectors_phase = [
+    ("LP01", tf_list[0]),
+    ("LP11a", tf_list[1]),
+    ("LP11b", tf_list[2]),
+    ("LP21a", tf_list[3]),
+    ("LP21b", tf_list[4]),
+    ("LP02", tf_list[5]),
+    ("LP31a", tf_list[6]),
+    ("LP31b", tf_list[7]),
+    ("LP12a", tf_list[8]),
+    ("LP12b", tf_list[9]),
+    ("LP41a", tf_list[10]),
+    ("LP41b", tf_list[11]),
+    ("LP22a", tf_list[12]),
+    ("LP22b", tf_list[13]),
+    ("LP03", tf_list[14]),
+    ("LP51a", tf_list[15]),
+    ("LP51b", tf_list[16])
+    ]
+    return tf_vectors_phase
+
+def plot_tf_matrix(tf_vectors, simulation_val, matrix_type = ""):
     '''
     Plot the transfer matrix for a given number of cores in some geometry AFTER running RSoftSimulation.py
 
@@ -843,20 +925,22 @@ def plot_tf_matrix(tf_vectors, simulation_val):
 
     for label, vec in tf_vectors:
         labels.append(label)
-        tf_matrix.append(vec[0][1:] if isinstance(vec[0], (list, np.ndarray)) else vec[1:])
+        tf_matrix.append(vec)
 
     fig, ax = plt.subplots(figsize=(10, 8))
-    im = plt.imshow(tf_matrix, cmap='viridis')
+    norm = colors.Normalize(vmin = np.min(tf_matrix), vmax = np.max(tf_matrix))
+
+    im = plt.imshow(tf_matrix, cmap='viridis', norm=norm)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="4%", pad=0.05)  
     cbar = fig.colorbar(im, cax=cax)
-    cbar.set_label("Amplitude")
+    cbar.set_label(f"{matrix_type}")
 
     ax.set_xlabel("Core No.")
     ax.set_ylabel("Excited Mode")
     ax.set_xticks(ticks=np.arange(core_num), labels=np.arange(1, core_num + 1))
     ax.set_yticks(ticks=np.arange(len(tf_vectors)), labels=labels)
-    ax.set_title(f"Transfer Matrix for {core_num} core {geo} Grid")
+    ax.set_title(f"Transfer Matrix ({matrix_type}) for {core_num} core {geo} Grid")
     plt.tight_layout()
     plt.savefig(f"Transfer Matrix for {core_num} core {geo} Grid", dpi=500)
     plt.show()
@@ -1082,3 +1166,261 @@ def make_animation(data_folder="", file_pattern="", output_gif="", interval=100)
 
     plt.close(fig) 
 #######################################################################################################################################################
+"""
+This function block is taken from Barnaby's lanternfiber_minimal.py
+
+The fiber-mode relevant parts from lanternfiber.py
+
+This class uses
+ofiber https://ofiber.readthedocs.io
+polarTransform https://polartransform.readthedocs.io/en/latest/getting-started.html
+"""
+import numpy as np
+import ofiber
+import matplotlib.pyplot as plt
+import polarTransform
+from scipy import ndimage
+
+class lanternfiber:
+    def __init__(self, n_core=None, n_cladding=None, core_radius=None, wavelength=None, nmodes=19, nwgs=19,
+                 datadir='./'):
+        self.n_core = n_core
+        self.n_cladding = n_cladding
+        self.core_radius = core_radius
+        self.wavelength = wavelength
+        self.allmodes_b = None
+        self.allmodes_l = None
+        self.allmodes_m = None
+        self.nmodes = nmodes
+        self.nwgs = nwgs
+        self.max_r = None
+        self.datadir = datadir
+
+        self.all_smpowers = []
+        self.all_mmpowers = []
+        self.all_mmphases = []
+        self.all_smphases = []
+        self.Cmat = None # Transfer matrix
+        self.Imat = None # Intensity-output matrix
+        self.out_field_ampl = []
+        self.out_field_phase = []
+        self.wg_posns = None
+        self.microns_per_pixel = None
+        self.npix = None
+        self.input_field = None
+        self.allmodefields_rsoftorder = None
+        self.all_runallbats = []
+        self.all_hyperbats = []
+        self.all_indiv_commands = []
+        self.all_wls = None
+        self.allBatfileNames = []
+
+        if n_core is not None:
+            self.NA = self.calc_numerical_aperture(n_core, n_cladding)
+            self.V = self.calc_V_parameter(core_radius, self.NA, wavelength)
+
+        # If the order of Rsoft monitor objects does not match the conventional waveguide order,
+        # specify order here. Using rsoft numbering (so starts at 1).
+        self.monitor_order = [10, 9, 14, 15, 11, 6, 5, 4, 3, 8, 13, 18, 19, 16, 17, 12, 7, 2, 1]
+
+        # Specify mode indices
+        self.LP_modes = np.array([[0,1],
+                             [0,2],
+                             [0,3],
+                             [1,1],
+                             [-1,1],
+                             [1,2],
+                             [-1,2],
+                             [2,1],
+                             [-2,1],
+                             [2,2],
+                             [-2,2],
+                             [3,1],
+                             [-3,1],
+                             [3,2],
+                             [-3,2],
+                             [4,1],
+                             [-4,1],
+                             [5,1],
+                             [-5,1]
+                             ])
+
+        # Make text mode labels
+        modelabels = []
+        for k in range(self.nmodes):
+            if k < 3:  # Assumes first 3 modes are LP0x modes
+                label = 'LP%d%d' % (self.LP_modes[k, 0], self.LP_modes[k, 1])
+            else:
+                if self.LP_modes[k, 0] > 0:
+                    suf = 'a'
+                else:
+                    suf = 'b'
+                label = 'LP%d%d' % (np.abs(self.LP_modes[k, 0]), self.LP_modes[k, 1]) + suf
+            modelabels.append(label)
+        self.modelabels = modelabels
+
+
+    def calc_numerical_aperture(self, n_core, n_cladding):
+        return np.sqrt(n_core ** 2 - n_cladding ** 2)
+
+
+    def calc_V_parameter(self, core_radius, NA, wavelength):
+        V = 2 * np.pi / wavelength * core_radius * NA
+        return V
+
+
+    def find_fiber_modes(self, max_l=100, return_n_unique=False, verbose=True):
+        """
+        Finds LP modes for the specified fiber.
+
+        Parameters
+        ----------
+        max_l
+            Maximum number of l modes to find (can be arbitrarily large)
+        """
+        self.NA = self.calc_numerical_aperture(self.n_core, self.n_cladding)
+        self.V = self.calc_V_parameter(self.core_radius, self.NA, self.wavelength)
+
+        allmodes_b = []
+        allmodes_l = []
+        allmodes_m = []
+        for l in range(max_l):
+            cur_b = ofiber.LP_mode_values(self.V, l)
+            if len(cur_b) == 0:
+                break
+            else:
+                allmodes_b.extend(cur_b)
+                ls = (np.ones_like(cur_b)) * l
+                allmodes_l.extend(ls.astype(int))
+                ms = np.arange(len(cur_b))+1
+                allmodes_m.extend(ms)
+
+        allmodes_b = np.asarray(allmodes_b)
+        nLPmodes = len(allmodes_b)
+        # print('Total number of LP modes found: %d' % nLPmodes)
+        l = np.asarray(allmodes_l)
+        total_unique_modes = len(np.where(l == 0)[0]) + len(np.where(l > 0)[0])*2
+        if verbose:
+            print('Total number of unique modes found: %d' % total_unique_modes)
+        self.allmodes_b = allmodes_b
+        self.allmodes_l = allmodes_l
+        self.allmodes_m = allmodes_m
+        self.nLPmodes = nLPmodes
+
+        # ADDED - HACK?
+        self.nmodes = total_unique_modes
+        if return_n_unique:
+            return total_unique_modes
+
+
+    def make_fiber_modes(self, max_r=2, npix=100, zlim=0.04, show_plots=False,
+                         normtosum=True, rotate_mode_angle=None):
+        """
+        Calculate the LP mode fields, and store as polar and cartesian amplitude maps
+
+        Parameters
+        ----------
+        max_r
+            Maximum radius to calculate mode field, where r=1 is the core diameter
+        npix
+            Half-width of mode field calculation in pixels
+        zlim
+            Maximum value to plot
+        show_plots : bool
+            Whether to produce a plot for each mode
+        normtosum : bool
+            If True, normalise each mode field so summed power = 1
+        """
+
+        r = np.linspace(0, max_r, npix) # Radial positions, normalised so core_radius = 1
+        self.max_r = max_r
+        self.npix = npix
+        self.allmodefields_cos_polar = []
+        self.allmodefields_cos_cart = []
+        self.allmodefields_sin_polar = []
+        self.allmodefields_sin_cart = []
+        self.allmodefields_rsoftorder = []
+
+        array_size_microns = self.max_r * self.core_radius * 2
+        self.microns_per_pixel = array_size_microns / (npix*2)
+
+        for mode_to_calc in range(self.nLPmodes):
+            field_1d = ofiber.LP_radial_field(self.V, self.allmodes_b[mode_to_calc],
+                                              self.allmodes_l[mode_to_calc], r)
+
+            phivals = np.linspace(0, 2*np.pi, npix)
+            phi_cos = np.cos(self.allmodes_l[mode_to_calc] * phivals)
+            phi_sin = np.sin(self.allmodes_l[mode_to_calc] * phivals)
+
+            rgrid, phigrid = np.meshgrid(r, phivals)
+            field_r_cos, field_phi = np.meshgrid(phi_cos, field_1d)
+            field_r_sin, field_phi = np.meshgrid(phi_sin, field_1d)
+            field_cos = field_r_cos * field_phi
+            field_sin = field_r_sin * field_phi
+
+            # Normalise each field so its total intensity is 1
+            field_cos = field_cos / np.sqrt(np.sum(field_cos**2))
+            field_sin = field_sin / np.sqrt(np.sum(field_sin**2))
+            field_cos = np.nan_to_num(field_cos)
+            field_sin = np.nan_to_num(field_sin)
+
+            field_cos_cart, d = polarTransform.convertToCartesianImage(field_cos.T)
+            field_sin_cart, d = polarTransform.convertToCartesianImage(field_sin.T)
+
+            if rotate_mode_angle is not None:
+                print('Warning: rotating mode fields by %f degrees. ONLY APPLIES TO CARTESIAN FIELDS!' %
+                      rotate_mode_angle)
+                field_cos_cart = ndimage.rotate(field_cos_cart, rotate_mode_angle, reshape=False)
+                field_sin_cart = ndimage.rotate(field_sin_cart, rotate_mode_angle, reshape=False)
+
+            if normtosum:
+                field_cos = field_cos / np.sqrt(np.sum(field_cos**2))
+                field_sin = field_sin / np.sqrt(np.sum(field_sin**2))
+                field_cos_cart = field_cos_cart / np.sqrt(np.sum(field_cos_cart**2))
+                field_sin_cart = field_sin_cart / np.sqrt(np.sum(field_sin_cart**2))
+
+            self.allmodefields_cos_polar.append(field_cos)
+            self.allmodefields_cos_cart.append(field_cos_cart)
+            self.allmodefields_sin_polar.append(field_sin)
+            self.allmodefields_sin_cart.append(field_sin_cart)
+            self.allmodefields_rsoftorder.append(field_cos_cart)
+            if self.allmodes_l[mode_to_calc] > 0:
+                self.allmodefields_rsoftorder.append(field_sin_cart)
+
+            if show_plots:
+                self.plot_fiber_modes(mode_to_calc, zlim)
+                plt.pause(0.5)
+
+
+    def plot_fiber_modes(self, mode_to_plot, zlim=0.04, fignum=1):
+        """
+        Make a plot of the cos and sin amplitudes of a given mode
+
+        Parameters
+        ----------
+        mode_to_plot
+            Number of mode to plot
+        zlim
+            Maximum value to plot
+        """
+        plt.figure(fignum)
+        plt.clf()
+        plt.subplot(121)
+        sz = self.max_r * self.core_radius
+        plt.imshow(self.allmodefields_cos_cart[mode_to_plot], extent=(-sz, sz, -sz, sz), cmap='bwr',
+                   vmin=-zlim, vmax=zlim)
+        plt.xlabel('Position ($\mu$m)')
+        plt.ylabel('Position ($\mu$m)')
+        plt.title('Mode l=%d, m=%d (cos)' % (self.allmodes_l[mode_to_plot], self.allmodes_m[mode_to_plot]))
+        core_circle = plt.Circle((0,0), self.core_radius, color='k', fill=False, linestyle='--', alpha=0.2)
+        plt.gca().add_patch(core_circle)
+        plt.subplot(122)
+        sz = self.max_r * self.core_radius
+        plt.imshow(self.allmodefields_sin_cart[mode_to_plot], extent=(-sz, sz, -sz, sz), cmap='bwr',
+                   vmin=-zlim, vmax=zlim)
+        plt.xlabel('Position ($\mu$m)')
+        plt.title('Mode l=%d, m=%d (sin)' % (self.allmodes_l[mode_to_plot], self.allmodes_m[mode_to_plot]))
+        core_circle = plt.Circle((0,0), self.core_radius, color='k', fill=False, linestyle='--', alpha=0.2)
+        plt.gca().add_patch(core_circle)
+        plt.pause(0.001)
+        print('LP mode %d, %d' % (self.allmodes_l[mode_to_plot], self.allmodes_m[mode_to_plot]))
