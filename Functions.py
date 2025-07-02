@@ -615,17 +615,24 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
         path_num += 1
         core = circuit.add_segment(
             position=(x / taper, y / taper, 0),
-            offset=(x - (x / taper), y - (y / taper), Taper_length),
+            offset=(x, y, Taper_length),
+            # offset=(x - (x / taper), y - (y / taper), Taper_length),
             dimensions=core_beginning_dims_list[j],
             dimensions_end=core_final_dims_list[j]
         )
         core.set_name(core_names[j])
+        # circuit.attach(core, cladding, 0, 0, 0)
         core_segments.append(core)
+
+        # if Launch_params["mon_type"] == "port_mon":
+        #     port = circuit.add_portmonitor(position=(x, y, Taper_length))
+        #     port_monitors.append(port)
+        #     circuit.attach(port, core, 1, 1, 1) 
 
     if Launch_params["mon_type"] == "port_mon":
         for j, (x, y) in enumerate(core_positions):
-            # Place monitor at the end of the segment
-            port = circuit.add_portmonitor(position=(x, y, Taper_length))
+            # Place monitor at the end of the segment, note that these are not offset from anything and so need the extra distance to line up with the segments
+            port = circuit.add_portmonitor(position=(x + (x / taper), y + (y / taper), Taper_length), dimensions = (6.5,6.5))
             port_monitors.append(port)
 
     # Attach port monitors to core segments
@@ -879,36 +886,36 @@ def extract_portmon_amp_phase(tf_list):
     amp = []
     phase = []
 
-    for _, tf in enumerate(tf_list):
-        arrs = np.array(tf[1:])
+    for tf in tf_list:
+        arrs = np.array(tf).flatten()
         tf_result.append(arrs)
-        amp.append(arrs[arrs < 1.0])
-        phase.append(arrs[arrs > 1.0])
+        amp.append(arrs[1::2])
+        phase.append(np.deg2rad(arrs[2::2]) - 3.2) # centres colorbar on 0 with max value of 3
     return amp, phase, tf_result
 
 def assign_17modes_to_tflist(tf_list):
     tf_vectors_phase = [
     ("LP01", tf_list[0]),
+    ("LP02", tf_list[5]),
+    ("LP03", tf_list[14]),
     ("LP11a", tf_list[1]),
     ("LP11b", tf_list[2]),
-    ("LP21a", tf_list[3]),
-    ("LP21b", tf_list[4]),
-    ("LP02", tf_list[5]),
-    ("LP31a", tf_list[6]),
-    ("LP31b", tf_list[7]),
     ("LP12a", tf_list[8]),
     ("LP12b", tf_list[9]),
-    ("LP41a", tf_list[10]),
-    ("LP41b", tf_list[11]),
+    ("LP21a", tf_list[3]),
+    ("LP21b", tf_list[4]),
     ("LP22a", tf_list[12]),
     ("LP22b", tf_list[13]),
-    ("LP03", tf_list[14]),
+    ("LP31a", tf_list[6]),
+    ("LP31b", tf_list[7]),
+    ("LP41a", tf_list[10]),
+    ("LP41b", tf_list[11]),
     ("LP51a", tf_list[15]),
     ("LP51b", tf_list[16])
     ]
     return tf_vectors_phase
 
-def plot_tf_matrix(tf_vectors, simulation_val, matrix_type = ""):
+def plot_tf_matrix(tf_vectors, simulation_val, matrix_type="", ax=None, cbar=True, reorder = False, phase = False):
     '''
     Plot the transfer matrix for a given number of cores in some geometry AFTER running RSoftSimulation.py
 
@@ -925,25 +932,43 @@ def plot_tf_matrix(tf_vectors, simulation_val, matrix_type = ""):
 
     for label, vec in tf_vectors:
         labels.append(label)
+        
+        if reorder:
+            """
+            Reorder index to match central core being #1, increasing in an anticlockwise fashion
+            """
+            if core_num == 19:
+                reorder_indices = [9, 10, 14, 13, 8, 4, 5, 11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
+            elif core_num == 7:
+                reorder_indices = [3, 4, 6, 5, 2, 0, 1]
+            vec = np.array(vec)[reorder_indices]
+
         tf_matrix.append(vec)
 
-    fig, ax = plt.subplots(figsize=(10, 8))
-    norm = colors.Normalize(vmin = np.min(tf_matrix), vmax = np.max(tf_matrix))
+    tf_matrix = np.array(tf_matrix)  # ensure 2D shape
 
-    im = plt.imshow(tf_matrix, cmap='viridis', norm=norm)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="4%", pad=0.05)  
-    cbar = fig.colorbar(im, cax=cax)
-    cbar.set_label(f"{matrix_type}")
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 8))
 
-    ax.set_xlabel("Core No.")
-    ax.set_ylabel("Excited Mode")
-    ax.set_xticks(ticks=np.arange(core_num), labels=np.arange(1, core_num + 1))
-    ax.set_yticks(ticks=np.arange(len(tf_vectors)), labels=labels)
-    ax.set_title(f"Transfer Matrix ({matrix_type}) for {core_num} core {geo} Grid")
-    plt.tight_layout()
-    plt.savefig(f"Transfer Matrix for {core_num} core {geo} Grid", dpi=500)
-    plt.show()
+    if phase:
+        im = ax.imshow(tf_matrix.T, cmap = 'twilight_shifted')
+    else:
+        im = ax.imshow(tf_matrix.T, cmap='viridis')
+    if cbar:
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="4%", pad=0.05)  
+        fig = ax.get_figure()
+        cb = fig.colorbar(im, cax=cax)
+        cb.set_label(f"{matrix_type}")
+
+    ax.set_ylabel("Core No.")
+    ax.set_xlabel("Excited Mode")
+    ax.set_yticks(ticks=np.arange(core_num), labels=np.arange(1, core_num + 1))
+    ax.set_xticks(ticks=np.arange(len(tf_vectors)), labels=labels, rotation=90)
+    ax.set_title(f"{matrix_type}")
+    ax.tick_params(axis='both', which='major', labelsize=14)
+
+    return im
 #######################################################################################################################################################
 def assign_core_properties(simulation_val):
     '''

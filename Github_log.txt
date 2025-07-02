@@ -1,7 +1,13 @@
-Added function to calculate the maximum and minimum diameter to support the number of modes equal to the number of cores. Generates image showing max/min diameters for a range of wavelengths and the modes supported within.
+Messed around with transfer matrices. The current situation is: 
+	- restrict core diameters by calculating how many modes will fit for each wavelength
+	- specify these modes in terms of positive and negative numbers (to account for rotations)
+	- use a for loop to iterate through these modes to run BeamPROP
+	- record the core outputs using port monitors
+	- extract core amplitudes and phases
+	- plot transfer matrix, both amplitude and phase
+Should expect degeneracies in both amplitude and phase, but not at the same time; amplitude may be degenerate but phase mightn't be.
 
-Wrote function to assign core properties before dumping simulation_val as a json.
-
-Bug fixes:
-- every core diameter was being assigned the template value in template.py instead of the fixed value in Data_manip.ipynb. This made the mode_selective feature redundant as ever core held the same core diam and delta n
-	Now only the mode selective core is assigned the custom values whereas other cores have fixed values
+Moving on:
+	- create multiprocessing loop to pick multiple modes to run simultaneously. This uses the same multiprocessing package implemented in MultProc()
+	- specify Default Field for port monitors OR calculated the FemSIM mode supported by a single mode fibre at the end of the lantern, and use this input field in the overlap integral (Data File)
+	- Overall, want to use the currently existing Bayesian optimisation to loop through a range of core diameters to better implement mode selectivity, but the test metric we need relies on the transfer matrix for that PL. Specifically, any core diameter the Bayesian Optimisation chooses, for that 19 core PL we want to run 17 simulations (for each mode) to build the transfer matrix. What the loss function then checks is the total power conservation; for the mode selective mode we want to maximise the power through the mode selective core and minimise the sum of powers for other non-mode selective cores/modes, meanwhile maximising the total output power over the entire lantern (this means conserving the portion of light partitioned to higher order modes).

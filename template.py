@@ -31,7 +31,7 @@ RSoft_params = {
     "slice_output_format": "OUTPUT_AMP_PHASE",
     "slice_output_individual": "None", # OUTPUT_AMP_PHASE_3D
     "background_index": 1.4345,
-    "free_space_wavelength": 1.551,
+    "free_space_wavelength": 1.55,
     "sim_tool": Sim_tool.BP,
     "launch_align_file": 1,
     "launch_normalization": 1,
@@ -40,8 +40,8 @@ RSoft_params = {
     "grid_size_y": 1,
     "step_size": 2,
     "structure": Struct_type.FIBRE,
-    "width": 5,
-    "height": 5,
+    "width": 6.5,
+    "height": 6.5,
     "slice_display_mode": "DISPLAY_CONTOURMAPXZ",
     "fem_iterations": 1000,
     "fem_nev": 45

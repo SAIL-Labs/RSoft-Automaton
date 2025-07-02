@@ -305,6 +305,7 @@ class RSoftSim:
                 core_params[core_key]["core_diam"] = core_diam
                 core_params[core_key]["delta"] = core_delta
 
+        # functions to generate the core layout, either a standard fibre or a complicated photonic lantern setup (either in hex, pent or circular geometry)
         path_num = 0
         if structure == "Fibre":
             path_num = build_fibre(self.circuit, path_num, self.core_positions, 
