@@ -511,7 +511,7 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
         writer.writerow([iteration_start // batch_size + 1] + list(best_params) + [best_throughput] +
                         (list(best_tf) if include_tf else []))
 
-def plotting_optimizer_results(df, param_names, tf = None, plot = True):
+def plotting_optimizer_results(df, param_names, tf = None, plot = True, csv_path = ""):
     """
     Plots optimizer results from a DataFrame, assuming columns:
     - 'Iteration'
@@ -537,7 +537,7 @@ def plotting_optimizer_results(df, param_names, tf = None, plot = True):
             print(f"{param_name}: {val:.3f}")
         print(f"Throughput: {best_throughput:.3f}")
 
-        interim_data = pd.read_csv("optimizer_results.csv")
+        interim_data = pd.read_csv(csv_path)
         interim_x_iters = interim_data[param_names].values.tolist()
         interim_y_vals = interim_data["Throughput"].values
         interim_idx = np.argmax(interim_y_vals)
@@ -881,7 +881,17 @@ def mode_wanted_considering_mode_orientations(LP_mode_dict, mode_desired):
 
     raise ValueError(f"Desired mode {mode_desired} exceeds total number of available mode orientations ({mode_number}).")
 
-def extract_portmon_amp_phase(tf_list):
+def extract_portmon_amp_phase(tf_list, grid_size_range = None):
+    """
+    Function used to comb through the complete list of transfer vectors from BeamPROP to extract the amplitude and phase values recorded by each 
+    port monitor.
+
+    Arguments:
+        - tf_list: list of transfer vectors from RSoft
+        - grid_size_range: range of grid sizes to test RSoft simulations on
+    Returns:
+        - arrays for the amplitude, phase and list of transfer vectors, as well as grid sizes if specified.
+    """
     tf_result = []
     amp = []
     phase = []
@@ -890,8 +900,46 @@ def extract_portmon_amp_phase(tf_list):
         arrs = np.array(tf).flatten()
         tf_result.append(arrs)
         amp.append(arrs[1::2])
-        phase.append(np.deg2rad(arrs[2::2]) - 3.2) # centres colorbar on 0 with max value of 3
-    return amp, phase, tf_result
+        phase.append(np.deg2rad(arrs[2::2])) 
+
+    if grid_size_range is not None:
+        grid_size = list(grid_size_range)
+        return amp, phase, grid_size, tf_result
+    else:
+        return amp, phase, tf_result
+
+def reorder_tf_vectors(tf_vector, simulation_val):
+    """
+    Reorder tf_vector index to match central core being #1, increasing in an anticlockwise fashion
+    
+    Arguments:
+        - tf_vector: list of tf_vectors resulting from BeamPROP
+        - simulaiton_val: disctionary of values used to initialise RSoft
+    
+    Returns:
+        - reordered list of transfer vectors
+    """
+    tf_matrix = []
+    labels = []
+    core_num = simulation_val.get("core_num", Simulation_params["core_num"])
+    geo = simulation_val.get("grid_type", Simulation_params["grid_type"])
+
+    for label, vec in tf_vector:
+        labels.append(label)
+        
+        if geo == "Hex":
+            if core_num == 19:
+                reorder_indices = [9, 10, 14, 13, 8, 4, 5, 11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
+            elif core_num == 7:
+                reorder_indices = [3, 4, 6, 5, 2, 0, 1]
+        vec = np.array(vec)[reorder_indices]
+
+        tf_matrix.append(vec)
+    return labels, tf_matrix
+
+def phase_to_pixel(phase_val, phase_min, phase_max, resolution):
+    # Maps phase_val to a pixel index for a colorbar image
+    return int(round((phase_val - phase_min) / (phase_max - phase_min) * (resolution - 1)))
 
 def assign_17modes_to_tflist(tf_list):
     tf_vectors_phase = [
@@ -969,6 +1017,97 @@ def plot_tf_matrix(tf_vectors, simulation_val, matrix_type="", ax=None, cbar=Tru
     ax.tick_params(axis='both', which='major', labelsize=14)
 
     return im
+
+def plot_combined_tf_matrix(amp, phase, core_num, phase_max = 2*np.pi, amp_max = 1.0, dir = "", name = ""):
+    """
+    Function used to combine both amplitude and phase transfer matrices into one joined matrix.
+
+    Arguments:
+        - amp: numpy array containing amplitude values
+        - phase: numpy array containing phase values
+        - core_num: number of cores specified in either simulation_val or Simulation_Params
+        - dir: string pointing to the save directory
+        - name: name of the image to save
+    
+    Return:
+        - Transfer matrix containing the phase and amplitude for each core and mode
+    """
+    resolution = 500
+    phase_min = 0
+    phase_max = phase_max
+    amp_min = 0
+    amp_max = amp_max
+
+    amp_matrix = np.vstack(amp)
+    phase_matrix = np.vstack(phase)
+
+    comp_matrix = amp_matrix * np.exp(1j * phase_matrix)
+    comp_tf_vector = assign_17modes_to_tflist(comp_matrix)
+
+    label, tf_matrix = reorder_tf_vectors(comp_tf_vector)
+
+    amp_phase_img = np.transpose(apply_complex_map(tf_matrix, cmocean.cm.phase), (1, 0, 2))
+    amp_phase_colorbar = generate_complex_colorbar(resolution = resolution)
+
+    fig, ax = plt.subplots(figsize=(14,8))
+    im = ax.imshow(amp_phase_img, aspect='auto', origin='lower')
+    plt.gca().invert_yaxis()
+
+    # Set mode and core labels
+    ax.set_yticks(np.arange(comp_matrix.shape[1]))
+    ax.set_xticks(np.arange(comp_matrix.shape[0]))
+
+    ax.set_ylabel("Core No.", fontsize = 14, labelpad = 10)
+    ax.set_xlabel("Excited Mode", fontsize = 14, labelpad = 10)
+    ax.set_yticks(ticks=np.arange(core_num), labels=np.arange(1, core_num + 1))
+    ax.set_xticks(ticks=np.arange(len(amp)), labels=(labels for labels, _ in comp_tf_vector), rotation=90)
+
+    ax.set_title("Complex Transfer Matrix (Amplitude+Phase)", fontsize = 18)
+    ax.tick_params(axis='both', which='major', labelsize=14)
+
+    cb_ax = fig.add_axes([1, 0.15, 0.03, 0.8])  
+    cb_ax.imshow(amp_phase_colorbar, aspect='auto', origin='lower')
+
+    phase_tick_vals = [0, np.pi/2, np.pi, 3*np.pi/2, 2*np.pi]
+    phase_tick_labels = [r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2\pi$"]
+    amp_tick_vals = [0, amp_max]
+    if amp_max < 0.5:
+        amp_tick_labels = ["0", "0.5"]
+    elif amp_max >= 0.5:
+        amp_tick_labels = ["0", "1"]
+
+    yticks = [phase_to_pixel(val, phase_min, phase_max, resolution) for val in phase_tick_vals]
+    xticks = [phase_to_pixel(val, amp_min, amp_max, resolution) for val in amp_tick_vals]
+
+    cb_ax.set_yticks(yticks)
+    cb_ax.set_xticks(xticks)
+    cb_ax.set_yticklabels(phase_tick_labels)
+    cb_ax.set_xticklabels(amp_tick_labels)
+    cb_ax.set_ylabel("$\phi$ [rad]")
+    cb_ax.set_xlabel("$|E|$")
+    cb_ax.tick_params(axis='y', right=True, labelright=True, left=False, labelleft=False)
+    cb_ax.yaxis.set_label_position("right")
+
+
+    plt.tight_layout()
+    save_dir = dir + "\\" + name
+    plt.savefig(save_dir, bbox_inches="tight", dpi = 300)
+    plt.show()
+
+def print_max_amp_or_phase_value(array):
+        """
+        Function that loops through each element in the array and prints out the maximum value
+
+        Arguments:
+            - array: 1D array of values
+        Returns:
+            - maximum value in the array
+        """
+        max_val = []
+        for i in array:
+            max_val.append(max(i))
+        max_value = max(max_val)
+        return max_value
 #######################################################################################################################################################
 def assign_core_properties(simulation_val):
     '''
@@ -1034,12 +1173,12 @@ def apply_complex_map(field, cmap, power=1.0, normalise=True, shift=0.0):
 
     return img
 
-def generate_complex_colorbar(power=1.0, shift=0.0, cmap=cmocean.cm.phase, resolution=300):
+def generate_complex_colorbar(amp_max = 1, amp_min = 0, phase_max = 2*np.pi,phase_min = 0,power=1.0, shift=0.0, cmap=cmocean.cm.phase, resolution=300):
     """
     Create an RGB image for a hue-brightness colorbar: hue = phase, brightness = amplitude.
     """
-    phase_vals = np.linspace(-np.pi, np.pi, resolution)
-    amp_vals = np.linspace(0, 1, resolution)
+    phase_vals = np.linspace(phase_min, phase_max, resolution)
+    amp_vals = np.linspace(amp_min, amp_max, resolution)
     phase_grid, amp_grid = np.meshgrid(phase_vals, amp_vals)
 
     field = amp_grid * np.exp(1j * (phase_grid + shift))

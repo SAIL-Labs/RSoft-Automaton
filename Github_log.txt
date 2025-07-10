@@ -1,13 +1,4 @@
-Messed around with transfer matrices. The current situation is: 
-	- restrict core diameters by calculating how many modes will fit for each wavelength
-	- specify these modes in terms of positive and negative numbers (to account for rotations)
-	- use a for loop to iterate through these modes to run BeamPROP
-	- record the core outputs using port monitors
-	- extract core amplitudes and phases
-	- plot transfer matrix, both amplitude and phase
-Should expect degeneracies in both amplitude and phase, but not at the same time; amplitude may be degenerate but phase mightn't be.
+Added function to simultaneously inject individual modes supported by the lantern to build the transfer matrix.
 
-Moving on:
-	- create multiprocessing loop to pick multiple modes to run simultaneously. This uses the same multiprocessing package implemented in MultProc()
-	- specify Default Field for port monitors OR calculated the FemSIM mode supported by a single mode fibre at the end of the lantern, and use this input field in the overlap integral (Data File)
-	- Overall, want to use the currently existing Bayesian optimisation to loop through a range of core diameters to better implement mode selectivity, but the test metric we need relies on the transfer matrix for that PL. Specifically, any core diameter the Bayesian Optimisation chooses, for that 19 core PL we want to run 17 simulations (for each mode) to build the transfer matrix. What the loss function then checks is the total power conservation; for the mode selective mode we want to maximise the power through the mode selective core and minimise the sum of powers for other non-mode selective cores/modes, meanwhile maximising the total output power over the entire lantern (this means conserving the portion of light partitioned to higher order modes).
+	- ##---ERROR RESOLVED---##. Seems to be a JSON error with long, dense simulations. Attempted to resolve by specifying each simulation its own prior file, labelled with the mode chosen and the PID for the simulation.
+	- Extended this to test a range of grid sizes for a standard multimode source.

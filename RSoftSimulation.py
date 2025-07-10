@@ -17,13 +17,18 @@ class RSoftSim:
     def __init__(self):
         self.sym = {}
 
-    def init_priors(self, custom = None):
+    def init_priors(self , prior_space_pid, build_tf, custom = None):
         base_priors = {}
         if custom:
             base_priors.update(custom)
         self.prior_space = base_priors
-        with open("prior_space.json", "w") as write:
-            json.dump(self.prior_space, write)
+
+        if build_tf:
+            with open(prior_space_pid, "w") as write:
+                json.dump(self.prior_space, write)
+        else:
+            with open("prior_space.json", "w") as write:
+                json.dump(self.prior_space, write)
         return base_priors
 
     def generate_core_positions(self):
@@ -75,7 +80,7 @@ class RSoftSim:
             with open("core_positions.json", "w") as g:
                 json.dump(self.core_positions, g)
 
-    def RunRSoftSim(self, name_tag, fixed, vars, fixed_length, param_range, simulation_val):
+    def RunRSoftSim(self, name_tag, fixed, vars, fixed_length, param_range, simulation_val, csv_path, json_config, prior_space_pid):
         filename = f"{name_tag}.ind"
         sim_tool = simulation_val.get("sim_tool", RSoft_params["sim_tool"])
         # Run RSoft simulation
@@ -132,7 +137,7 @@ class RSoftSim:
 
         # Move all output files immediately after simulation
         for file in os.listdir():
-            if file.startswith(name_tag) or file == filename:
+            if file.startswith(name_tag) or file == filename or file == csv_path or file == json_config or file == prior_space_pid:
                 shutil.move(file, os.path.join(results_folder, file))
 
         # Safely access the .mon file in its new location
@@ -163,9 +168,9 @@ class RSoftSim:
 
             # Write throughput CSV to same folder
             csv_tag = f"Throughput_{name_tag}.csv"
-            csv_path = Path(results_folder) / csv_tag
+            csv_pathway = Path(results_folder) / csv_tag
 
-            with open(csv_path, mode="w", newline="") as file:
+            with open(csv_pathway, mode="w", newline="") as file:
                 writer = csv.writer(file)
                 header = ["x"] + [f"Monitor_{i}" for i in range(num_monitors)]
                 writer.writerow(header)
@@ -179,9 +184,9 @@ class RSoftSim:
 
             # Write throughput CSV to same folder
             csv_tag = f"Throughput_{name_tag}.csv"
-            csv_path = Path(results_folder) / csv_tag
+            csv_pathway = Path(results_folder) / csv_tag
 
-            with open(csv_path, mode="w", newline="") as file:
+            with open(csv_pathway, mode="w", newline="") as file:
                 writer = csv.writer(file)
                 header = ["x"] + [f"Monitor_{i}" for i in range(num_monitors)]
                 writer.writerow(header)
@@ -191,31 +196,54 @@ class RSoftSim:
                     writer.writerow(row)
 
         if Simulation_params["metric"] == 'TH':
-            return -throughput_metric(csv_path, fixed_length,
+            return -throughput_metric(csv_pathway, fixed_length,
                                        fixed, vars, 
                                        param_range, Simulation_params["mode_selective"])
         if Simulation_params['metric'] == 'MS':
-            return - mode_selective_metric(csv_path, Simulation_params["core_to_monitor"], 
+            return - mode_selective_metric(csv_pathway, Simulation_params["core_to_monitor"], 
                                            f"LP{Launch_params['launch_mode']}{Launch_params['launch_mode_radial']}")
         if Simulation_params["metric"] == "TF":
-            transfer_vector, throughput = transfer_matrix_component(csv_path, row)
+            transfer_vector, throughput = transfer_matrix_component(csv_pathway, row)
             return transfer_vector, -throughput
 
-    def build_circuit(self, params): # maybe put this into its own function. Make it universal.
+    def build_circuit(self, params, build_tf, json_config, csv_path, simulation_val, prior_space_pid): # maybe put this into its own function. Make it universal.
         """
         Create the design file using template.py and 
         write to separate .ind file. Also contains function to run BeamProp
         and scikit Optimize
         """
-        with open("launch_config.json", "r") as launch_config:
-            simulation_val = json.load(launch_config)
+        if build_tf:
+            with open(json_config, "r") as launch_config:
+                simulation_val = json.load(launch_config)
+        else:
+            with open("launch_config.json", "r") as launch_config:
+                simulation_val = json.load(launch_config)
         
         for key, val in simulation_val.items():
             Launch_params[key] = val
 
         # load prior space
-        with open("prior_space.json", "r") as read:
-            param_range = json.load(read)
+        if build_tf:
+            for attempt in range(10):
+                try:
+                    with open(prior_space_pid, "r") as read:
+                        param_range = json.load(read)
+                    break
+                except json.decoder.JSONDecodeError:
+                    time.sleep(0.2)
+            else:
+                raise RuntimeError(f"Failed to load {prior_space_pid} after retries.")
+        else:
+            for attempt in range(10):
+                try:
+                    with open("prior_space.json", "r") as read:
+                        param_range = json.load(read)
+                    break
+                except json.decoder.JSONDecodeError:
+                    time.sleep(0.2)
+            else:
+                raise RuntimeError("Failed to load prior_space.json after retries.")
+            
         para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
         param_dict = {dim.name: val for dim, val in zip(para_space, params)}
         
@@ -322,8 +350,8 @@ class RSoftSim:
             launch_mode_radial = simulation_val["launch_mode_radial"]
             name_tag = f"_LP{launch_mode}{launch_mode_radial}_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
         else:
-            # grid = simulation_val["grid_size"] # use only when trying to find the optimal gridding to run BeamPROP in.
-            name_tag = f"_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
+            grid = simulation_val["grid_size"] # use only when trying to find the optimal gridding to run BeamPROP in.
+            name_tag = f"_Grid{grid}".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
         self.sym["Name"] = name_tag
         self.circuit.write(f"{name_tag}.ind")
         """
@@ -341,21 +369,40 @@ class RSoftSim:
         if Simulation_params['metric'] != 'TF':
             average_throughput = self.RunRSoftSim(name_tag, fixed, 
                                               vars, fixed_length, 
-                                              param_range, simulation_val)
+                                              param_range, simulation_val, csv_path, json_config, prior_space_pid)
             return average_throughput
         else: 
             transfer_vector, average_throughput = self.RunRSoftSim(name_tag, fixed, 
                                               vars, fixed_length, 
-                                              param_range, simulation_val)
+                                              param_range, simulation_val, csv_path, json_config, prior_space_pid)
             return transfer_vector, average_throughput
-    
-    def MultProc(self):
+
+    def MultProc(self, build_tf, json_config, csv_path, simulation_val, prior_space_pid):
         images_dir = Path(os.path.expanduser("~/Desktop/Results/Images"))
         images_dir.mkdir(parents=True, exist_ok=True)
 
         # load prior space
-        with open("prior_space.json", "r") as read:
-            param_range = json.load(read)
+        if build_tf:
+            for attempt in range(10):
+                try:
+                    with open(prior_space_pid, "r") as read:
+                        param_range = json.load(read)
+                    break
+                except json.decoder.JSONDecodeError:
+                    time.sleep(0.2)
+            else:
+                raise RuntimeError(f"Failed to load {prior_space_pid} after retries.")
+        else:
+            for attempt in range(10):
+                try:
+                    with open("prior_space.json", "r") as read:
+                        param_range = json.load(read)
+                    break
+                except json.decoder.JSONDecodeError:
+                    time.sleep(0.2)
+            else:
+                raise RuntimeError("Failed to load prior_space.json after retries.")
+            
         para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
         
         # backend of skopt.gp_minimize that can handle multiprocessing
@@ -380,11 +427,11 @@ class RSoftSim:
 
         self.sym["Name"] = "MCF_Test"
         if Simulation_params['metric'] != 'TF':
-            seed_result = self.build_circuit(seed_params)
+            seed_result = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
             opt.tell(seed_params, seed_result)
             tf_vector = None
         else:
-            tf_vector, seed_result = self.build_circuit(seed_params)
+            tf_vector, seed_result = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
             opt.tell(seed_params, seed_result)
 
         all_results.append({
@@ -412,8 +459,18 @@ class RSoftSim:
 
             # Evaluate in parallel
             ctx = mp.get_context("spawn")
+            args_list = [(params, build_tf, json_config, csv_path, simulation_val, prior_space_pid) for params in param_batch]
             with ctx.Pool(batch_size) as pool:
-                result_batch = pool.map(run_rsoft_sim, param_batch)
+                result_batch = pool.map(run_rsoft_sim, args_list)
+
+            # # batch simulation to inject single modes into fibre to create transfer matrix
+            # if multi_mode_per_param and mode_vals is not None and radial_mode_vals is not None:
+            #     mode_pairs = list(zip(mode_vals, radial_mode_vals))
+            #     for params in param_batch:
+            #         args_list = [(params, m, rm) for m, rm in mode_pairs]
+            #         ctx_mode = mp.get_context("spawn")
+            #         with ctx_mode.Pool(n_mode_processes) as pool_modes:
+            #             mode_results = pool_modes.starmap(run_rsoft_sim_mode, args_list)
 
             # Feed results back to optimizer
             # opt.tell(param_batch, result_batch)
@@ -456,7 +513,7 @@ class RSoftSim:
                                   penalty_batch= None,
                                   transfer_vector_batch=tf_vector_val)
 
-    def RunRSoft(self, simulate = True):
+    def RunRSoft(self, simulation_val, prior_space_pid, csv_path, json_config, simulate=True, build_tf = True):
         '''
         Multiprocessing must to be run outside of a Jupyter cell or it will silently 
         fail/infinitely loop on the first batch
@@ -469,46 +526,206 @@ class RSoftSim:
         self.generate_core_positions()
 
         # remove old results
-        csv_path = "optimizer_results.csv"
+        # csv_path = "optimizer_results.csv"
         if os.path.exists(csv_path):
             os.remove(csv_path)
 
         if simulate:
-            self.MultProc()
-        else:
-            # load prior space
-            with open("prior_space.json", "r") as read:
-                param_range = json.load(read)
-            para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
-            param_names = [dim.name for dim in para_space]
-            seed_params = [variable_params[k] for k in param_names]
+            self.MultProc(build_tf, json_config, csv_path, prior_space_pid)
+            return  
 
-            # build circuit with template/overwritten values and run a single simulation
-            if Simulation_params['metric'] != 'TF':
-                seed_result = self.build_circuit(seed_params)
-                tf_vector = None
+        # -- BELOW: for "simulate=False" only --
+        # Always load template/seed params first
+        
+        if build_tf:
+            for attempt in range(10):
+                try:
+                    with open(prior_space_pid, "r") as read:
+                        param_range = json.load(read)
+                    break
+                except json.decoder.JSONDecodeError:
+                    time.sleep(0.2)
             else:
-                tf_vector, seed_result = self.build_circuit(seed_params)
-                
-            log_optimizer_results(
-                x_iters=[seed_params],
-                y_vals=[-seed_result],
-                param_batch=[seed_params],
-                result_batch=[seed_result],
-                param_names=param_names,
-                iteration_start=0,
-                batch_size=1,
-                penalty_batch=None,
-                transfer_vector_batch=[tf_vector]
-            )
+                raise RuntimeError(f"Failed to load {prior_space_pid} after retries.")
+        else:
+            for attempt in range(10):
+                try:
+                    with open("prior_space.json", "r") as read:
+                        param_range = json.load(read)
+                    break
+                except json.decoder.JSONDecodeError:
+                    time.sleep(0.2)
+            else:
+                raise RuntimeError("Failed to load prior_space.json after retries.")
+        
+        para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
+        param_names = [dim.name for dim in para_space]
+        seed_params = [variable_params[k] for k in param_names]
 
-def run_rsoft_sim(params):
+        # if multi_mode_per_param:
+        #     print("Running transfer matrix simulations for all launch modes (with template params)...")
+        #     from multiprocessing import get_context
+        #     ctx = get_context("spawn")
+        #     mode_pairs = list(zip(mode_vals, radial_mode_vals))
+        #     args_list = [(simulation_val, custom_priors, m, rm) for (m, rm) in mode_pairs]
+        #     with ctx.Pool(processes=6) as pool:  
+        #         results = pool.starmap(simulate_mode_with_params, args_list)
+
+        #     tf_list = []
+        #     for m, rm, tf_vectors in results:
+        #         tf_list.append(tf_vectors)
+        #         print(f"Finished Mode: LP{m,rm}")
+        #     # You can do more with tf_list here if needed
+        #     return  # Only do multi-mode runs, skip single sim below
+
+        # -- If not multi-mode: do just the single template simulation
+        if Simulation_params['metric'] != 'TF':
+            seed_result = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
+            tf_vector = None
+        else:
+            tf_vector, seed_result = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
+
+        log_optimizer_results(
+            x_iters=[seed_params],
+            y_vals=[-seed_result],
+            param_batch=[seed_params],
+            result_batch=[seed_result],
+            param_names=param_names,
+            iteration_start=0,
+            batch_size=1,
+            penalty_batch=None,
+            transfer_vector_batch=[tf_vector],
+            csv_path = csv_path
+        )
+
+def run_rsoft_sim(args):
     from RSoftSimulation import RSoftSim  
     from Functions import overwrite_template_val
 
+    params, build_tf, json_config, csv_path, simulation_val, prior_space_pid = args
     # this needs to be defined here as well or 
     # else some paras won't be updated for some reason???
     overwrite_template_val()
     sim = RSoftSim()
     sim.generate_core_positions()
-    return sim.build_circuit(params)
+    return sim.build_circuit(params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
+
+#############################################################################################################################################################################
+"""
+CURRENT: simultaneously chooses pairs of modes to run RSoft with to develop the transfer matrix faster than running individually.
+TO DO: Multiprocessing to occur after the parameter is chosen that sequentially injects individual modes to build the transfer matrix
+"""
+import copy
+from multiprocessing import get_context
+
+def arg_worker(*args):
+    gridding = args[-1]
+    if gridding:
+        simulation_val_list, gr, taper_min, taper_max = args[:-1]
+
+        sim_val = copy.deepcopy(simulation_val_list)
+        sim_val["grid_size"] = gr
+        sim_val["grid_size_y"] = gr
+        sim_val["launch_type"] = LaunchType.MM
+        sim_val["launch_tilt"] = 0
+        sim_val["launch_mode_radial"] = "*"
+
+        # CONTINUE HERE
+
+        # specify MS core properties
+        assign_core_properties(sim_val)
+
+        # dump configuration paras into json for use later
+        pid = os.getpid()
+        prior_space_pid = f"Grid_{gr}_prior_space_{pid}.json"
+        code_config = f"Grid_{gr}_launch_config.json"
+        optimizer_result = f"Grid_{gr}_Optimizer_Result.csv"
+        param_num = f"Grid {gr}"
+    else:
+        simulation_val_list, m, rm, taper_min, taper_max = args[:-1]
+        sim_val = copy.deepcopy(simulation_val_list)
+        sim_val["launch_mode"] = m
+        sim_val["launch_mode_radial"] = rm
+
+        # specify MS core properties
+        assign_core_properties(sim_val)
+
+        # dump configuration paras into json for use later
+        pid = os.getpid()
+        prior_space_pid = f"LP_{m}{rm}_prior_space_{pid}.json"
+        code_config = f"LP_{m}{rm}_launch_config.json"
+        optimizer_result = f"LP_{m}{rm}_Optimizer_Result.csv"
+        param_num = f"LP{m}{rm}"
+
+    return sim_val, param_num, prior_space_pid, code_config, optimizer_result, taper_min, taper_max
+
+def multiple_mode_tf(arg_list):
+
+    # simulation_val_list, m, rm, taper_min, taper_max = arg_list
+    # sim_val = copy.deepcopy(simulation_val_list)
+    # sim_val["launch_mode"] = m
+    # sim_val["launch_mode_radial"] = rm
+
+    # # specify MS core properties
+    # assign_core_properties(sim_val)
+
+    # # dump configuration paras into json for use later
+    # pid = os.getpid()
+    # prior_space_pid = f"LP_{m}{rm}_prior_space_{pid}.json"
+    # code_config = f"LP_{m}{rm}_launch_config.json"
+    # optimizer_result = f"LP_{m}{rm}_Optimizer_Result.csv"
+
+    sim_val, param_num, prior_space_pid, code_config, optimizer_result, taper_min, taper_max = arg_worker(*arg_list)
+
+    with open(code_config, "w") as launch_config:
+        json.dump(sim_val, launch_config, indent = 2)
+
+    custom_priors = {
+                "taper": (taper_min, taper_max),
+                "core_delta": (0.0, 0.02),
+                "core_diam": (1.0, 20.0)
+                }
+
+    build_tf = True
+
+    sim = RSoftSim()
+    sim.init_priors(prior_space_pid, build_tf, custom_priors)
+
+    # true = optimisation runs,
+    # false = only a single simulation using template vals runs
+    sim.RunRSoft(sim_val, prior_space_pid, csv_path = optimizer_result, json_config = code_config, simulate = False, build_tf = build_tf)
+
+    # Load results
+    data = pd.read_csv("best_params_log.csv")
+
+    # Extract parameter names
+    param_names = list(custom_priors.keys())
+
+    # Identify and extract TF columns
+    tf_columns = [col for col in data.columns if col.startswith("TF_")]
+    if tf_columns:
+        tf_vectors = data[tf_columns].values.tolist()  
+    else:
+        tf_vectors = None
+
+    # Call plotting function
+    plotting_optimizer_results(data, param_names, tf=tf_vectors, plot= False)
+    return (param_num, tf_vectors)
+
+def run_tf_multproc(simulation_val, mode_vals, radial_mode_vals, taper_min, taper_max, gridding = False):
+    tf_list = []
+    if not gridding:
+        args_list = [(simulation_val, m, rm, taper_min, taper_max, gridding) for m, rm in zip(mode_vals, radial_mode_vals)]
+    else:
+        grid_size_list = np.arange(0.1, 2.1, 0.1)
+        grid_size_range = np.linspace(0.1, 2.0, len(grid_size_list))
+        args_list = [(simulation_val, gr, taper_min, taper_max, gridding) for gr in grid_size_range]
+
+    ctx = get_context("spawn")
+    with ctx.Pool(processes=6) as pool:
+        results = pool.map(multiple_mode_tf, args_list)
+
+    for param, result in results:
+        print(f"Param: {param}, Result: {result}")
+        tf_list.append(results)
+    return tf_list
