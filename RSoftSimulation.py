@@ -98,7 +98,7 @@ class RSoftSim:
 
             try:
                 subprocess.run(
-                    ["bsimw32", filename, prefix, "wait=0"],
+                    [r"C:\Synopsys\PhotonicSolutions\2024.09-SP2-1\RSoft\bin\bsimw32.exe", filename, prefix, "wait=0"],
                     check=True,
                     capture_output=True,
                     text=True
@@ -337,13 +337,15 @@ class RSoftSim:
         path_num = 0
         if structure == "Fibre":
             path_num = build_fibre(self.circuit, path_num, self.core_positions, 
-                        core_name, Taper_L, tuple(core * taper for core in core_beg_dims_list), core_end_dims_list)
+                        core_name, Taper_L, tuple(core * taper for core in core_beg_dims_list), core_end_dims_list,
+                        simulation_val)
 
         elif structure == "PL":
             path_num = build_PL(self.circuit, path_num, self.core_positions, 
                     core_name, taper, Taper_L,
                     cladding_beg_dims, cladding_end_dims,
-                    core_beg_dims_list, core_end_dims_list)
+                    core_beg_dims_list, core_end_dims_list,
+                    simulation_val)
             
         if simulation_val["launch_type"] == LaunchType.SM:
             launch_mode = simulation_val["launch_mode"]
@@ -359,7 +361,7 @@ class RSoftSim:
         on launch parameters. 
         """ 
         
-        AddHack(name_tag, launch, path_num - 1, param_dict, simulation_val.get("mon_type", Launch_params["mon_type"]) )
+        AddHack(name_tag, launch, path_num - 1, param_dict, simulation_val["core_to_monitor"], simulation_val.get("mon_type", Launch_params["mon_type"]))
         '''
         Manual setup to loop through a list of values. Runs the terminal line that will initiate RSoft and will calculate the 
         metric to test.
@@ -520,7 +522,7 @@ class RSoftSim:
         '''
 
         # write in the values within simulation_val
-        overwrite_template_val()
+        overwrite_template_val(json_config)
         
         # generate the positions of the cores. 
         self.generate_core_positions()
@@ -605,7 +607,7 @@ def run_rsoft_sim(args):
     params, build_tf, json_config, csv_path, simulation_val, prior_space_pid = args
     # this needs to be defined here as well or 
     # else some paras won't be updated for some reason???
-    overwrite_template_val()
+    overwrite_template_val(json_config)
     sim = RSoftSim()
     sim.generate_core_positions()
     return sim.build_circuit(params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
@@ -660,7 +662,7 @@ def arg_worker(*args):
     return sim_val, param_num, prior_space_pid, code_config, optimizer_result, taper_min, taper_max
 
 def multiple_mode_tf(arg_list):
-
+    import template
     # simulation_val_list, m, rm, taper_min, taper_max = arg_list
     # sim_val = copy.deepcopy(simulation_val_list)
     # sim_val["launch_mode"] = m
@@ -676,7 +678,9 @@ def multiple_mode_tf(arg_list):
     # optimizer_result = f"LP_{m}{rm}_Optimizer_Result.csv"
 
     sim_val, param_num, prior_space_pid, code_config, optimizer_result, taper_min, taper_max = arg_worker(*arg_list)
-
+    # specify MS core properties
+    assign_core_properties(sim_val)
+    
     with open(code_config, "w") as launch_config:
         json.dump(sim_val, launch_config, indent = 2)
 
@@ -719,6 +723,10 @@ def run_tf_multproc(simulation_val, mode_vals, radial_mode_vals, taper_min, tape
     else:
         grid_size_list = np.arange(0.1, 2.1, 0.1)
         grid_size_range = np.linspace(0.1, 2.0, len(grid_size_list))
+
+        if simulation_val["launch_type"] != "LAUNCH_MULTIMODE" and Launch_params["launch_random_set"] != 0:
+            raise Exception("Launch type must be multimode with a fixed radnom set when determining optimal grid sizes!")
+        
         args_list = [(simulation_val, gr, taper_min, taper_max, gridding) for gr in grid_size_range]
 
     ctx = get_context("spawn")
@@ -728,4 +736,8 @@ def run_tf_multproc(simulation_val, mode_vals, radial_mode_vals, taper_min, tape
     for param, result in results:
         print(f"Param: {param}, Result: {result}")
         tf_list.append(results)
-    return tf_list
+        
+    if gridding:
+        return grid_size_range, tf_list
+    else:
+        return tf_list

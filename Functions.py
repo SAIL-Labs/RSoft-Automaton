@@ -177,7 +177,7 @@ def create_folders(folder_name):
     os.makedirs(results_folder, exist_ok=True)
     return results_folder
 #######################################################################################################################################################
-def AddHack(file_name, json_file, core_num, param_dict, mon_type = ""):
+def AddHack(file_name, json_file, core_num, param_dict, core_to_monitor, mon_type = ""):
     '''
     Hacking function to add text that will import segments to RSoft that the Python API does not currently handle.
 
@@ -396,23 +396,35 @@ end launch_field
         final_lines = []
         in_time_monitor = False
         inserted = False
+        mon_number = 1
 
         for line in modified_lines:
-            final_lines.append(line)
+            
             line_strip = line.strip()
 
+            # by default add_portmonitor sets the monitor to overlap, which needs FemSIM files. Should get similar results
+            # if using default field
+            if "type = TIMEMON_EXTENDED" in line:
+                line = line.replace("type = TIMEMON_EXTENDED", "type = TIMEMON_FIELD")
+        
+            final_lines.append(line)
             if line_strip.startswith("time_monitor"):
                 in_time_monitor = True
                 inserted = False  # reset insertion flag for each time_monitor
 
-            if in_time_monitor and line_strip.startswith("monitoroutputmask") and not inserted:
-                final_lines.append("\toverlap_type = 1\n")
-                final_lines.append("\tmonitor_file = LP01_19cPL.m00\n")
-                inserted = True
+            # if in_time_monitor and line_strip.startswith("monitoroutputmask") and not inserted:
+            #     final_lines.append("\toverlap_type = 1\n")
+
+            #     # if mon_number == core_to_monitor:
+            #     #     final_lines.append("\tmonitor_file = FEMSIM_z55000_MS.m00\n")
+            #     # else:
+            #     final_lines.append("\tmonitor_file = FEMSIM_z55000_NonMS.m00\n")
+            #     inserted = True
+            #     mon_number += 1
 
             if in_time_monitor and line_strip.startswith("end monitor"):
                 in_time_monitor = False
-
+                
         with open(f"{file_name}.ind", "w") as out:
             out.writelines(final_lines)
         
@@ -596,8 +608,11 @@ def build_fibre(circuit, path_num, core_positions, core_names, Taper_length, beg
 
 def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
              cladd_beginning_diam, cladd_final_diam,
-             core_beginning_dims_list, core_final_dims_list):
+             core_beginning_dims_list, core_final_dims_list,
+                simulation_val):
     
+    core_diam = simulation_val["core_diam"]
+
     cladding = circuit.add_segment(
         position=(0, 0, 0),
         offset=(0, 0, Taper_length),
@@ -624,15 +639,65 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
         # circuit.attach(core, cladding, 0, 0, 0)
         core_segments.append(core)
 
-        # if Launch_params["mon_type"] == "port_mon":
-        #     port = circuit.add_portmonitor(position=(x, y, Taper_length))
-        #     port_monitors.append(port)
-        #     circuit.attach(port, core, 1, 1, 1) 
+    if Launch_params["mon_type"] == "port_mon":
+        for j, (x, y) in enumerate(core_positions):
+            # Place monitor at the end of the segment, note that these are not offset from anything and so need the extra distance to line up with the segments
+            port = circuit.add_portmonitor(position=(x + (x / taper), y + (y / taper), Taper_length), dimensions = core_final_dims_list[j])
+            port_monitors.append(port)
+
+    # Attach port monitors to core segments
+    if Launch_params["mon_type"] == "port_mon":
+        for core_seg, port_mon in zip(core_segments, port_monitors):
+            # Attach monitor to the *output end* of the segment
+            circuit.attach(port_mon, core_seg, 1, 1, 1) 
+    return path_num
+
+def build_pigtail(circuit, path_num, core_positions, core_names, taper, Taper_length,
+             cladd_beginning_diam, cladd_final_diam,
+             core_beginning_dims_list, core_final_dims_list, 
+             simulation_val):
+    """
+    WIP: small MM end before the pigtail 
+    """
+    cladding_beg = circuit.add_segment(
+        position=(0, 0, 0),
+        offset=(0, 0, 2000),
+        dimensions=cladd_beginning_diam,
+        dimensions_end=cladd_beginning_diam
+    )
+    cladding_beg.set_name("MMF")
+    path_num += 1
+
+    # Store segments and monitors for attachment
+    core_segments = []
+    port_monitors = []
+
+    for j, (x, y) in enumerate(core_positions):
+        path_num += 1
+
+        cladding = circuit.add_segment(
+            position=(x / taper, y / taper, 2000),
+            offset=(x, y, Taper_length),
+            dimensions=cladd_beginning_diam,
+            dimensions_end=cladd_final_diam
+        )
+
+        core = circuit.add_segment(
+            position=(x / taper, y / taper, 2000),
+            offset=(x, y, Taper_length),
+            # offset=(x - (x / taper), y - (y / taper), Taper_length),
+            dimensions=core_beginning_dims_list[j],
+            dimensions_end=core_final_dims_list[j]
+        )
+        core.set_name(core_names[j])
+        cladding.set_name(f"Cladding: {core_names[j]}")
+        # circuit.attach(core, cladding, 0, 0, 0)
+        core_segments.append(core)
 
     if Launch_params["mon_type"] == "port_mon":
         for j, (x, y) in enumerate(core_positions):
             # Place monitor at the end of the segment, note that these are not offset from anything and so need the extra distance to line up with the segments
-            port = circuit.add_portmonitor(position=(x + (x / taper), y + (y / taper), Taper_length), dimensions = (6.5,6.5))
+            port = circuit.add_portmonitor(position=(x + (x / taper), y + (y / taper), Taper_length), dimensions = core_final_dims_list[j])
             port_monitors.append(port)
 
     # Attach port monitors to core segments
@@ -705,8 +770,8 @@ def read_port_mon_file(filepath = ""):
     filtered = all_vals[ all_vals < 1]
     return filtered
 #######################################################################################################################################################
-def overwrite_template_val():
-    with open("launch_config.json", "r") as launch_config:
+def overwrite_template_val(json_file):
+    with open(json_file, "r") as launch_config:
         simulation_val = json.load(launch_config)
     for k,_ in simulation_val.items():
         if k in fixed_params.keys():
@@ -921,8 +986,8 @@ def reorder_tf_vectors(tf_vector, simulation_val):
     """
     tf_matrix = []
     labels = []
-    core_num = simulation_val.get("core_num", Simulation_params["core_num"])
-    geo = simulation_val.get("grid_type", Simulation_params["grid_type"])
+    core_num = simulation_val["core_num"]
+    geo = simulation_val["grid_type"]
 
     for label, vec in tf_vector:
         labels.append(label)
@@ -932,6 +997,11 @@ def reorder_tf_vectors(tf_vector, simulation_val):
                 reorder_indices = [9, 10, 14, 13, 8, 4, 5, 11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
             elif core_num == 7:
                 reorder_indices = [3, 4, 6, 5, 2, 0, 1]
+        elif geo == "Pent":
+            if core_num == 6:
+                # not much of a change since these positions are 
+                # calculated in an anti-clockwise fashion to begin with
+                reorder_indices = [5, 1, 2, 3, 4, 0] 
         vec = np.array(vec)[reorder_indices]
 
         tf_matrix.append(vec)
@@ -941,26 +1011,39 @@ def phase_to_pixel(phase_val, phase_min, phase_max, resolution):
     # Maps phase_val to a pixel index for a colorbar image
     return int(round((phase_val - phase_min) / (phase_max - phase_min) * (resolution - 1)))
 
-def assign_17modes_to_tflist(tf_list):
-    tf_vectors_phase = [
-    ("LP01", tf_list[0]),
-    ("LP02", tf_list[5]),
-    ("LP03", tf_list[14]),
-    ("LP11a", tf_list[1]),
-    ("LP11b", tf_list[2]),
-    ("LP12a", tf_list[8]),
-    ("LP12b", tf_list[9]),
-    ("LP21a", tf_list[3]),
-    ("LP21b", tf_list[4]),
-    ("LP22a", tf_list[12]),
-    ("LP22b", tf_list[13]),
-    ("LP31a", tf_list[6]),
-    ("LP31b", tf_list[7]),
-    ("LP41a", tf_list[10]),
-    ("LP41b", tf_list[11]),
-    ("LP51a", tf_list[15]),
-    ("LP51b", tf_list[16])
-    ]
+def assign_17modes_to_tflist(tf_list, simulation_val):
+
+    core_num = simulation_val.get("core_num", Simulation_params["core_num"])
+    geo = simulation_val.get("grid_type", Simulation_params["grid_type"])
+    if core_num == 19:
+        tf_vectors_phase = [
+        ("LP01", tf_list[0]),
+        ("LP02", tf_list[5]),
+        ("LP03", tf_list[14]),
+        ("LP11a", tf_list[1]),
+        ("LP11b", tf_list[2]),
+        ("LP12a", tf_list[8]),
+        ("LP12b", tf_list[9]),
+        ("LP21a", tf_list[3]),
+        ("LP21b", tf_list[4]),
+        ("LP22a", tf_list[12]),
+        ("LP22b", tf_list[13]),
+        ("LP31a", tf_list[6]),
+        ("LP31b", tf_list[7]),
+        ("LP41a", tf_list[10]),
+        ("LP41b", tf_list[11]),
+        ("LP51a", tf_list[15]),
+        ("LP51b", tf_list[16])
+        ]
+    elif core_num == 7 or geo == "Pent":
+        tf_vectors_phase = [
+        ("LP01", tf_list[0]),
+        ("LP02", tf_list[5]),
+        ("LP11a", tf_list[1]),
+        ("LP11b", tf_list[2]),
+        ("LP21a", tf_list[3]),
+        ("LP21b", tf_list[4])
+        ]
     return tf_vectors_phase
 
 def plot_tf_matrix(tf_vectors, simulation_val, matrix_type="", ax=None, cbar=True, reorder = False, phase = False):
@@ -974,24 +1057,11 @@ def plot_tf_matrix(tf_vectors, simulation_val, matrix_type="", ax=None, cbar=Tru
         Plot of the transfer matrix
     '''
     core_num = simulation_val["core_num"]
-    geo = simulation_val.get("grid_type", Simulation_params["grid_type"]) 
-    labels = []
     tf_matrix = []
 
-    for label, vec in tf_vectors:
-        labels.append(label)
-        
-        if reorder:
-            """
-            Reorder index to match central core being #1, increasing in an anticlockwise fashion
-            """
-            if core_num == 19:
-                reorder_indices = [9, 10, 14, 13, 8, 4, 5, 11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
-            elif core_num == 7:
-                reorder_indices = [3, 4, 6, 5, 2, 0, 1]
-            vec = np.array(vec)[reorder_indices]
-
-        tf_matrix.append(vec)
+    tf_vectors = assign_17modes_to_tflist(tf_vectors, simulation_val)
+    if reorder:
+        label, tf_matrix = reorder_tf_vectors(tf_vectors, simulation_val)
 
     tf_matrix = np.array(tf_matrix)  # ensure 2D shape
 
@@ -1012,13 +1082,13 @@ def plot_tf_matrix(tf_vectors, simulation_val, matrix_type="", ax=None, cbar=Tru
     ax.set_ylabel("Core No.")
     ax.set_xlabel("Excited Mode")
     ax.set_yticks(ticks=np.arange(core_num), labels=np.arange(1, core_num + 1))
-    ax.set_xticks(ticks=np.arange(len(tf_vectors)), labels=labels, rotation=90)
-    ax.set_title(f"{matrix_type}")
+    ax.set_xticks(ticks=np.arange(len(tf_vectors)), labels=label, rotation=90)
+    ax.set_title(f"{matrix_type} Matrix")
     ax.tick_params(axis='both', which='major', labelsize=14)
 
     return im
 
-def plot_combined_tf_matrix(amp, phase, core_num, phase_max = 2*np.pi, amp_max = 1.0, dir = "", name = ""):
+def plot_combined_tf_matrix(simulation_val, amp, phase, core_num, phase_max = 2*np.pi, amp_max = 1.0, dir = "", name = ""):
     """
     Function used to combine both amplitude and phase transfer matrices into one joined matrix.
 
@@ -1042,9 +1112,9 @@ def plot_combined_tf_matrix(amp, phase, core_num, phase_max = 2*np.pi, amp_max =
     phase_matrix = np.vstack(phase)
 
     comp_matrix = amp_matrix * np.exp(1j * phase_matrix)
-    comp_tf_vector = assign_17modes_to_tflist(comp_matrix)
+    comp_tf_vector = assign_17modes_to_tflist(comp_matrix, simulation_val)
 
-    label, tf_matrix = reorder_tf_vectors(comp_tf_vector)
+    label, tf_matrix = reorder_tf_vectors(comp_tf_vector, simulation_val)
 
     amp_phase_img = np.transpose(apply_complex_map(tf_matrix, cmocean.cm.phase), (1, 0, 2))
     amp_phase_colorbar = generate_complex_colorbar(resolution = resolution)
@@ -1088,7 +1158,6 @@ def plot_combined_tf_matrix(amp, phase, core_num, phase_max = 2*np.pi, amp_max =
     cb_ax.tick_params(axis='y', right=True, labelright=True, left=False, labelleft=False)
     cb_ax.yaxis.set_label_position("right")
 
-
     plt.tight_layout()
     save_dir = dir + "\\" + name
     plt.savefig(save_dir, bbox_inches="tight", dpi = 300)
@@ -1116,7 +1185,7 @@ def assign_core_properties(simulation_val):
     will be set to None so that skopt may optimise its parameters alone.
     '''
     if "core_num" in simulation_val and "core_delta" in simulation_val:
-        ms_diam = [variable_params["core_diam"]] * simulation_val["core_num"]
+        ms_diam = [simulation_val["core_diam"]] * simulation_val["core_num"]
         ms_delta = [simulation_val["core_delta"]] * simulation_val["core_num"]
 
         if len(ms_diam) != simulation_val["core_num"] or len(ms_delta) != simulation_val["core_num"]:

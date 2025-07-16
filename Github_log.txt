@@ -1,4 +1,1 @@
-Added function to simultaneously inject individual modes supported by the lantern to build the transfer matrix.
-
-	- ##---ERROR RESOLVED---##. Seems to be a JSON error with long, dense simulations. Attempted to resolve by specifying each simulation its own prior file, labelled with the mode chosen and the PID for the simulation.
-	- Extended this to test a range of grid sizes for a standard multimode source.
+Can now produce transfer matrices for pentagon PLs. 

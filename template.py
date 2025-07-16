@@ -6,8 +6,8 @@ NOTE: Using values from 19CorePL_July2021_noOuter_MMtoSM_extraMM.ind
 fixed_params = {
     "core_sep": 60,
     "MCFCladd": 328, #328
-    "cladding_delta": 0.0055,
-    "Taper_L": 40000,
+    "cladding_delta": 0.01242,#0.0055,
+    "Taper_L": 55000, #40000
     # "taper": 10,
     # "core_delta": 0.0122895, #0.015,
     # "core_diam": 8.2,
@@ -80,10 +80,9 @@ Simulation_params = {
 }
 
 variable_params= {
-    "taper": 10, #16.53475828, # taken from rough calculation of diameter required to support 7 modes
-    # # "Taper_L": 40000,
-    "core_delta": 0.0122895,#0.0132929599265003,
-    "core_diam": 6.5#19.4994673523175,
+    "taper": 15, #10 
+    "core_delta": 0.01763, #0.02186, #0.0122895,
+    "core_diam": 8.2, #5.6
 }
 Launch_params["core_delta"] = variable_params["core_delta"
                                               ]
