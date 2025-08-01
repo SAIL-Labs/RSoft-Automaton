@@ -616,60 +616,18 @@ Below is the current workflow for building the transfer matrix for a PL. Above i
 it's throughput as the metric.
 
 CURRENT: simultaneously chooses pairs of modes to run RSoft with to develop the transfer matrix faster than running individually.
-Multiprocessing to occur after the parameter is chosen that sequentially injects individual modes to build the transfer matrix
-
-TO DO: add furhter multiprocessing that picks a new set of parameters, injects individual LP modes to build the transfer matrix, 
+Multiprocessing to occur after the parameter is chosen that sequentially injects individual modes to build the transfer matrix. 
+Multiprocessing that picks a new set of parameters, injects individual LP modes to build the transfer matrix, 
 and then suggest new parameters to test
 """
 import copy
-from multiprocessing import get_context
-
-def arg_worker(*args):
-    gridding = args[-1]
-    if gridding:
-        simulation_val_list, gr, simulate_tf = args[:-1]
-
-        sim_val = copy.deepcopy(simulation_val_list)
-        sim_val["grid_size"] = gr
-        sim_val["grid_size_y"] = gr
-        sim_val["launch_type"] = LaunchType.MM
-        sim_val["launch_tilt"] = 0
-        sim_val["launch_mode_radial"] = "*"
-
-        # CONTINUE HERE
-
-        # specify MS core properties
-        assign_core_properties(sim_val)
-
-        # dump configuration paras into json for use later
-        pid = os.getpid()
-        prior_space_pid = f"Grid_{gr}_prior_space_{pid}.json"
-        code_config = f"Grid_{gr}_launch_config.json"
-        optimizer_result = f"Grid_{gr}_Optimizer_Result.csv"
-        param_num = f"Grid {gr}"
-    else:
-        simulation_val_list, m, rm, param = args[:-1]
-        sim_val = copy.deepcopy(simulation_val_list)
-        sim_val["launch_mode"] = m
-        sim_val["launch_mode_radial"] = rm
-
-        # specify MS core properties
-        assign_core_properties(sim_val)
-
-        # dump configuration paras into json for use later
-        pid = os.getpid()
-        prior_space_pid = f"LP_{m}{rm}_prior_space_{pid}.json"
-        code_config = f"LP_{m}{rm}_launch_config.json"
-        optimizer_result = f"LP_{m}{rm}_Optimizer_Result_{pid}.csv"
-        param_num = f"LP{m}{rm}"
-
-    return sim_val, param_num, prior_space_pid, code_config, optimizer_result, param #, simulate_tf
 
 def multiple_mode_tf(arg_list):
-    import template
 
-    # sim_val, param_num, prior_space_pid, code_config, optimizer_result, params = arg_worker(*arg_list) #, run_tf_simulation
     sim_val, m, rm, params, gridding = arg_list
+    '''
+    TO DO: fix up the gridding part of this code.
+    '''
     if gridding:
         # sim_val = copy.deepcopy(simulation_val_list)
         # sim_val["grid_size"] = gr
@@ -693,44 +651,35 @@ def multiple_mode_tf(arg_list):
         sim_val = copy.deepcopy(sim_val)
         sim_val["launch_mode"] = m
         sim_val["launch_mode_radial"] = rm
+
+        # write core diameter properties to simulation_val and set special core properties to None for SKOPT to overwrite
         assign_core_properties(sim_val)
         core_to_monitor = sim_val["core_to_monitor"]
 
-        param_names = ["core_delta", "core_diam"]  # Or load dynamically if needed
-        # Assign the new params directly to the monitored core
+        # dynamically load parameters to vary
+        param_names = list(variable_params.keys())
+
+        # Assign the new params directly to the special core
         for pname, pval in zip(param_names, params):
             sim_val[f"core_{core_to_monitor}"][pname] = pval
             variable_params[pname] = pval
-        # specify MS core properties
-        # assign_core_properties(sim_val)
 
         # dump configuration paras into json for use later
+        # pid is needed to avoid cross-talking between files created/used in multiprocessing tasks
         pid = os.getpid()
+        # prior space identifier
         prior_space_pid = f"LP_{m}{rm}_prior_space_{pid}.json"
+        # launch config identifier
         code_config = f"LP_{m}{rm}_launch_config_{pid}.json"
+        # csv to store results later
         optimizer_result = f"LP_{m}{rm}_Optimizer_Result_{pid}.csv"
         param_num = f"LP{m}{rm}"
-
-    # sim_val = copy.deepcopy(sim_val)
-    # sim_val["launch_mode"] = m
-    # sim_val["launch_mode_radial"] = rm
-
     
-    # core_to_monitor = sim_val["core_to_monitor"]
-    # # Set param names in the order optimizer expects
-    # param_names = ["core_delta", "core_diam"]  
-    # for pname, pval in zip(param_names, params):
-    #     sim_val[f"core_{core_to_monitor}"][pname] = pval
-    # specify MS core properties
-    # # overwrite_template_val(code_config)
-    # assign_core_properties(sim_val)
-    
+    # dump launch config profile into simulation_val
     with open(code_config, "w") as launch_config:
         json.dump(sim_val, launch_config, indent = 2)
 
-    # overwrite_template_val(code_config)
     custom_priors = {
-                # "taper": (taper_min, taper_max),
                 "core_delta": (0.0, 0.02),
                 "core_diam": (1.0, 20.0)
                 }
@@ -740,12 +689,10 @@ def multiple_mode_tf(arg_list):
     sim = RSoftSim()
     sim.init_priors(prior_space_pid, build_tf, custom_priors)
 
-    # true = optimisation runs,
-    # false = only a single simulation using template vals runs
+    # run simulation
     sim.RunRSoft(sim_val, prior_space_pid, csv_path = optimizer_result, json_config = code_config, build_tf = build_tf)
 
     # Load results
-    pid = os.getpid()
     best_para_log = f"best_params_log_{pid}.csv"
     data = pd.read_csv(best_para_log)
 
@@ -763,26 +710,31 @@ def multiple_mode_tf(arg_list):
     plotting_optimizer_results(data, param_names, tf=tf_vectors, plot= False)
     return (param_num, tf_vectors)
 
-def run_tf_multproc(params, simulation_val, mode_vals, radial_mode_vals, gridding = False,): #taper_min, taper_max, run_tf_simulation = False
-    # # update key parameters
-    # param_names = [k for k in variable_params.keys()]
+def run_tf_multproc(params, simulation_val, mode_vals, radial_mode_vals, gridding = False,): 
 
-    # for pname, pval in zip(param_names, params):
-    #     variable_params[pname] = pval
-    # # print(variable_params)
     tf_list = []
     if not gridding:
-        args_list = [(simulation_val, m, rm, params, gridding) for m, rm in zip(mode_vals, radial_mode_vals)] #taper_min, taper_max, run_tf_simulation
+        # initialise global parent argument list. This creates multiple instances of args_list based on the length of
+        # mode_vals or radial_mode_vals. i.e. 
+        # [(simulation_val, 0, 1, params, False),(simulation_val, 1, 1, params, False),(simulation_val, -1, 1, params, False), .....]
+        args_list = [(simulation_val, m, rm, params, gridding) for m, rm in zip(mode_vals, radial_mode_vals)] 
     else:
+        # run gridding determination
         grid_size_list = np.arange(0.1, 2.1, 0.1)
         grid_size_range = np.linspace(0.1, 2.0, len(grid_size_list))
 
         if simulation_val["launch_type"] != "LAUNCH_MULTIMODE" and Launch_params["launch_random_set"] != 0:
             raise Exception("Launch type must be multimode with a fixed random set when determining optimal grid sizes!")
         
-        args_list = [(simulation_val, gr, params, gridding) for gr in grid_size_range] # taper_min, taper_max, run_tf_simulation
+        # initialise global parent argument list
+        args_list = [(simulation_val, gr, params, gridding) for gr in grid_size_range] 
 
+    # note 'spawn' means Python will start n separate processes each with their own memory of global variables. 
+    # You need to define any changes within their own instance or else NOTHING changes.
     with mp.get_context("spawn").Pool(processes=6) as pool:
+        # supply multiple_mode_tf with the arguments required to run. 
+        # Since the number of processes match the length of the mode_vals/radial_mode_vals
+        # then each worker gets an instance of arg_list. i.e. arg_list[i]
         results = pool.map(multiple_mode_tf, args_list)
 
     for param, result in results:
@@ -795,43 +747,25 @@ def run_tf_multproc(params, simulation_val, mode_vals, radial_mode_vals, griddin
         return tf_list
 
 def run_all_modes_for_params(params, simulation_val, mode_vals, radial_mode_vals, gridding=False):
-    import template
     """
     For a single param vector, run all modes and aggregate result.
     params: list of optimized parameter values (from skopt)
-    simulation_val: base simulation config (deepcopy inside function to avoid cross-talk)
-    mode_list: list of (m, rm) tuples (for your 6 modes)
-    gridding: bool, optional
+    simulation_val: base simulation config
+    mode_list: list of (m, rm) tuples
+    gridding: bool, determines whether to run gridding determination or not
     """
 
     if gridding:
+        # run gridding determination
         grid_size_range, tf_list = run_tf_multproc(params, simulation_val, mode_vals, radial_mode_vals, params, gridding)
         return grid_size_range, tf_list
     else:
         # multiprocessing in here, we only want multiprocessing in this function and not in main_optimizer!!!!
         tf_list = run_tf_multproc(params, simulation_val, mode_vals, radial_mode_vals, gridding)
-    # tf_list = []
-
-    # for m, rm in zip(mode_vals, radial_mode_vals):
-    #     sim_val = copy.deepcopy(simulation_val)
-    #     # Set the parameters for this run (update simulation config)
-    #     # e.g. variable_params are set from params
-    #     param_names = [k for k in variable_params.keys()]
-
-    #     for pname, pval in zip(param_names, params):
-    #         variable_params[pname] = pval
-    #     # Also update sim_val as needed for this mode:
-    #     sim_val["launch_mode"] = m
-    #     sim_val["launch_mode_radial"] = rm
-
-    #     # Run the simulation for this parameter and mode:
-    #     # (multiple_mode_tf should take sim_val, m, rm, gridding)
-    #     param, result = multiple_mode_tf((sim_val, m, rm, gridding))
-    #     tf_list.append((param, result))
     
     # Aggregate result (compute scalar loss/metric for this parameter vector)
     core_to_monitor = simulation_val["core_to_monitor"]
-    modes_to_monitor = ["LP01"]   # Or a list, as required
+    modes_to_monitor = ["LP01"]  
 
     loss = mode_selective_tf_matrix_metric(
         tf_list,
@@ -840,9 +774,8 @@ def run_all_modes_for_params(params, simulation_val, mode_vals, radial_mode_vals
     )
     return loss
 
-
-def main_optimizer(prior_space_pid, simulation_val, mode_vals, radial_mode_vals, gridding, total_calls):
-
+def main_optimizer(prior_space_pid, simulation_val, mode_vals, radial_mode_vals, gridding, total_calls, simulate_tf_metric = True):
+    # create image folder in results location
     images_dir = Path(os.path.expanduser("~/Desktop/Results/Images"))
     images_dir.mkdir(parents=True, exist_ok=True)
 
@@ -857,163 +790,34 @@ def main_optimizer(prior_space_pid, simulation_val, mode_vals, radial_mode_vals,
     else:
         raise RuntimeError(f"Failed to load {prior_space_pid} after retries.")
     
+    # read in prior space to inform optimiser of the dimensions
     para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
+    
+    # initialise optimiser
     opt = Optimizer(
         dimensions=para_space,
         base_estimator="GP",
         acq_func="EI",
         random_state=42
     )
-
-    all_results = []
-    for batch_idx in range(total_calls):
-        param_batch = opt.ask()
-        # print(param_batch)
-        # Each worker gets (params, simulation_val, mode_list)
-        # jobs = [(param_batch, simulation_val, mode_vals, radial_mode_vals)]
-        # with mp.get_context("spawn").Pool() as pool:
-        result_batch = run_all_modes_for_params(param_batch, simulation_val, mode_vals, radial_mode_vals, gridding = gridding)
-        opt.tell(param_batch, result_batch)
-        print(f"Iteration {batch_idx + 1}: {result_batch}")
-        # for params, score in zip(param_batch, result_batch):
-        all_results.append({'params': param_batch, 'result': result_batch, 'Iteration': batch_idx + 1})
-
-    return all_results
-
-
-# def tf_MultProc(simulation_val, prior_space_pid): #taper_min, taper_max,
+    # if true, run optimisation testing the loss metric
+    if simulate_tf_metric:
+        all_results = []
+        for batch_idx in range(total_calls):
+            # ask for 1 set of parameter vectors only to prevent daemonic process having children 
+            param_batch = opt.ask()
+            # run simulation
+            result_batch = run_all_modes_for_params(param_batch, simulation_val, mode_vals, radial_mode_vals, gridding = gridding)
+            # tell optimiser the performance of the chosen parameters
+            opt.tell(param_batch, result_batch)
+            # log iteration of parameters, store for later use
+            print(f"Iteration {batch_idx + 1}: {result_batch}")
+            all_results.append({'params': param_batch, 'result': result_batch, 'Iteration': batch_idx + 1})
         
-#         mode_vals = simulation_val["mode_vals"]
-#         radial_mode_vals = simulation_val["radial_mode_vals"]
-#         images_dir = Path(os.path.expanduser("~/Desktop/Results/Images"))
-#         images_dir.mkdir(parents=True, exist_ok=True)
-
-#         # load prior space
-#         for attempt in range(10):
-#             try:
-#                 with open(prior_space_pid, "r") as read:
-#                     param_range = json.load(read)
-#                 break
-#             except json.decoder.JSONDecodeError:
-#                 time.sleep(0.2)
-#         else:
-#             raise RuntimeError(f"Failed to load {prior_space_pid} after retries.")
-
-#         # initialise optimiser  
-#         para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
-#         param_names = [dim.name for dim in para_space]
-
-#         opt = Optimizer(
-#             dimensions= para_space,
-#             base_estimator = "GP",
-#             acq_func= "EI",
-#             random_state = 42
-#         )
-#         sim_params = Simulation_params
-#         total_calls = sim_params["num_paras"]
-#         batch_size = sim_params["batch_num"]
-#         all_results = []
-
-#         seed_params = [variable_params[k] for k in param_names]
-
-#         # define initial point
-#         seed_loss, seed_tf_list = evaluate_param_set(
-#             seed_params, param_names, simulation_val, simulation_val["mode_vals"], simulation_val["radial_mode_vals"],# taper_min, taper_max,
-#             core_to_monitor=simulation_val["core_to_monitor"]-1,  # zero-based if needed
-#             modes_to_monitor=["LP01"],    # adjust as needed
-#             gridding=False
-#         )
-#         # print(seed_loss)
-#         opt.tell(seed_params, seed_loss)
-#         all_results.append({
-#             "params": seed_params,
-#             "result": seed_loss,
-#             "transfer_vector": seed_tf_list
-#         })
-
-#         log_optimizer_results(
-#             x_iters=[seed_params],
-#             y_vals=[-seed_loss],
-#             param_batch=[seed_params],
-#             result_batch=[seed_loss],
-#             param_names=param_names,
-#             iteration_start=0,
-#             batch_size=1,
-#             penalty_batch=None,
-#             transfer_vector_batch=[seed_tf_list]
-#         )
-
-#         # Run optimiser
-#         for i in range(1, total_calls):
-#             param_batch = opt.ask() # only 1 parameter set to prevent daemonic processes
-#             print("Trying params:", param_batch)
-#             # ctx = mp.get_context("spawn")
-#             # args_list = [
-#             #     (
-#             #         params, param_names, simulation_val, mode_vals, radial_mode_vals,
-#             #         # taper_min, taper_max, 
-#             #         simulation_val["core_to_monitor"] - 1,
-#             #         ["LP01"], False
-#             #     ) for params in param_batch
-#             # ]
-#             # with ctx.Pool(batch_size) as pool:
-#             #     results = pool.starmap(evaluate_param_set, args_list)
-            
-#             # loss_batch, tf_list_batch = zip(*results)
-#             # opt.tell(param_batch, loss_batch)
-#             loss_batch, tf_list_batch = evaluate_param_set(
-#                 param_batch, param_names, simulation_val, mode_vals, radial_mode_vals,
-#                 core_to_monitor=simulation_val["core_to_monitor"]-1,
-#                 modes_to_monitor=["LP01"], gridding=False
-#             )
-#             opt.tell(tf_list_batch, loss_batch)
-#             for params, loss, tf_list in zip(param_batch, loss_batch, tf_list_batch):
-#                 all_results.append({
-#                     "params": params,
-#                     "result": loss,
-#                     "transfer_vector": tf_list
-#                 })
-            
-#             # Unpack results
-#             x_iters = [r["params"] for r in all_results]  # parameter sets
-#             y_vals = [-r["result"] for r in all_results]  # throughput values
-#             tf_vector_val = [r["transfer_vector"] for r in all_results]
-
-#             param_names = [dim.name for dim in opt.space.dimensions]
-#             # log chosen values and penalties
-#             log_optimizer_results(x_iters, y_vals,
-#                                   param_batch, 
-#                                   [r["result"] for r in all_results[-batch_size:]],
-#                                   param_names, iteration_start=i,
-#                                   batch_size = batch_size,
-#                                   penalty_batch= None,
-#                                   transfer_vector_batch=tf_vector_val)
-
-# def evaluate_param_set(params, param_names, simulation_val_template, mode_vals, radial_mode_vals, core_to_monitor, modes_to_monitor, gridding=False): #taper_min, taper_max,
-#     """
-#     params: List of parameter values to test
-#     param_names: Names of parameters (order matches 'params')
-#     simulation_val_template: The base simulation dictionary (not mutated)
-#     mode_vals, radial_mode_vals, ... : Other simulation setup
-#     core_to_monitor, modes_to_monitor: for the metric
-#     """
-#     import copy
-#     sim_val = copy.deepcopy(simulation_val_template)
-#     for name, val in zip(param_names, params):
-#         variable_params[name] = val
-
-#     # Actually run the simulation for this parameter set
-#     tf_list = run_tf_multproc(
-#         sim_val,
-#         mode_vals, radial_mode_vals, # taper_min, taper_max,
-#         gridding=gridding
-#     )
-
-#     # Compute the metric; pass through extra config as needed
-#     loss = mode_selective_tf_matrix_metric(
-#         tf_list,
-#         core_to_monitor=core_to_monitor,
-#         modes_to_monitor=modes_to_monitor
-#     )
-#     return (loss, tf_list)
-
+        return all_results
+    # if false, run tf code for the template parameters
+    else:
+        param_names = ["core_delta", "core_diam"]
+        params = [variable_params[k] for k in param_names]
+        tf_list = run_tf_multproc(params, simulation_val, mode_vals, radial_mode_vals, gridding)
+        return tf_list
