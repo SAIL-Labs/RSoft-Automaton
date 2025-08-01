@@ -9,6 +9,7 @@ from template import *
 import matplotlib.animation as animation
 from matplotlib.animation import FFMpegWriter
 from matplotlib import colors
+from matplotlib.colors import Normalize
 import glob
 import ehtplot.color
 import cmocean
@@ -259,15 +260,6 @@ end launch_field
             f.write(text)
     elif mon_type == "port_mon":
         block_text = { 
-#         "monitor": '''
-# time_monitor {n}
-#     profile_type = PROF_INACTIVE
-#     color = 2
-#     type = TIMEMON_EXTENDED
-#     timeaverage = 2
-#     monitoroutputmask = 1024
-# 	monitoroutputformat = OUTPUT_AMP_PHASE
-# ''',
         "pathway": '''
 pathway {n}
     {n}
@@ -295,23 +287,6 @@ end launch_field
                 text = block_text["pathway"].format(n=i)
                 f.write(text)
 
-            # Write all monitors
-            # for i in range(1, core_num + 2):
-                # monitor_width = launch_array["cladd_monitor_width"] if i == 1 else launch_array["core_monitor_width"]
-                # monitor_height = launch_array["cladd_monitor_height"] if i == 1 else launch_array["core_monitor_height"]
-                # monitor_type = launch_array["cladding_monitor_type"] if i == 1 else launch_array["monitor_type"]
-
-                # text = block_text["monitor"].format(
-                #     n=i,
-                #     # monitor_width=monitor_width,
-                #     # monitor_height=monitor_height,
-                #     monitor_type=monitor_type,
-                #     comp=launch_array["comp"],
-                #     launch_tilt=launch_array["launch_tilt"],
-                #     monitor_mode = 0, #launch_array["launch_mode"] if i == (launch_array["core_to_monitor"] + 1) else 0
-                #     monitor_normalization = launch_array["monitor_normalization"]
-                # )
-                # f.write(text)
                 # Write only one launch field (for the cladding (MMF case)/core (SMF case))
             text = block_text["launch_field"].format(
                 n=1,
@@ -322,15 +297,15 @@ end launch_field
                 launch_mode=launch_array["launch_mode"],
                 launch_mode_radial=launch_array["launch_mode_radial"],
                 launch_random_set=launch_array["launch_random_set"],
-                launch_phase = launch_array["launch_phase"]
+                launch_phase = launch_array["launch_phase"],
             )
             f.write(text)
 
     # Open file in read mode
     with open(f"{file_name}.ind", "r") as f:
         lines = f.readlines()
-    # Insert delta after core and cladding segment start
 
+    # Insert delta after core and cladding segment start
     core_name = [f"core_{n}" for n in range(1, core_num+1)]
 
     for core_key in core_name:
@@ -342,7 +317,22 @@ end launch_field
     lines = insert_after_match(lines, "begin.width =", [
         f"\tbegin.delta = {launch_array['cladding_delta']}\n",
         f"\tend.delta = {launch_array['cladding_delta']}\n"
-    ], segment_filter="Super Cladding")
+    ], segment_filter="Super Cladding") 
+
+    # lines = insert_after_match(lines, "begin.width =", ["profile_type = PROF_INACTIVE"
+    # ], segment_filter="Super Cladding") 
+
+    # for i in range(1, core_num + 1):
+    #     if i == core_to_monitor:
+    #         lines = insert_after_match(lines, "begin.width =", [
+    #             f"\tbegin.delta = {launch_array['cen_core_cladding_delta']}\n",
+    #             f"\tend.delta = {launch_array['cen_core_cladding_delta']}\n"
+    #         ], segment_filter=f"Cladding: {i}")
+    #     else:
+    #         lines = insert_after_match(lines, "begin.width =", [
+    #             f"\tbegin.delta = {launch_array['core_cladding_delta']}\n",
+    #             f"\tend.delta = {launch_array['core_cladding_delta']}\n"
+    #         ], segment_filter=f"Cladding: {i}")
 
     # Build the updated lines
     modified_lines = []
@@ -360,7 +350,7 @@ end launch_field
             in_segment_header = True
             modified_lines.append(line)
             continue
-        elif line_strip.startswith("comp_name = core_"):
+        elif line_strip.startswith("comp_name = core_") or line_strip.startswith("comp_name = Cladding"):
             current_segment_is_super_cladding = False
             in_segment_header = True
             modified_lines.append(line)
@@ -401,26 +391,48 @@ end launch_field
         for line in modified_lines:
             
             line_strip = line.strip()
-
             # by default add_portmonitor sets the monitor to overlap, which needs FemSIM files. Should get similar results
             # if using default field
-            if "type = TIMEMON_EXTENDED" in line:
-                line = line.replace("type = TIMEMON_EXTENDED", "type = TIMEMON_FIELD")
-        
+            # if "type = TIMEMON_EXTENDED" in line:
+            #     line = line.replace("type = TIMEMON_EXTENDED", "type = TIMEMON_FIELD")
+
+            # forecfully fix certain port monitor parameters that appear as default otherwise  for port monitors
+            port_mon_text_arr = ["phi = default", "begin.width = default", "begin.height = default"]
+            port_mon_text_replace = ["phi = 0", f"begin.width = 6.5", f"begin.height = 6.5"]
+                        
+            for p, r in zip(port_mon_text_arr, port_mon_text_replace):
+                if p in line:
+                    line = line.replace(p, r)
+            
+                # Remove 'comp_name' and 'portnum' lines
+            if line_strip.startswith("portnum"):  #line_strip.startswith("comp_name") or
+                continue 
+
             final_lines.append(line)
             if line_strip.startswith("time_monitor"):
                 in_time_monitor = True
+
                 inserted = False  # reset insertion flag for each time_monitor
 
-            # if in_time_monitor and line_strip.startswith("monitoroutputmask") and not inserted:
-            #     final_lines.append("\toverlap_type = 1\n")
+            if in_time_monitor and line_strip.startswith("monitoroutputmask") and not inserted:
+                final_lines.append("\tmonitoroutputformat = OUTPUT_AMP_PHASE\n")
+                final_lines.append("\toverlap_type = 1\n")
 
-            #     # if mon_number == core_to_monitor:
-            #     #     final_lines.append("\tmonitor_file = FEMSIM_z55000_MS.m00\n")
-            #     # else:
-            #     final_lines.append("\tmonitor_file = FEMSIM_z55000_NonMS.m00\n")
-            #     inserted = True
-            #     mon_number += 1
+                if mon_number == (core_to_monitor):
+                    first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
+                    final_lines.append(f"\t{first_mode_first_pol_file}\n")
+                else:
+                    first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
+                    final_lines.append(f"\t{first_mode_first_pol_file}\n")                    
+                    # first_mode_second_pol = f"monitor_file2 = Core_{mon_number}_femSIM.m01"
+                final_lines.append(f"\tpolarizer = 2")
+
+                
+                # final_lines.append(f"\t{first_mode_second_pol}\n")
+                # else:
+                #     final_lines.append("\tmonitor_file = Core_1_femSIM.m00\n")
+                inserted = True
+                mon_number += 1
 
             if in_time_monitor and line_strip.startswith("end monitor"):
                 in_time_monitor = False
@@ -514,8 +526,8 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
     best_params = x_iters[best_idx]
     best_throughput = y_vals[best_idx]
     best_tf = transfer_vector_batch[best_idx] if include_tf else []
-
-    para_tag = "best_params_log.csv"
+    pid = os.getpid()
+    para_tag = f"best_params_log_{pid}.csv"
     with open(para_tag, "w", newline="") as log:
         writer = csv.writer(log)
         writer.writerow(["Iteration"] + param_names + ["Throughput"] +
@@ -608,11 +620,9 @@ def build_fibre(circuit, path_num, core_positions, core_names, Taper_length, beg
 
 def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
              cladd_beginning_diam, cladd_final_diam,
-             core_beginning_dims_list, core_final_dims_list,
-                simulation_val):
+             core_beginning_dims_list, core_final_dims_list, 
+             simulation_val):
     
-    core_diam = simulation_val["core_diam"]
-
     cladding = circuit.add_segment(
         position=(0, 0, 0),
         offset=(0, 0, Taper_length),
@@ -639,73 +649,109 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
         # circuit.attach(core, cladding, 0, 0, 0)
         core_segments.append(core)
 
+        if Simulation_params["add_cladding_to_cores"] is not None:
+            for i in Simulation_params["add_cladding_to_cores"]:
+                if i == j:
+                    if fixed_params["core_cladding_diam"] is not None:
+                        core_cladding_beg_dims = (fixed_params["core_cladding_diam"] / taper,fixed_params["core_cladding_diam"] / taper)
+                        core_cladding_end_dims = (fixed_params["core_cladding_diam"], fixed_params["core_cladding_diam"])
+                        core_cladding = circuit.add_segment(
+                            position=(x / taper, y / taper, 0),
+                            offset=(x, y, Taper_length),
+                            dimensions=core_cladding_beg_dims,
+                            dimensions_end=core_cladding_end_dims
+                        )
+                        core_cladding.color('0')
+                        core_cladding.set_name(f"Core {i} Cladding")
+
+                    else:
+                        raise Exception("core_cladding_diam cannot be None!!!!")
+
     if Launch_params["mon_type"] == "port_mon":
         for j, (x, y) in enumerate(core_positions):
             # Place monitor at the end of the segment, note that these are not offset from anything and so need the extra distance to line up with the segments
-            port = circuit.add_portmonitor(position=(x + (x / taper), y + (y / taper), Taper_length), dimensions = core_final_dims_list[j])
+            port = circuit.add_portmonitor(dimensions = core_final_dims_list[j])
             port_monitors.append(port)
 
     # Attach port monitors to core segments
     if Launch_params["mon_type"] == "port_mon":
         for core_seg, port_mon in zip(core_segments, port_monitors):
             # Attach monitor to the *output end* of the segment
-            circuit.attach(port_mon, core_seg, 1, 1, 1) 
+            circuit.attach(port_mon, core_seg, 1, 0, attach_angles = 0, attach_dimensions = 1) 
     return path_num
 
-def build_pigtail(circuit, path_num, core_positions, core_names, taper, Taper_length,
-             cladd_beginning_diam, cladd_final_diam,
-             core_beginning_dims_list, core_final_dims_list, 
-             simulation_val):
-    """
-    WIP: small MM end before the pigtail 
-    """
-    cladding_beg = circuit.add_segment(
-        position=(0, 0, 0),
-        offset=(0, 0, 2000),
-        dimensions=cladd_beginning_diam,
-        dimensions_end=cladd_beginning_diam
-    )
-    cladding_beg.set_name("MMF")
-    path_num += 1
+# def build_pigtail(circuit, path_num, core_positions, core_names, taper, Taper_length,
+#              cladd_beginning_diam, cladd_final_diam,
+#              core_beginning_dims_list, core_final_dims_list, 
+#              simulation_val, core_cladding_beg_dims, core_cladding_end_dims,
+#              cen_core_cladding_beg_dims, cen_core_cladding_end_dims):
+    
+#     ms_core = simulation_val["core_to_monitor"]
+#     """
+#     WIP: small MM end before the pigtail 
+#     """
+#     cladding_beg = circuit.add_segment(
+#         position=(0, 0, 0),
+#         offset=(0, 0, Taper_length),
+#         dimensions=cladd_beginning_diam,
+#         dimensions_end=cladd_final_diam
+#     )
+#     cladding_beg.set_name("Super Cladding")
+#     cladding_beg.color('0')
+#     path_num += 1
 
-    # Store segments and monitors for attachment
-    core_segments = []
-    port_monitors = []
+#     # Store segments and monitors for attachment
+#     core_segments = []
+#     port_monitors = []
 
-    for j, (x, y) in enumerate(core_positions):
-        path_num += 1
+#     for j, (x, y) in enumerate(core_positions):
+#         path_num += 1
 
-        cladding = circuit.add_segment(
-            position=(x / taper, y / taper, 2000),
-            offset=(x, y, Taper_length),
-            dimensions=cladd_beginning_diam,
-            dimensions_end=cladd_final_diam
-        )
+#         if j == (ms_core - 1):
+#             cladding = circuit.add_segment(
+#                 position=(x / taper, y / taper, 0),
+#                 offset=(x, y, Taper_length),
+#                 dimensions=cen_core_cladding_beg_dims,
+#                 dimensions_end=cen_core_cladding_end_dims
+#             )
+#         else:
+#             cladding = circuit.add_segment(
+#                 position=(x / taper, y / taper, 0),
+#                 offset=(x, y, Taper_length),
+#                 dimensions=core_cladding_beg_dims,
+#                 dimensions_end=core_cladding_end_dims
+#             )
 
-        core = circuit.add_segment(
-            position=(x / taper, y / taper, 2000),
-            offset=(x, y, Taper_length),
-            # offset=(x - (x / taper), y - (y / taper), Taper_length),
-            dimensions=core_beginning_dims_list[j],
-            dimensions_end=core_final_dims_list[j]
-        )
-        core.set_name(core_names[j])
-        cladding.set_name(f"Cladding: {core_names[j]}")
-        # circuit.attach(core, cladding, 0, 0, 0)
-        core_segments.append(core)
+#         core = circuit.add_segment(
+#             position=(x / taper, y / taper, 0),
+#             offset=(x, y, Taper_length),
+#             # offset=(x - (x / taper), y - (y / taper), Taper_length),
+#             dimensions=core_beginning_dims_list[j],
+#             dimensions_end=core_final_dims_list[j]
+#         )
+#         core.color('4')
 
-    if Launch_params["mon_type"] == "port_mon":
-        for j, (x, y) in enumerate(core_positions):
-            # Place monitor at the end of the segment, note that these are not offset from anything and so need the extra distance to line up with the segments
-            port = circuit.add_portmonitor(position=(x + (x / taper), y + (y / taper), Taper_length), dimensions = core_final_dims_list[j])
-            port_monitors.append(port)
+#         core.set_name(core_names[j])
+#         cladding.set_name(f"Cladding: {j + 1}")
+#         # circuit.attach(core, cladding, 0, 0, 0)
+#         core_segments.append(core)
 
-    # Attach port monitors to core segments
-    if Launch_params["mon_type"] == "port_mon":
-        for core_seg, port_mon in zip(core_segments, port_monitors):
-            # Attach monitor to the *output end* of the segment
-            circuit.attach(port_mon, core_seg, 1, 1, 1) 
-    return path_num
+#     if Launch_params["mon_type"] == "port_mon":
+#         for j, (x, y) in enumerate(core_positions):
+#             # Place monitor at the end of the segment, note that these are not offset from anything and so need the extra distance to line up with the segments
+#             if j == (ms_core - 1):
+#                 port = circuit.add_portmonitor(dimensions = cen_core_cladding_end_dims)
+#             else:
+#                 port = circuit.add_portmonitor(dimensions = core_final_dims_list[j])
+
+#             port_monitors.append(port)
+
+#     # Attach port monitors to core segments
+#     if Launch_params["mon_type"] == "port_mon":
+#         for core_seg, port_mon in zip(core_segments, port_monitors):
+#             # Attach monitor to the *output end* of the segment
+#             circuit.attach(port_mon, core_seg, 1, 0, 1) 
+#     return path_num
 ############################################################################################################################################
 def throughput_metric(csv_path, fixed_length, fixed, vars, param_range, mode_selective):
     df = pd.read_csv(csv_path)
@@ -722,12 +768,15 @@ def throughput_metric(csv_path, fixed_length, fixed, vars, param_range, mode_sel
     else:
         return throughput
     
-def transfer_matrix_component(csv_path, row):
+def transfer_matrix_component(csv_path, row, port_mon = False):
     df = pd.read_csv(csv_path)
     transfer_vector = []
 
     monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]        
-    ms_col = f"Monitor_{Simulation_params['core_to_monitor']}"
+    if port_mon:
+        ms_col = f"Monitor_{Simulation_params['core_to_monitor']}_Amplitude"
+    else:
+        ms_col = f"Monitor_{Simulation_params['core_to_monitor'] - 1}"
     
     if Launch_params["mon_type"] == "pathway_mon":
         for cl in monitor_columns:
@@ -735,34 +784,104 @@ def transfer_matrix_component(csv_path, row):
         throughput = df[ms_col].tail(10).mean()
         return np.array(transfer_vector), throughput
     
-    elif Launch_params["mon_type"] == "port_mon":
-        throughput = df[ms_col].tail(10).mean()
+    elif port_mon:
+        # extract individual mode selective throughput, return all port
+        # monitor outputs along with the specific mode selective throughput
+        throughput = df[ms_col]
         return row, throughput
 
             
-def mode_selective_metric(csv_path, core_to_monitor, mode_type=""):
-    df = pd.read_csv(csv_path)
-    monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]
+def mode_selective_tf_matrix_metric(tf_list, core_to_monitor, modes_to_monitor):
+    """
+    Function that will sort through tf_list, extract the mode selective core values in ms/non-ms modes and return the loss function needed by scikit
+    Arguments:
+        - tf_list: transfer matrix resulting from RSoft multiprocessing
+        - core_to_monitor: special core to have ms capabilities. Must be a single integer
+        - modes_to_monitor: modes to couple into the ms core. Must be an array of values (e.g. ["LP01", "LP11a",...])
+    Returns:
+        - loss function that will maximise the ms core in the ms mode(s), overall power in non-ms cores in non-ms modes, 
+        while minimising ms core in non-ms modes and non-ms cores in ms-mode(s)
+    """
+    label_replacements = {
+        'LP01': 'LP01',
+        'LP11': 'LP11a',
+        'LP-11': 'LP11b',
+        'LP21': 'LP21a',
+        'LP-21': 'LP21b',
+        'LP02': 'LP02',
+        'LP31': 'LP31a',
+        'LP-31': 'LP31b',
+        'LP12': 'LP12a',
+        'LP-12': 'LP12b',
+        'LP41': 'LP41a',
+        'LP-41': 'LP41b',
+        'LP22': 'LP22a',
+        'LP-22': 'LP22b',
+        'LP03': 'LP03',
+        'LP51': 'LP51a',
+        'LP-51': 'LP51b'
+    }
 
-    # Sanity check to prevent choosing invalid cores
-    if core_to_monitor < 1 or core_to_monitor > len(monitor_columns):
-        raise ValueError("Invalid core_to_monitor index.")
+    tf_list = tf_list[0]
+    # with open(f"worker_debug_{os.getpid()}.txt", "w") as f:
+    #     f.write(f"tf_list = {repr(tf_list)}\n")
+    #     for i, item in enumerate(tf_list):
+    #         try:
+    #             f.write(f"tf_list[{i}] = {item}, len={len(item) if hasattr(item, '__len__') else 'N/A'}\n")
+    #         except Exception as e:
+    #             f.write(f"tf_list[{i}] = {item}, error: {e}\n")
+    # relabel
+    new_tf_list = [
+        (label_replacements.get(label, label), arr)
+        for label, arr in tf_list
+    ]
 
-    # Compute average monitor power over final 10 samples
-    ms_core = monitor_columns[Simulation_params["core_to_monitor"]]
-    avg_throughput = df[ms_core].tail(10).mean()
-    non_ms_cores = [col for col in monitor_columns if col != ms_core]
+    mode_list = [label for label, _ in new_tf_list]
+    # extract the amplitudes only and leave the phase information
+    mode_result = {
+        f"{label}_result": new_tf_list[idx][1][0][1::2]
+        for idx, label in enumerate(mode_list)
+    }
 
-    P_ms = avg_throughput
-    P_non_ms = df[non_ms_cores].tail(10).mean().sum()
+    # Select which core and mode are mode-selective
+    ms_core = core_to_monitor            # Index (0-based) for the mode-selective core
+    ms_mode_index = []
 
-    # Select metric style
-    if mode_type == mode_type:
-        # We expect LP01 to go into the mode-selective core only
-        return P_ms / (P_non_ms + 1e-12)  # avoid divide-by-zero
-    else:
-        # For higher-order modes, we want leakage into the MS core to be small
-        return P_non_ms / (P_ms + 1e-12) # avoid divide-by-zero
+    for h in modes_to_monitor:
+        ms_mode_index.append(list(label_replacements.values()).index(h))
+    ms_modes = ms_mode_index         # Index for the mode-selective mode(s) 
+
+    for mode_idx in ms_modes:
+        mode_label = mode_list[mode_idx]          # 'LP01', specifies the label for the MS mode 
+        ms_mode_vals = mode_result[f"{mode_label}_result"]   # extracts the core amplitudes for the MS mode 
+
+        # 1. MS core in MS mode:
+        ms_core_mode = np.abs(ms_mode_vals[ms_core])**2 
+
+        # 2. All non-MS cores in MS mode:
+        nonms_core_ms_mode = [np.abs(val)**2 for idx, val in enumerate(ms_mode_vals) if idx != ms_core] 
+        nonms_core_ms_mode = np.mean(nonms_core_ms_mode)
+
+        # Prepare other modes
+        other_mode_labels = [lab for idx, lab in enumerate(mode_list) if idx != mode_idx] 
+        other_mode_vals = [mode_result[f"{lab}_result"] for lab in other_mode_labels] 
+        # 3. Mean of MS core in non-MS modes:
+        ms_core_other_mode_vals = [np.abs(vals[ms_core])**2 for vals in other_mode_vals] 
+
+        ms_core_other_mode = np.mean(ms_core_other_mode_vals) 
+
+        # 4. Mean of non-MS cores in non-MS modes: 
+        nonms_core_other_mode_vals = [
+            np.abs(val)**2
+            for vals in other_mode_vals
+            for idx, val in enumerate(vals) if idx != ms_core
+        ] # extracts every non-ms core intensity and stores it in the array called nonms_core_other_mode_vals
+        nonms_core_other_mode = np.mean(nonms_core_other_mode_vals) # averages the intensity of non-ms cores in non-ms modes. 
+                                                                    # This is what should be maximised and is equivelant to taking 
+                                                                    # the average of each non-ms core in each individual non-ms mode
+
+        loss_func = -ms_core_mode -nonms_core_other_mode + (nonms_core_ms_mode + ms_core_other_mode)
+        return loss_func
 
 def read_port_mon_file(filepath = ""):
     dat = pd.read_csv(filepath, skiprows = 3, sep=r'\s+', header = None)
@@ -773,6 +892,7 @@ def read_port_mon_file(filepath = ""):
 def overwrite_template_val(json_file):
     with open(json_file, "r") as launch_config:
         simulation_val = json.load(launch_config)
+    core_to_monitor = simulation_val["core_to_monitor"]
     for k,_ in simulation_val.items():
         if k in fixed_params.keys():
             raise Warning(f"Cannot change {k} using simulation_val. Change directly within template.py instead")
@@ -800,10 +920,11 @@ def overwrite_template_val(json_file):
                 "delta": fixed_params["core_delta"]
             }
         elif "core_diam" in variable_params and "core_delta" in variable_params:
-            core_params[core_key] = {
-                "core_diam": variable_params["core_diam"],
-                "delta": variable_params["core_delta"]
-            }
+            if i != core_to_monitor:
+                core_params[core_key] = {
+                    "core_diam": variable_params["core_diam"],
+                    "delta": variable_params["core_delta"]
+                }
 #######################################################################################################################################################
 def plot_lp_modes(V):
     r_over_a = np.linspace(0, 1.5, 50) # changes the position of the maxima points
@@ -888,7 +1009,7 @@ def plot_available_modes(diam, wave, ell_num, NA):
         plt.savefig(f"Available_LP_Modes_for_V_{V:.3f}.png", dpi = 300)
         plot_lp_modes(V)
 
-def print_paras(radii, wavelengths, mode_count, mode_desired, l_modes_to_consider, NA):
+def print_paras(radii, wavelengths, mode_count, mode_desired, l_modes_to_consider, NA, upper_bound, lower_bound):
     rad_range = []
     for i, r in enumerate(radii):
         for j, wl in enumerate(wavelengths):
@@ -896,8 +1017,7 @@ def print_paras(radii, wavelengths, mode_count, mode_desired, l_modes_to_conside
                 rad_range.append((r, wl))
 
     df_range = pd.DataFrame(rad_range, columns = ["Core Radius (µm)", "Wavelength (µm)"])
-    df_filtered = df_range[(df_range["Wavelength (µm)"] >= 1.55) & (df_range["Wavelength (µm)"] < 1.56)]
-
+    df_filtered = df_range[(df_range["Wavelength (µm)"] >= lower_bound) & (df_range["Wavelength (µm)"] < upper_bound)]
     min_diam = 2 * min(df_filtered["Core Radius (µm)"])
     max_diam = 2 * max(df_filtered["Core Radius (µm)"])
     diam = [min_diam, max_diam]
@@ -996,7 +1116,7 @@ def reorder_tf_vectors(tf_vector, simulation_val):
             if core_num == 19:
                 reorder_indices = [9, 10, 14, 13, 8, 4, 5, 11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
             elif core_num == 7:
-                reorder_indices = [3, 4, 6, 5, 2, 0, 1]
+                reorder_indices = [3, 4, 5, 2, 0, 1]
         elif geo == "Pent":
             if core_num == 6:
                 # not much of a change since these positions are 
@@ -1068,10 +1188,11 @@ def plot_tf_matrix(tf_vectors, simulation_val, matrix_type="", ax=None, cbar=Tru
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 8))
 
+    norm = Normalize(vmin = 0, vmax = 1.0)
     if phase:
         im = ax.imshow(tf_matrix.T, cmap = 'twilight_shifted')
     else:
-        im = ax.imshow(tf_matrix.T, cmap='viridis')
+        im = ax.imshow(tf_matrix.T, cmap='viridis') #, norm=norm
     if cbar:
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="4%", pad=0.05)  
@@ -1118,6 +1239,7 @@ def plot_combined_tf_matrix(simulation_val, amp, phase, core_num, phase_max = 2*
 
     amp_phase_img = np.transpose(apply_complex_map(tf_matrix, cmocean.cm.phase), (1, 0, 2))
     amp_phase_colorbar = generate_complex_colorbar(resolution = resolution)
+    norm = Normalize(vmin = 0, vmax = 1.0)
 
     fig, ax = plt.subplots(figsize=(14,8))
     im = ax.imshow(amp_phase_img, aspect='auto', origin='lower')
@@ -1136,7 +1258,7 @@ def plot_combined_tf_matrix(simulation_val, amp, phase, core_num, phase_max = 2*
     ax.tick_params(axis='both', which='major', labelsize=14)
 
     cb_ax = fig.add_axes([1, 0.15, 0.03, 0.8])  
-    cb_ax.imshow(amp_phase_colorbar, aspect='auto', origin='lower')
+    cb_ax.imshow(amp_phase_colorbar, aspect='auto', origin='lower') #, norm = norm
 
     phase_tick_vals = [0, np.pi/2, np.pi, 3*np.pi/2, 2*np.pi]
     phase_tick_labels = [r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2\pi$"]
@@ -1185,8 +1307,8 @@ def assign_core_properties(simulation_val):
     will be set to None so that skopt may optimise its parameters alone.
     '''
     if "core_num" in simulation_val and "core_delta" in simulation_val:
-        ms_diam = [simulation_val["core_diam"]] * simulation_val["core_num"]
-        ms_delta = [simulation_val["core_delta"]] * simulation_val["core_num"]
+        ms_diam = [variable_params["core_diam"]] * simulation_val["core_num"]
+        ms_delta = [variable_params["core_delta"]] * simulation_val["core_num"]
 
         if len(ms_diam) != simulation_val["core_num"] or len(ms_delta) != simulation_val["core_num"]:
             raise Exception("Number of specified core properties does not match the number of modelled cores")
@@ -1195,12 +1317,12 @@ def assign_core_properties(simulation_val):
             if simulation_val["mode_selective"] == 1 and i == simulation_val["core_to_monitor"]:
                 simulation_val[f"core_{i}"] = {
                     "core_diam": None,
-                    "delta": None
+                    "core_delta": None
                 }
             else:
                 simulation_val[f"core_{i}"] = {
                     "core_diam": diam,
-                    "delta": delta
+                    "core_delta": delta
                 }
 #######################################################################################################################################################
 def apply_complex_map(field, cmap, power=1.0, normalise=True, shift=0.0):

@@ -216,10 +216,56 @@ def estimate_pentagon_radius(n_points, grid_spacing, tolerance = 0):
     print(f"Warning: maximum iterations reached. Final points = {actual_points}")
     return radius
 ##############################################################################
+def generate_hex_ring_grid(max_radius, core_spacing, core_number, include_center=True):
+    """
+    Generate a hexagon-based ring grid of points (concentric hexagons).
+    
+    Parameters:
+        max_radius (float): Maximum radial extent of the grid (e.g., cladding radius).
+        core_spacing (float): Spacing between concentric hexagonal rings.
+        core_number (int): Desired number of total cores (approximate).
+        include_center (bool): Whether to include a center core.
+
+    Returns:
+        Xarrs, Yarrs: Lists of x and y coordinates.
+    """
+    n_sides = 6
+    theta = 360 / n_sides
+    Xarrs, Yarrs = [], []
+
+    # Estimate the number of rings
+    num_rings = int(max_radius // core_spacing)
+    if include_center:
+        rings_required = min(num_rings, max(1, (core_number - 1) // n_sides))
+    else:
+        rings_required = min(num_rings, max(1, core_number // n_sides))
+
+    def gen_ring(radius):
+        xs, ys = [], []
+        for i in range(n_sides):
+            angle = i * theta  # rotate so flat side is down
+            x = radius * np.cos(np.deg2rad(angle))
+            y = radius * np.sin(np.deg2rad(angle))
+            xs.append(x)
+            ys.append(y)
+        return xs, ys
+
+    for j in range(1, rings_required + 1):
+        radius = j * core_spacing
+        xs, ys = gen_ring(radius)
+        Xarrs.extend(xs)
+        Yarrs.extend(ys)
+
+    if include_center:
+        Xarrs.append(0)
+        Yarrs.append(0)
+
+    return Xarrs, Yarrs
+##############################################################################
 '''
 Functions to generate a hex grid
 '''
-def generate_hex_grid(row_num, grid_spacing):
+def old_generate_hex_grid(row_num, grid_spacing, include_centre = True):
     coord = []
     dx = grid_spacing
     dy = np.sqrt(3) * grid_spacing / 2
@@ -237,6 +283,13 @@ def generate_hex_grid(row_num, grid_spacing):
 
     hcoord = [c[1] for c in coord]
     vcoord = [c[2] for c in coord]
+    
+    # Remove the central core at (0,0) if include_centre is False
+    if not include_centre:
+        # Find indices of (0,0) point(s), which can occur for even/odd row_num
+        filtered = [(x, y) for x, y in zip(hcoord, vcoord) if not (np.isclose(x, 0) and np.isclose(y, 0))]
+        hcoord = [x for x, y in filtered]
+        vcoord = [y for x, y in filtered]
     return hcoord, vcoord
 
 def number_rows(n_points):

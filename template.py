@@ -4,10 +4,14 @@ import random, numpy as np
 NOTE: Using values from 19CorePL_July2021_noOuter_MMtoSM_extraMM.ind
 '''
 fixed_params = {
-    "core_sep": 60,
-    "MCFCladd": 328, #328
-    "cladding_delta": 0.01242,#0.0055,
-    "Taper_L": 55000, #40000
+    "core_sep": 35,
+    "MCFCladd": 125, #328
+    # "core_claddings": None, 
+    "core_cladding_diam": None,#80,
+    "cladding_delta": 0.0055,
+    "core_cladding_delta": None,
+    "cen_core_cladding_delta": None,#0.00949,
+    "Taper_L": 45000, #40000
     # "taper": 10,
     # "core_delta": 0.0122895, #0.015,
     # "core_diam": 8.2,
@@ -31,7 +35,7 @@ RSoft_params = {
     "slice_output_format": "OUTPUT_AMP_PHASE",
     "slice_output_individual": "None", # OUTPUT_AMP_PHASE_3D
     "background_index": 1.4345,
-    "free_space_wavelength": 1.55,
+    "free_space_wavelength": 1.5,
     "sim_tool": Sim_tool.BP,
     "launch_align_file": 1,
     "launch_normalization": 1,
@@ -40,11 +44,9 @@ RSoft_params = {
     "grid_size_y": 1,
     "step_size": 2,
     "structure": Struct_type.FIBRE,
-    "width": 6.5,
-    "height": 6.5,
     "slice_display_mode": "DISPLAY_CONTOURMAPXZ",
     "fem_iterations": 1000,
-    "fem_nev": 45
+    "fem_nev": 15
 }
 RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
 
@@ -65,7 +67,9 @@ Launch_params = {
     # "monitor_step_size": 10,
     # "monitoroutputformat": "OUTPUT_AMP_PHASE",
     # "core_delta": fixed_params["core_delta"],
-    "cladding_delta": fixed_params["cladding_delta"]
+    "cladding_delta": fixed_params["cladding_delta"],
+    # "core_cladding_delta": fixed_params["core_cladding_delta"],
+    # "cen_core_cladding_delta": fixed_params["cen_core_cladding_delta"]
 }
 
 Simulation_params = {
@@ -73,26 +77,34 @@ Simulation_params = {
     "num_paras": 72,
     "batch_num": 6,
     "grid_type": "Hex",
-    "Structure": "PL",
+    "plot_centre_core": True,
+    "Structure": "PL", # Fibre, PL, pigtail
     "metric": "TH", # TH = throughput, MS = Mode Selective, TF = Transfer Vector
+    "add_cladding_to_cores": None, # This must be zero-indexed!
     "mode_selective": 0, # 0 == False, 1 == True
-    "core_to_monitor": 4
+    "core_to_monitor": 4,
+    "port_mon_file": None
 }
 
 variable_params= {
-    "taper": 15, #10 
-    "core_delta": 0.01763, #0.02186, #0.0122895,
-    "core_diam": 8.2, #5.6
+    "core_delta": 0.0122895,
+    "core_diam": 6.5, #5.6
+    "taper": 6.55789308,
 }
+
 Launch_params["core_delta"] = variable_params["core_delta"
                                               ]
 for k in variable_params.keys():
     if k == "free_space_wavelength":
         RSoft_params[k] = variable_params[k]
 RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
+
+RSoft_params["width"] = variable_params["core_diam"]
+RSoft_params["height"] = variable_params["core_diam"]
 Launch_params["core_to_monitor"] = Simulation_params["core_to_monitor"]
 Launch_params["launch_random_set"] = 0 #random.randint(0,Simulation_params["num_paras"]) # ensures that every simulation sees a different field
 RSoft_params["random_set"] = Launch_params["launch_random_set"]
+fixed_params["MMF_Taper"] = variable_params["taper"]
 
 core_params = {}
 
@@ -102,8 +114,9 @@ for i in range(1, Simulation_params["core_num"] + 1):
         "core_diam": fixed_params["core_diam"],
         "delta": fixed_params["core_delta"]
         }
+
     elif "core_diam" in variable_params and "core_delta" in variable_params:
         core_params[f"core_{i}"] = {
-        "core_diam": variable_params["core_diam"],
-        "delta": variable_params["core_delta"]
+        "core_diam": 6.5,#variable_params["core_diam"],
+        "delta": 0.0122895 #variable_params["core_delta"]
         }
