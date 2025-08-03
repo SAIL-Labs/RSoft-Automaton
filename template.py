@@ -20,7 +20,7 @@ fixed_params = {
     }
 
 RSoft_params = {
-    "Name": "MCF_Test",
+    # "Name": "MCF_Test",
     "cad_aspectratio_x": -1,
     "cad_aspectratio_y": -1,
     "cad_aspectratio_z": -1,

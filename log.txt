@@ -2184,9 +2184,12 @@ Message: Actual Computation Time = 369.192 min
 
 SimTool: BeamPROP
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 Version: 2024.09-SP2-1 Build 20250608
 
 =======
+=======
+>>>>>>> Stashed changes
 Version: 2024.09-SP1 Build 20241203
 
 
@@ -2911,13 +2914,19 @@ Message: NZ=55001, NX=1161, NY=1161, Estimated Time = 142.578 min
 setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
 Message: NZ=55001, NX=1741, NY=1741, Estimated Time = 320.800 min
 Message: NZ=55001, NX=871, NY=871, Estimated Time = 80.200 min
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 Message: NZ=55001, NX=697, NY=697, Estimated Time = 51.328 min
 setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
 setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
 setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
 Message: NZ=55001, NX=581, NY=581, Estimated Time = 35.644 min
 setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
 setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
@@ -4128,6 +4137,7 @@ Version: 2024.09-SP1 Build 20241203
 SimTool: BeamPROP
 Version: 2024.09-SP1 Build 20241203
 
+<<<<<<< Updated upstream
 >>>>>>> Stashed changes
 
 SimTool: BeamPROP
@@ -30790,3 +30800,5 @@ setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14
 setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
 setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
 setting KMP_AFFINITY=nowarnings,explicit,proclist=[23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0]
+=======
+>>>>>>> Stashed changes

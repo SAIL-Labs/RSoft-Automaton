@@ -623,6 +623,8 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
              core_beginning_dims_list, core_final_dims_list, 
              simulation_val):
     
+    core_diam = simulation_val["core_diam"]
+
     cladding = circuit.add_segment(
         position=(0, 0, 0),
         offset=(0, 0, Taper_length),

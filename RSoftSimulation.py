@@ -211,12 +211,12 @@ class RSoftSim:
         """
         if build_tf:
             with open(json_config, "r") as launch_config:
-                simulation_val = json.load(launch_config)
+                sim_val = json.load(launch_config)
         else:
             with open("launch_config.json", "r") as launch_config:
-                simulation_val = json.load(launch_config)
+                sim_val = json.load(launch_config)
         
-        for key, val in simulation_val.items():
+        for key, val in sim_val.items():
             Launch_params[key] = val
 
         # load prior space
@@ -254,7 +254,7 @@ class RSoftSim:
         and build symbol dictionary containing ONLY the parameters that
         RSoft needs.
         """
-        if simulation_val["launch_type"] == "LAUNCH_MULTIMODE":
+        if sim_val["launch_type"] == "LAUNCH_MULTIMODE":
             # Remove problematic launch symbols temporarily
             launch_skip_keys = {"launch_mode", "launch_mode_radial"}
             self.sym = {**RSoft_params,
