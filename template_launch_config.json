@@ -21,14 +21,14 @@
   "grid_type": "Hex",
   "plot_centre_core": true,
   "core_delta": 0.0122895,
-  "grid_size": 0.3,
-  "grid_size_y": 0.3,
+  "grid_size": 3,
+  "grid_size_y": 3,
   "step_size": 1,
   "launch_tilt": 1,
   "launch_normalization": 1,
-  "core_to_monitor": 2,
+  "core_to_monitor": 7,
   "metric": "TF",
-  "num_paras": 144,
+  "num_paras": 10,
   "mode_selective": 1,
   "core_num": 7
 }

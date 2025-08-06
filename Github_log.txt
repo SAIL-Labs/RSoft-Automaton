@@ -1,8 +1,1 @@
-Added support for new PL type: pigtail. Need to add dynamic support so one can switch freely between structure types
-Can now produce transfer matrices for pentagon, pigtail PLs. 
-
-Combined pigtail functionality within standard PL circuit so now the user can specify each core to have its own cladding via "add_cladding_to_cores" in Simulation_params. The core numbers must be zero-indexed, and must be passed through as an array.
-
-Rectified throughput issue whereby summed intensities << 1.0 by appending polarizer = 2 (linear, 0) to each port monitor. This is needed for the port monitor to correctly measure the FemSIM file since the chosen LP mode should have 0 polarisation relative to the other degenerate polarisation.
-
-Built multiprocessing framework to choose parameters to test, and spawn 6 simultaneous simulations to build tf.
+For the same number of beamprop files generated the same number of femsim files are made. FemSIM simulations are then performed, focusing on the special core +-30um just to identify LP01. This field file is then used by the beamprop simulation, within the port monitor option Overlap -> Data Files (Up to 2).

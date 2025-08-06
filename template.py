@@ -46,7 +46,7 @@ RSoft_params = {
     "structure": Struct_type.FIBRE,
     "slice_display_mode": "DISPLAY_CONTOURMAPXZ",
     "fem_iterations": 1000,
-    "fem_nev": 15
+    "fem_nev": 1
 }
 RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
 
@@ -92,8 +92,7 @@ variable_params= {
     "taper": 6.55789308,
 }
 
-Launch_params["core_delta"] = variable_params["core_delta"
-                                              ]
+Launch_params["core_delta"] = variable_params["core_delta"]
 for k in variable_params.keys():
     if k == "free_space_wavelength":
         RSoft_params[k] = variable_params[k]
@@ -112,11 +111,13 @@ for i in range(1, Simulation_params["core_num"] + 1):
     if "core_diam" in fixed_params and "core_delta" in fixed_params:
         core_params[f"core_{i}"] = {
         "core_diam": fixed_params["core_diam"],
-        "delta": fixed_params["core_delta"]
+        "delta": fixed_params["core_delta"],
+        "taper": variable_params["taper"]
         }
 
     elif "core_diam" in variable_params and "core_delta" in variable_params:
         core_params[f"core_{i}"] = {
         "core_diam": 6.5,#variable_params["core_diam"],
-        "delta": 0.0122895 #variable_params["core_delta"]
+        "delta": 0.0122895, #variable_params["core_delta"]
+        "taper": variable_params["taper"]
         }

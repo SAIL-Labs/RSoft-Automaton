@@ -178,11 +178,12 @@ def create_folders(folder_name):
     os.makedirs(results_folder, exist_ok=True)
     return results_folder
 #######################################################################################################################################################
-def AddHack(file_name, json_file, core_num, param_dict, core_to_monitor, mon_type = ""):
+def AddHack(file_name, FS_file_name, json_file, core_num, param_dict, simulation_val):
     '''
     Hacking function to add text that will import segments to RSoft that the Python API does not currently handle.
 
     file_name: name tag for the ind file to be hacked
+    FS_file_name: femsim name tag
     json_file: contains a dictionary of parameters to be used by the launch field and pathway monitors
     core_num: number of cores in ind file
     param_dict: json file contain the names and values of all the parameters to be modified during simulations
@@ -190,6 +191,8 @@ def AddHack(file_name, json_file, core_num, param_dict, core_to_monitor, mon_typ
         "pathway_mon" records the throughput at each iteration making the simulation time scale with Z and grid spacing,
         "port_mon" (default) records only the throughput at the end of the fibre, or the position at which the monitor is placed.
     '''
+    core_to_monitor = simulation_val["core_to_monitor"]
+    mon_type = simulation_val.get("mon_type", Launch_params["mon_type"])
     launch_array = {k: json_file[k] for k in json_file}
     if mon_type == "pathway_mon":
         block_text = { 
@@ -278,8 +281,27 @@ launch_field {n}
 end launch_field
 '''
     }
+        # Open FS file in append mode
+        with open(f"{FS_file_name}.ind", "a") as fs:
+            # Write all pathways
+            for i in range(1, core_num + 2):  # +1 for cladding
+                text = block_text["pathway"].format(n=i)
+                fs.write(text)
 
-        # Open file in append mode
+                # Write only one launch field (for the cladding (MMF case)/core (SMF case))
+            text = block_text["launch_field"].format(
+                n=1,
+                launch_type=launch_array["launch_type"],
+                launch_tilt=launch_array["launch_tilt"],
+                launch_normalization=launch_array["launch_normalization"],
+                launch_align_file = launch_array["launch_align_file"],
+                launch_mode=launch_array["launch_mode"],
+                launch_mode_radial=launch_array["launch_mode_radial"],
+                launch_random_set=launch_array["launch_random_set"],
+                launch_phase = launch_array["launch_phase"],
+            )
+            fs.write(text)
+        # Open BP file in append mode
         with open(f"{file_name}.ind", "a") as f:
 
             # Write all pathways
@@ -301,7 +323,10 @@ end launch_field
             )
             f.write(text)
 
-    # Open file in read mode
+    # Open FS file in read mode
+    with open(f"{FS_file_name}.ind", "r") as fs:
+        lines_fs = fs.readlines()
+    # Open BP file in read mode
     with open(f"{file_name}.ind", "r") as f:
         lines = f.readlines()
 
@@ -313,8 +338,16 @@ end launch_field
             f"\tbegin.delta = {core_params[core_key]['delta']}\n",
             f"\tend.delta = {core_params[core_key]['delta']}\n"
         ], segment_filter=f"{core_key}")
+        lines_fs = insert_after_match(lines_fs, "begin.width =", [
+            f"\tbegin.delta = {core_params[core_key]['delta']}\n",
+            f"\tend.delta = {core_params[core_key]['delta']}\n"
+        ], segment_filter=f"{core_key}")
 
     lines = insert_after_match(lines, "begin.width =", [
+        f"\tbegin.delta = {launch_array['cladding_delta']}\n",
+        f"\tend.delta = {launch_array['cladding_delta']}\n"
+    ], segment_filter="Super Cladding") 
+    lines_fs = insert_after_match(lines_fs, "begin.width =", [
         f"\tbegin.delta = {launch_array['cladding_delta']}\n",
         f"\tend.delta = {launch_array['cladding_delta']}\n"
     ], segment_filter="Super Cladding") 
@@ -336,109 +369,163 @@ end launch_field
 
     # Build the updated lines
     modified_lines = []
-    in_core = False
-    in_segment_header = False
-    current_segment_is_super_cladding = False
-    core_index = 0
-    
-    for line in lines:
-        line_strip = line.strip()
-        replaced = False
+    modified_lines_fs = []
 
-        if line_strip.startswith("comp_name = Super Cladding"):
-            current_segment_is_super_cladding = True
-            in_segment_header = True
-            modified_lines.append(line)
-            continue
-        elif line_strip.startswith("comp_name = core_") or line_strip.startswith("comp_name = Cladding"):
-            current_segment_is_super_cladding = False
-            in_segment_header = True
-            modified_lines.append(line)
-            continue
-        
-        if line_strip.startswith("extended ="):
-            if not current_segment_is_super_cladding:
+    for curr_lines, curr_file_name, arr_name in zip([lines, lines_fs], [file_name, FS_file_name], [modified_lines, modified_lines_fs]):
+        in_segment_header = False
+        current_segment_is_super_cladding = False
+
+        for line in curr_lines:
+            line_strip = line.strip()
+            replaced = False
+
+            if line_strip.startswith("comp_name = Super Cladding"):
+                current_segment_is_super_cladding = True
+                in_segment_header = True
+                arr_name.append(line)
+                continue
+            elif line_strip.startswith("comp_name = core_") or line_strip.startswith("comp_name = Cladding"):
+                current_segment_is_super_cladding = False
+                in_segment_header = True
+                arr_name.append(line)
                 continue
 
-        if in_segment_header and not line_strip.startswith("begin."):
-            modified_lines.append("\twidth_taper = TAPER_LINEAR\n")
-            modified_lines.append("\theight_taper = TAPER_LINEAR\n")
-            modified_lines.append("\tposition_taper = TAPER_LINEAR\n")
-            modified_lines.append("\tposition_y_taper = TAPER_LINEAR\n")
-            in_segment_header = False
+            if line_strip.startswith("extended ="):
+                if not current_segment_is_super_cladding:
+                    continue
 
-        for param, val in param_dict.items():
+            if in_segment_header and not line_strip.startswith("begin."):
+                arr_name.append("\twidth_taper = TAPER_LINEAR\n")
+                arr_name.append("\theight_taper = TAPER_LINEAR\n")
+                arr_name.append("\tposition_taper = TAPER_LINEAR\n")
+                arr_name.append("\tposition_y_taper = TAPER_LINEAR\n")
+                in_segment_header = False
 
-            if line_strip.startswith(f"{param} ="):
-                modified_lines.append(f"{param} = {val:.6f}\n")
-                replaced = True
-                break
+            for param, val in param_dict.items():
+                if param == "core_diam":
+                    core_diam_replaced = val
+                if line_strip.startswith(f"{param} ="):
+                    arr_name.append(f"{param} = {val:.6f}\n")
+                    replaced = True
+                    break
 
-        if not replaced:
-            modified_lines.append(line)
+            if not replaced:
+                arr_name.append(line)
 
-    # Write the final .ind file with symbolic delta expression
-    with open(f"{file_name}.ind", "w") as out:
-        out.writelines(modified_lines)
+        with open(f"{curr_file_name}.ind", "w") as out:
+            out.writelines(arr_name)
 
-    # hack in the port monitor stuff to monitor femSIM files rather than the launch field
-    if mon_type == "port_mon":
-        final_lines = []
-        in_time_monitor = False
-        inserted = False
-        mon_number = 1
+        # hack in the port monitor stuff to monitor femSIM files rather than the launch field
+        if mon_type == "port_mon":
+            final_lines = []
+            in_time_monitor = False
+            inserted = False
+            mon_number = 0
 
-        for line in modified_lines:
-            
-            line_strip = line.strip()
-            # by default add_portmonitor sets the monitor to overlap, which needs FemSIM files. Should get similar results
-            # if using default field
-            # if "type = TIMEMON_EXTENDED" in line:
-            #     line = line.replace("type = TIMEMON_EXTENDED", "type = TIMEMON_FIELD")
+            for line in arr_name:
+                
+                line_strip = line.strip()
+                # by default add_portmonitor sets the monitor to overlap, which needs FemSIM files. Should get similar results
+                # if using default field
+                # if "type = TIMEMON_EXTENDED" in line:
+                #     line = line.replace("type = TIMEMON_EXTENDED", "type = TIMEMON_FIELD")
 
-            # forecfully fix certain port monitor parameters that appear as default otherwise  for port monitors
-            port_mon_text_arr = ["phi = default", "begin.width = default", "begin.height = default"]
-            port_mon_text_replace = ["phi = 0", f"begin.width = 6.5", f"begin.height = 6.5"]
-                        
-            for p, r in zip(port_mon_text_arr, port_mon_text_replace):
-                if p in line:
-                    line = line.replace(p, r)
-            
+                # forecfully fix certain port monitor parameters that appear as default otherwise  for port monitors
+                port_mon_text_arr = ["phi = default", "begin.width = default", "begin.height = default"]
+                port_mon_text_replace = ["phi = 0", "begin.width = 6.5", "begin.height = 6.5"]
+                port_mon_text_replace_special = ["phi = 0", f"begin.width = {core_diam_replaced}", f"begin.height = {core_diam_replaced}"]
+                            
+                # for p, r, s in zip(port_mon_text_arr, port_mon_text_replace, port_mon_text_replace_special):
+                #     if p in line:
+                #         line = line.replace(p, r)
+                if line_strip.startswith("time_monitor"):
+                    in_time_monitor = True
+                    inserted = False  # reset insertion flag for each time_monitor
+
+                if in_time_monitor:
+                    if mon_number == core_to_monitor:
+                        for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
+                            if p in line:
+                                line = line.replace(p, r)
+                    else:
+                        for p, r in zip(port_mon_text_arr, port_mon_text_replace):
+                            if p in line:
+                                line = line.replace(p, r)
+
                 # Remove 'comp_name' and 'portnum' lines
-            if line_strip.startswith("portnum"):  #line_strip.startswith("comp_name") or
-                continue 
+                if line_strip.startswith("portnum"):  #line_strip.startswith("comp_name") or
+                    continue 
 
-            final_lines.append(line)
-            if line_strip.startswith("time_monitor"):
-                in_time_monitor = True
+                final_lines.append(line)
 
-                inserted = False  # reset insertion flag for each time_monitor
+                
+                if in_time_monitor and line_strip.startswith("monitoroutputmask") and not inserted:
+                    final_lines.append("\tmonitoroutputformat = OUTPUT_AMP_PHASE\n")
+                    final_lines.append("\toverlap_type = 1\n")
 
-            if in_time_monitor and line_strip.startswith("monitoroutputmask") and not inserted:
-                final_lines.append("\tmonitoroutputformat = OUTPUT_AMP_PHASE\n")
-                final_lines.append("\toverlap_type = 1\n")
+                    if mon_number == (core_to_monitor - 1):
+                        first_mode_first_pol_file = f"monitor_file = {FS_file_name}.m00"
+                        final_lines.append(f"\t{first_mode_first_pol_file}\n")
+                        # for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
+                        #     if line_strip.startswith(p):
+                        #         line_strip = line_strip.replace(p,r)
 
-                if mon_number == (core_to_monitor):
-                    first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
-                    final_lines.append(f"\t{first_mode_first_pol_file}\n")
+                    else:
+                        first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
+                        final_lines.append(f"\t{first_mode_first_pol_file}\n")     
+                        # for p, r in zip(port_mon_text_arr, port_mon_text_replace):
+                        #     if line_strip.startswith(p):
+                        #         line_strip = line_strip.replace(p,r)               
+                    final_lines.append(f"\tpolarizer = 2\n")
+                    inserted = True
+                    mon_number += 1
+
+                if in_time_monitor and line_strip.startswith("end monitor"):
+                    in_time_monitor = False
+                    
+            with open(f"{curr_file_name}.ind", "w") as out:
+                out.writelines(final_lines)
+            
+            # Append/replace certain names in the femsim file
+            with open(f"{FS_file_name}.ind", "r") as fin:
+                lines = fin.readlines()
+
+            output_lines = []
+            for idx, line in enumerate(lines):
+                stripped = line.strip()
+
+                output_lines.append(line)
+                # Insert boundary_* after boundary_gap_z = 0
+                if stripped == "boundary_gap_z = 0":
+                    output_lines.extend([
+                        "boundary_max = 30\n",
+                        "boundary_max_y = 30\n",
+                        "boundary_min = -30\n",
+                        "boundary_min_y = -30\n"
+                    ])
+                # Insert domain_min after dimension = 3
+                if stripped == "dimension = 3":
+                    output_lines.append("domain_min = 45000\n")
+
+            # Process other replacements in a second pass
+            final_lines = []
+            for line in output_lines:
+                stripped = line.strip()
+                if stripped == "sim_tool = ST_BEAMPROP":
+                    final_lines.append("sim_tool = ST_FEMSIM\n")
+                elif stripped == f"grid_size = {simulation_val['grid_size']}":
+                    final_lines.append("grid_size = 0.5\n")
+                elif stripped == f"grid_size_y = {simulation_val['grid_size_y']}":
+                    final_lines.append("grid_size_y = 0.5\n")
+                elif stripped == "metric = TF":
+                    final_lines.append("mode_output_format = OUTPUT_REAL_IMAG\n")
                 else:
-                    first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
-                    final_lines.append(f"\t{first_mode_first_pol_file}\n")                    
-                    # first_mode_second_pol = f"monitor_file2 = Core_{mon_number}_femSIM.m01"
-                final_lines.append(f"\tpolarizer = 2")
+                    final_lines.append(line)
 
-                
-                # final_lines.append(f"\t{first_mode_second_pol}\n")
-                # else:
-                #     final_lines.append("\tmonitor_file = Core_1_femSIM.m00\n")
-                inserted = True
-                mon_number += 1
+            # Write the output file
+            with open(f"{FS_file_name}.ind", "w") as fout:
+                fout.writelines(final_lines)
 
-            if in_time_monitor and line_strip.startswith("end monitor"):
-                in_time_monitor = False
-                
-        with open(f"{file_name}.ind", "w") as out:
-            out.writelines(final_lines)
         
 #######################################################################################################################################################
 # Calculate the V-number from available parameters
@@ -478,19 +565,12 @@ def filter_parameter_space_by_v_number(para_space, background_index, wavelength,
 def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_names,
                           iteration_start, batch_size,
                           penalty_batch=None, transfer_vector_batch=None,
-                          csv_path="optimizer_results.csv"):
+                          csv_path="", name_tag=None):
     """
     Save a batch of scikit-optimize parameter evaluations to CSV, and plot the results.
-
-    Parameters:
-        param_batch (list of lists): Parameter vectors from skopt.ask()
-        result_batch (list of floats): Corresponding throughput (negated loss) results
-        param_names (list of str): Names of the parameters in order
-        iteration_start (int): Index of the first sample in this batch (zero-based)
-        penalty_batch (list of floats, optional): Penalties applied to each evaluation
-        transfer_vector_batch (list of np.array, optional): Transfer vectors to log
-        csv_path (str): Path to CSV file
+    Moves both csv_path and best_params_log_{pid}.csv to the folder named by name_tag if provided.
     """
+    import shutil, os
 
     include_penalty = penalty_batch is not None
     include_tf = transfer_vector_batch is not None and transfer_vector_batch[0] is not None
@@ -534,6 +614,23 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
                         ([f"TF_{i+1}" for i in range(len(best_tf))] if include_tf else []))
         writer.writerow([iteration_start // batch_size + 1] + list(best_params) + [best_throughput] +
                         (list(best_tf) if include_tf else []))
+
+    # Move both CSV files to the results folder, if name_tag is specified
+    if name_tag is not None:
+        # Build the results folder path (adapt to your exact convention)
+        results_folder = os.path.join(os.path.expanduser("~/Desktop/Results"), f"BP_{name_tag}")
+        os.makedirs(results_folder, exist_ok=True)
+        # Move the best_params_log_{pid}.csv file
+        try:
+            shutil.move(para_tag, os.path.join(results_folder, para_tag))
+        except Exception as e:
+            print(f"Warning: Could not move {para_tag}: {e}")
+        # Move the main batch CSV file
+        try:
+            shutil.move(csv_path, os.path.join(results_folder, os.path.basename(csv_path)))
+        except Exception as e:
+            print(f"Warning: Could not move {csv_path}: {e}")
+    return results_folder
 
 def plotting_optimizer_results(df, param_names, tf = None, plot = True, csv_path = ""):
     """
@@ -623,8 +720,6 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
              core_beginning_dims_list, core_final_dims_list, 
              simulation_val):
     
-    core_diam = simulation_val["core_diam"]
-
     cladding = circuit.add_segment(
         position=(0, 0, 0),
         offset=(0, 0, Taper_length),
@@ -882,8 +977,13 @@ def mode_selective_tf_matrix_metric(tf_list, core_to_monitor, modes_to_monitor):
                                                                     # This is what should be maximised and is equivelant to taking 
                                                                     # the average of each non-ms core in each individual non-ms mode
 
-        loss_func = -ms_core_mode -nonms_core_other_mode + (nonms_core_ms_mode + ms_core_other_mode)
-        return loss_func
+        loss_func = -ms_core_mode -0.5*nonms_core_other_mode + 0.5*(nonms_core_ms_mode + ms_core_other_mode)
+        array_of_results = [ms_core_mode, #a
+                            nonms_core_other_mode, #b
+                            nonms_core_ms_mode, #c
+                            ms_core_other_mode #c
+                            ]
+        return loss_func, array_of_results
 
 def read_port_mon_file(filepath = ""):
     dat = pd.read_csv(filepath, skiprows = 3, sep=r'\s+', header = None)
@@ -1110,6 +1210,7 @@ def reorder_tf_vectors(tf_vector, simulation_val):
     labels = []
     core_num = simulation_val["core_num"]
     geo = simulation_val["grid_type"]
+    plot_centre_core  =simulation_val["plot_centre_core"]
 
     for label, vec in tf_vector:
         labels.append(label)
@@ -1118,7 +1219,10 @@ def reorder_tf_vectors(tf_vector, simulation_val):
             if core_num == 19:
                 reorder_indices = [9, 10, 14, 13, 8, 4, 5, 11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
             elif core_num == 7:
-                reorder_indices = [3, 4, 5, 2, 0, 1]
+                if plot_centre_core:
+                    reorder_indices = [6, 0, 1, 2, 3, 4, 5]
+                else:
+                    reorder_indices = [0, 1, 2, 3, 4, 5]
         elif geo == "Pent":
             if core_num == 6:
                 # not much of a change since these positions are 
@@ -1179,6 +1283,7 @@ def plot_tf_matrix(tf_vectors, simulation_val, matrix_type="", ax=None, cbar=Tru
         Plot of the transfer matrix
     '''
     core_num = simulation_val["core_num"]
+    plot_centre_core = simulation_val["plot_centre_core"]
     tf_matrix = []
 
     tf_vectors = assign_17modes_to_tflist(tf_vectors, simulation_val)
@@ -1190,7 +1295,6 @@ def plot_tf_matrix(tf_vectors, simulation_val, matrix_type="", ax=None, cbar=Tru
     if ax is None:
         fig, ax = plt.subplots(figsize=(10, 8))
 
-    norm = Normalize(vmin = 0, vmax = 1.0)
     if phase:
         im = ax.imshow(tf_matrix.T, cmap = 'twilight_shifted')
     else:
@@ -1204,7 +1308,10 @@ def plot_tf_matrix(tf_vectors, simulation_val, matrix_type="", ax=None, cbar=Tru
 
     ax.set_ylabel("Core No.")
     ax.set_xlabel("Excited Mode")
-    ax.set_yticks(ticks=np.arange(core_num), labels=np.arange(1, core_num + 1))
+    if not plot_centre_core:
+        ax.set_yticks(ticks=np.arange(core_num-1), labels=np.arange(1, core_num))
+    else:
+        ax.set_yticks(ticks=np.arange(core_num), labels=np.arange(1, core_num + 1))
     ax.set_xticks(ticks=np.arange(len(tf_vectors)), labels=label, rotation=90)
     ax.set_title(f"{matrix_type} Matrix")
     ax.tick_params(axis='both', which='major', labelsize=14)
@@ -1253,7 +1360,7 @@ def plot_combined_tf_matrix(simulation_val, amp, phase, core_num, phase_max = 2*
 
     ax.set_ylabel("Core No.", fontsize = 14, labelpad = 10)
     ax.set_xlabel("Excited Mode", fontsize = 14, labelpad = 10)
-    ax.set_yticks(ticks=np.arange(core_num), labels=np.arange(1, core_num + 1))
+    ax.set_yticks(ticks=np.arange(core_num - 1), labels=np.arange(1, core_num))
     ax.set_xticks(ticks=np.arange(len(amp)), labels=(labels for labels, _ in comp_tf_vector), rotation=90)
 
     ax.set_title("Complex Transfer Matrix (Amplitude+Phase)", fontsize = 18)
