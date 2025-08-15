@@ -888,7 +888,7 @@ def transfer_matrix_component(csv_path, row, port_mon = False):
         return row, throughput
 
             
-def mode_selective_tf_matrix_metric(tf_list, core_to_monitor, modes_to_monitor):
+def mode_selective_tf_matrix_metric(tf_list, hyp_param_b, hyp_param_c, core_to_monitor, modes_to_monitor):
     """
     Function that will sort through tf_list, extract the mode selective core values in ms/non-ms modes and return the loss function needed by scikit
     Arguments:
@@ -977,7 +977,7 @@ def mode_selective_tf_matrix_metric(tf_list, core_to_monitor, modes_to_monitor):
                                                                     # This is what should be maximised and is equivelant to taking 
                                                                     # the average of each non-ms core in each individual non-ms mode
 
-        loss_func = -ms_core_mode -0.5*nonms_core_other_mode + 0.5*(nonms_core_ms_mode + ms_core_other_mode)
+        loss_func = -ms_core_mode -hyp_param_b*nonms_core_other_mode + hyp_param_c*(nonms_core_ms_mode + ms_core_other_mode)
         array_of_results = [ms_core_mode, #a
                             nonms_core_other_mode, #b
                             nonms_core_ms_mode, #c
@@ -1623,7 +1623,7 @@ def make_animation(data_folder="", file_pattern="", output_gif="", interval=100)
         fig, update, frames=len(file_list), blit=True, interval=interval, repeat=True #(plotting_phase,) is a 1-element tuple, required by FuncAnimation
     )
     matplotlib.rcParams['animation.ffmpeg_path'] = r"C:\Users\justinvella\Desktop\Git_Repos\ffmpeg-7.1.1-essentials_build\ffmpeg-7.1.1-essentials_build\bin\ffmpeg.exe"
-    writer = animation.FFMpegWriter(fps = 30, metadata=dict(artist = "Justin Vella"))
+    writer = animation.FFMpegWriter(fps = 30, bitrate=8000, metadata=dict(artist = "Justin Vella"))
     # ani.save(output_gif, writer='pillow')
     ani.save(f"{output_gif}.mp4", writer = writer)
     print(f"Saved animation to {output_gif}")

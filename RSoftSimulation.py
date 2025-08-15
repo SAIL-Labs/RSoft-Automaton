@@ -312,13 +312,13 @@ class RSoftSim:
             taper = fixed["taper"]
         else:
             taper = param_dict.get("taper", vars["taper"])
-        MMF_Taper = fixed["MMF_Taper"]
+        # MMF_Taper = fixed["MMF_Taper"]
         core_num = sim_param["core_num"]
         core_name = [f"core_{n}" for n in range(1, core_num + 1)]
         structure = Simulation_params["Structure"]
 
         cladd_diam = fixed["MCFCladd"]
-        cladding_beg_dims = (cladd_diam / MMF_Taper, cladd_diam / MMF_Taper)
+        cladding_beg_dims = (cladd_diam / taper, cladd_diam / taper)
         cladding_end_dims = (cladd_diam , cladd_diam)
 
         core_beg_dims_list = []
@@ -645,7 +645,7 @@ import copy
 
 def multiple_mode_tf(arg_list):
 
-    sim_val, m, rm, params, taper_min, taper_max, gridding = arg_list
+    sim_val, custom_priors, m, rm, params, taper_min, taper_max, gridding = arg_list
     '''
     TO DO: fix up the gridding part of this code.
     '''
@@ -700,12 +700,6 @@ def multiple_mode_tf(arg_list):
     with open(code_config, "w") as launch_config:
         json.dump(sim_val, launch_config, indent = 2)
 
-    custom_priors = {
-                "core_delta": (0.0, 0.02),
-                "core_diam": (1.0, 20.0),
-                "taper": (taper_min, taper_max)
-                }
-
     build_tf = True
 
     sim = RSoftSim()
@@ -732,14 +726,14 @@ def multiple_mode_tf(arg_list):
     plotting_optimizer_results(data, param_names, tf=tf_vectors, plot= False)
     return (param_num, tf_vectors)
 
-def run_tf_multproc(params, simulation_val, mode_vals, radial_mode_vals, taper_min, taper_max, gridding = False,): 
+def run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding = False): 
 
     tf_list = []
     if not gridding:
         # initialise global parent argument list. This creates multiple instances of args_list based on the length of
         # mode_vals or radial_mode_vals. i.e. 
         # [(simulation_val, 0, 1, params, False),(simulation_val, 1, 1, params, False),(simulation_val, -1, 1, params, False), .....]
-        args_list = [(simulation_val, m, rm, params, taper_min, taper_max, gridding) for m, rm in zip(mode_vals, radial_mode_vals)] 
+        args_list = [(simulation_val, custom_priors,m, rm, params, taper_min, taper_max, gridding) for m, rm in zip(mode_vals, radial_mode_vals)] 
     else:
         # run gridding determination
         grid_size_list = np.arange(0.1, 2.1, 0.1)
@@ -749,7 +743,7 @@ def run_tf_multproc(params, simulation_val, mode_vals, radial_mode_vals, taper_m
             raise Exception("Launch type must be multimode with a fixed random set when determining optimal grid sizes!")
         
         # initialise global parent argument list
-        args_list = [(simulation_val, gr, params, taper_min, taper_max, gridding) for gr in grid_size_range] 
+        args_list = [(simulation_val, custom_priors, gr, params, taper_min, taper_max, gridding) for gr in grid_size_range] 
 
     # note 'spawn' means Python will start n separate processes each with their own memory of global variables. 
     # You need to define any changes within their own instance or else NOTHING changes.
@@ -768,7 +762,7 @@ def run_tf_multproc(params, simulation_val, mode_vals, radial_mode_vals, taper_m
     else:
         return tf_list
 
-def run_all_modes_for_params(params, iteration_num, simulation_val, mode_vals, radial_mode_vals, taper_min, taper_max, gridding=False):
+def run_all_modes_for_params(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding=False):
     """
     For a single param vector, run all modes and aggregate result.
     params: list of optimized parameter values (from skopt)
@@ -779,11 +773,11 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, mode_vals, r
 
     if gridding:
         # run gridding determination
-        grid_size_range, tf_list = run_tf_multproc(params, simulation_val, mode_vals, radial_mode_vals, params, taper_min, taper_max, gridding)
+        grid_size_range, tf_list = run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals, params, taper_min, taper_max, gridding)
         return grid_size_range, tf_list
     else:
         # multiprocessing in here, we only want multiprocessing in this function and not in main_optimizer!!!!
-        tf_list = run_tf_multproc(params, simulation_val, mode_vals, radial_mode_vals, taper_min, taper_max, gridding)
+        tf_list = run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding)
     
     # Aggregate result (compute scalar loss/metric for this parameter vector)
     """
@@ -854,7 +848,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, mode_vals, r
         tf_to_plot = [amp, phase]
 
         tf_figure = plt.figure(figsize = (16,12))
-        tf_figure.suptitle(f"Iteration {iteration_num}, Parameters:{params}", y=0.7)
+        tf_figure.suptitle(f"Iteration {iteration_num}\n Parameters:{params}", y=0.72)
         gs = gridspec.GridSpec(1,3, width_ratios=[1,1,1])
         
         # ensure each plot is the same height
@@ -923,16 +917,19 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, mode_vals, r
         # plot_combined_tf_matrix(simulation_val, amp, phase, core_number, amp_max = max_value,
         #                         dir = r"C:\Users\justinvella\Desktop\Github Code\RSoft-Automaton", 
         #                         name = f"TF_Combined_{simulation_val['core_num']}c{simulation_val['grid_type']}PL.png")
-        
+    hyp_param_b = simulation_val["hyp_param_b"]
+    hyp_param_c = simulation_val["hyp_param_c"]
     loss, arr_results = mode_selective_tf_matrix_metric(
         tf_list,
+        hyp_param_b,
+        hyp_param_c,
         core_to_monitor=core_to_monitor,
-        modes_to_monitor=modes_to_monitor
+        modes_to_monitor=modes_to_monitor,
     )
         
     return loss, arr_results
 
-def main_optimizer(prior_space_pid, simulation_val, mode_vals, radial_mode_vals, taper_min, taper_max, gridding, total_calls, simulate_tf_metric = True):
+def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding, total_calls, simulate_tf_metric = True):
     
     array_of_results = []
     
@@ -959,7 +956,8 @@ def main_optimizer(prior_space_pid, simulation_val, mode_vals, radial_mode_vals,
         dimensions=para_space,
         base_estimator="GP",
         acq_func="EI",
-        random_state=42
+        random_state=42,
+        n_initial_points=30
     )
     # if true, run optimisation testing the loss metric
     if simulate_tf_metric:
@@ -969,7 +967,7 @@ def main_optimizer(prior_space_pid, simulation_val, mode_vals, radial_mode_vals,
             param_batch = opt.ask()
             # run simulation
             result_batch, arr_results = run_all_modes_for_params(param_batch, batch_idx + 1, 
-                                                                      simulation_val, mode_vals, 
+                                                                      simulation_val, custom_priors, mode_vals, 
                                                                       radial_mode_vals, taper_min, 
                                                                       taper_max, gridding = gridding)
             # tell optimiser the performance of the chosen parameters
@@ -985,5 +983,5 @@ def main_optimizer(prior_space_pid, simulation_val, mode_vals, radial_mode_vals,
     else:
         param_names = ["core_delta", "core_diam"]
         params = [variable_params[k] for k in param_names]
-        tf_list = run_tf_multproc(params, simulation_val, mode_vals, radial_mode_vals, gridding)
+        tf_list = run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals,taper_min, taper_max, gridding)
         return tf_list

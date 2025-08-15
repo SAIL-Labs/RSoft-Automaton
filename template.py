@@ -76,6 +76,8 @@ Simulation_params = {
     "core_num": 7,
     "num_paras": 72,
     "batch_num": 6,
+    "hyp_param_b": 1,
+    "hyp_param_c": 1,
     "grid_type": "Hex",
     "plot_centre_core": True,
     "Structure": "PL", # Fibre, PL, pigtail
