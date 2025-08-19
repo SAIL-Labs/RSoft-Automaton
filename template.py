@@ -12,7 +12,6 @@ fixed_params = {
     "core_cladding_delta": None,
     "cen_core_cladding_delta": None,#0.00949,
     "Taper_L": 45000, #40000
-    # "taper": 10,
     # "core_delta": 0.0122895, #0.015,
     # "core_diam": 8.2,
     "alpha": 0,

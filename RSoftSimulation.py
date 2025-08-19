@@ -955,9 +955,11 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
     opt = Optimizer(
         dimensions=para_space,
         base_estimator="GP",
-        acq_func="EI",
+        acq_func="LCB",
+        acq_func_kwargs={"kappa": 2.5},
+        acq_optimizer = "sampling",
         random_state=42,
-        n_initial_points=30
+        n_initial_points=50
     )
     # if true, run optimisation testing the loss metric
     if simulate_tf_metric:
@@ -965,6 +967,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
         for batch_idx in range(total_calls):
             # ask for 1 set of parameter vectors only to prevent daemonic process having children 
             param_batch = opt.ask()
+            print(f"Trying core_delta: {param_batch[0]:.3f}, core_diam: {param_batch[1]:.3f}, taper: {param_batch[2]:.3f}")
             # run simulation
             result_batch, arr_results = run_all_modes_for_params(param_batch, batch_idx + 1, 
                                                                       simulation_val, custom_priors, mode_vals, 
