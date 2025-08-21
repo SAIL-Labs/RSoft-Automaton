@@ -955,8 +955,8 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
     opt = Optimizer(
         dimensions=para_space,
         base_estimator="GP",
-        acq_func="LCB",
-        acq_func_kwargs={"kappa": 2.5},
+        acq_func="EI", #LCB
+        acq_func_kwargs={"xi": 0.8}, #{"kappa": 2.5}
         acq_optimizer = "sampling",
         random_state=42,
         n_initial_points=50
