@@ -160,23 +160,32 @@ end launch_field
             launch_normalization=launch_array["launch_normalization"])
         f.write(text)
 #######################################################################################################################################################
-def create_folders(folder_name):
+def create_folders(folder_name, pos):
     '''
     Creates folder to be placed within the 'Results' folder on the desktop.
 
     Arguments:
         - folder_name: string entry that will become the name of the folder
+        - pos: string to determine where the folder is placed
     
     Returns:
         - pathway to results folder
     '''
 
     user_home = os.path.expanduser("~")
-    desktop_path = os.path.join(user_home, "Desktop")
-    results_root = os.path.join(desktop_path, "Results")
-    results_folder = os.path.join(results_root, folder_name)
-    os.makedirs(results_folder, exist_ok=True)
-    return results_folder
+
+    if pos == "Desktop":
+        desktop_path = os.path.join(user_home, "Desktop")
+        results_root = os.path.join(desktop_path, "Results")
+        results_folder = os.path.join(results_root, folder_name)
+        os.makedirs(results_folder, exist_ok=True)
+        return results_folder
+    elif pos == "Onedrive":
+        onedrive_path = os.path.join(user_home, r"C:\Users\justinvella\OneDrive - The University of Sydney (Students)\RSoft Automaton Results")
+        results_root_onedrive = os.path.join(onedrive_path, "Results")
+        results_folder_onedrive = os.path.join(results_root_onedrive, folder_name)
+        os.makedirs(results_folder_onedrive, exist_ok=True)
+        return results_folder_onedrive
 #######################################################################################################################################################
 def AddHack(file_name, FS_file_name, json_file, core_num, param_dict, simulation_val):
     '''

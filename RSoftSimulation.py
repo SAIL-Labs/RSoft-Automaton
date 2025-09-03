@@ -109,7 +109,10 @@ class RSoftSim:
             folder_BP   = f"BP_{name_tag}"
             prefix_FS = f"prefix={femsim_name_tag}"
 
-            results_folder = create_folders(folder_BP)
+            results_folder = create_folders(folder_BP, "Desktop")
+
+            # we want to copy the important files in Onedrive for backup purposes
+            onedrive_results_folder = create_folders(folder_BP, "Onedrive")
 
             try:
                 subprocess.run(
@@ -158,11 +161,27 @@ class RSoftSim:
             csv_path,
             json_config,
             prior_space_pid]
+        
+        # files to copy to Onedrive
+        onedrive_filename = name_tag + ".ind"
+        onedrive_filename_results = name_tag + "_mon.dat"
+        onedrive_femsim_filename_results = femsim_name_tag + ".ind"
+
+        file_extensions_to_copy = [
+           onedrive_filename, onedrive_filename_results, onedrive_femsim_filename_results
+        ]
 
         # Normalize to basenames in case paths are used
         files_to_move = [os.path.basename(f) for f in files_to_move]
+        file_extensions_to_move = [os.path.basename(k) for k in file_extensions_to_copy]
 
         for file in os.listdir():
+            # copy important files to Onedrive
+            for l in file_extensions_to_move:
+                if file == l:
+                    shutil.copy(file, os.path.join(onedrive_results_folder,file))
+
+            # move everything to the desktop
             if (file in files_to_move or file.startswith(name_tag) or file.startswith(femsim_name_tag)):
                 shutil.move(file, os.path.join(results_folder, file))
 
@@ -214,9 +233,22 @@ class RSoftSim:
             # Write throughput CSV to same folder
             csv_tag = f"Throughput_{name_tag}.csv"
             csv_pathway = Path(results_folder) / csv_tag
+            csv_pathway_onedrive = Path(onedrive_results_folder) / csv_tag
 
             with open(csv_pathway, mode="w", newline="") as file:
                 writer = csv.writer(file)
+                header = ["x"]
+                for i in range(num_monitors):
+                    header.append(f"Monitor_{i+1}_Amplitude")
+                    header.append(f"Monitor_{i+1}_Phase")
+                writer.writerow(header)
+                for i in range(z_all.shape[0]):
+                 #NOTE: by default row contains amplitude and phase values, should expect 2*core_num entries
+                    row = [x_all[i]] + list(z_all[i])
+                    writer.writerow(row)
+
+            with open(csv_pathway_onedrive, mode="w", newline="") as file_onedrvie:
+                writer = csv.writer(file_onedrvie)
                 header = ["x"]
                 for i in range(num_monitors):
                     header.append(f"Monitor_{i+1}_Amplitude")
