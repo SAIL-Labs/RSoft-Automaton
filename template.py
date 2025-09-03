@@ -4,14 +4,14 @@ import random, numpy as np
 NOTE: Using values from 19CorePL_July2021_noOuter_MMtoSM_extraMM.ind
 '''
 fixed_params = {
-    "core_sep": 35,
-    "MCFCladd": 125, #328
+    "core_sep": 120, #35, # 120
+    "MCFCladd": 380, # 380 #125
     # "core_claddings": None, 
-    "core_cladding_diam": None,#80,
-    "cladding_delta": 0.0055,
+    "core_cladding_diam": 125, # None #80,
+    "cladding_delta": 0.0095, #0.0055,
     "core_cladding_delta": None,
     "cen_core_cladding_delta": None,#0.00949,
-    "Taper_L": 45000, #40000
+    "Taper_L": 50000, #45000
     # "core_delta": 0.0122895, #0.015,
     # "core_diam": 8.2,
     "alpha": 0,
@@ -84,15 +84,17 @@ Simulation_params = {
     "add_cladding_to_cores": None, # This must be zero-indexed!
     "mode_selective": 0, # 0 == False, 1 == True
     "core_to_monitor": 4,
-    "port_mon_file": None
+    "port_mon_file": None,
+    "skip_core": None, # if you want to skip a certain core, set this to the 0-index core number
+    "fixed_fem_file": False
 }
 
 variable_params= {
-    "core_delta": 0.0122895,
-    "core_diam": 6.5, #5.6
-    "taper": 6.55789308,
-}
-
+    "core_delta": 0.0157,#0.0122895,
+    "core_diam": 8.3, #6.5
+    "taper": 22#6.55789308 #8.53
+}       
+        
 Launch_params["core_delta"] = variable_params["core_delta"]
 for k in variable_params.keys():
     if k == "free_space_wavelength":
@@ -118,7 +120,7 @@ for i in range(1, Simulation_params["core_num"] + 1):
 
     elif "core_diam" in variable_params and "core_delta" in variable_params:
         core_params[f"core_{i}"] = {
-        "core_diam": 6.5,#variable_params["core_diam"],
-        "delta": 0.0122895, #variable_params["core_delta"]
+        "core_diam": 8.3,# 6.5,variable_params["core_diam"],
+        "delta": 0.0157, #0.0122895 ,#variable_params["core_delta"]
         "taper": variable_params["taper"]
         }

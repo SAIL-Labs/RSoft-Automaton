@@ -352,8 +352,20 @@ end launch_field
         f"\tend.delta = {launch_array['cladding_delta']}\n"
     ], segment_filter="Super Cladding") 
 
-    # lines = insert_after_match(lines, "begin.width =", ["profile_type = PROF_INACTIVE"
-    # ], segment_filter="Super Cladding") 
+    if Simulation_params["add_cladding_to_cores"] is not None:
+        lines = insert_after_match(lines, "begin.width =", ["profile_type = PROF_INACTIVE"
+        ], segment_filter="Super Cladding") 
+        for cladd_num in Simulation_params["add_cladding_to_cores"]:
+            lines = insert_after_match(lines, "begin.width =", [
+            f"\tbegin.delta = {launch_array['cladding_delta']}\n",
+            f"\tend.delta = {launch_array['cladding_delta']}\n"
+            ], segment_filter=f"Core {cladd_num + 1} Cladding") 
+                
+            lines_fs = insert_after_match(lines_fs, "begin.width =", [
+                f"\tbegin.delta = {launch_array['cladding_delta']}\n",
+                f"\tend.delta = {launch_array['cladding_delta']}\n"
+            ], segment_filter=f"Core {cladd_num + 1} Cladding") 
+   
 
     # for i in range(1, core_num + 1):
     #     if i == core_to_monitor:
@@ -432,7 +444,7 @@ end launch_field
 
                 # forecfully fix certain port monitor parameters that appear as default otherwise  for port monitors
                 port_mon_text_arr = ["phi = default", "begin.width = default", "begin.height = default"]
-                port_mon_text_replace = ["phi = 0", "begin.width = 6.5", "begin.height = 6.5"]
+                port_mon_text_replace = ["phi = 0", "begin.width = 8.3", "begin.height = 8.3"]
                 port_mon_text_replace_special = ["phi = 0", f"begin.width = {core_diam_replaced}", f"begin.height = {core_diam_replaced}"]
                             
                 # for p, r, s in zip(port_mon_text_arr, port_mon_text_replace, port_mon_text_replace_special):
@@ -453,7 +465,7 @@ end launch_field
                                 line = line.replace(p, r)
 
                 # Remove 'comp_name' and 'portnum' lines
-                if line_strip.startswith("portnum"):  #line_strip.startswith("comp_name") or
+                if line_strip.startswith("portnum"): 
                     continue 
 
                 final_lines.append(line)
@@ -463,19 +475,26 @@ end launch_field
                     final_lines.append("\tmonitoroutputformat = OUTPUT_AMP_PHASE\n")
                     final_lines.append("\toverlap_type = 1\n")
 
-                    if mon_number == (core_to_monitor - 1):
+                    if Simulation_params["skip_core"] is not None and Simulation_params["fixed_fem_file"] is False:
                         first_mode_first_pol_file = f"monitor_file = {FS_file_name}.m00"
                         final_lines.append(f"\t{first_mode_first_pol_file}\n")
-                        # for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
-                        #     if line_strip.startswith(p):
-                        #         line_strip = line_strip.replace(p,r)
-
-                    else:
+                    elif Simulation_params["skip_core"] is not None and Simulation_params["fixed_fem_file"] is True:
                         first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
-                        final_lines.append(f"\t{first_mode_first_pol_file}\n")     
-                        # for p, r in zip(port_mon_text_arr, port_mon_text_replace):
-                        #     if line_strip.startswith(p):
-                        #         line_strip = line_strip.replace(p,r)               
+                        final_lines.append(f"\t{first_mode_first_pol_file}\n")
+                    elif Simulation_params["fixed_fem_file"] is True:
+                        first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
+                        final_lines.append(f"\t{first_mode_first_pol_file}\n")
+                    else:
+                        if mon_number == (core_to_monitor - 1):
+                            first_mode_first_pol_file = f"monitor_file = {FS_file_name}.m00"
+                            final_lines.append(f"\t{first_mode_first_pol_file}\n")
+
+                        else:
+                            first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
+                            final_lines.append(f"\t{first_mode_first_pol_file}\n")     
+                            # for p, r in zip(port_mon_text_arr, port_mon_text_replace):
+                            #     if line_strip.startswith(p):
+                            #         line_strip = line_strip.replace(p,r)               
                     final_lines.append(f"\tpolarizer = 2\n")
                     inserted = True
                     mon_number += 1
@@ -498,14 +517,14 @@ end launch_field
                 # Insert boundary_* after boundary_gap_z = 0
                 if stripped == "boundary_gap_z = 0":
                     output_lines.extend([
-                        "boundary_max = 30\n",
-                        "boundary_max_y = 30\n",
-                        "boundary_min = -30\n",
-                        "boundary_min_y = -30\n"
+                        "boundary_max = 20\n", #10+38.5
+                        "boundary_max_y = 20\n", #15
+                        "boundary_min = -20\n", #-10+38.5
+                        "boundary_min_y = -20\n" #-15
                     ])
                 # Insert domain_min after dimension = 3
                 if stripped == "dimension = 3":
-                    output_lines.append("domain_min = 45000\n")
+                    output_lines.append(f"domain_min = {fixed_params['Taper_L']}\n")
 
             # Process other replacements in a second pass
             final_lines = []
@@ -718,8 +737,9 @@ def build_fibre(circuit, path_num, core_positions, core_names, Taper_length, beg
 def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
              cladd_beginning_diam, cladd_final_diam,
              core_beginning_dims_list, core_final_dims_list, 
-             simulation_val):
-    
+             simulation_val,cladding_positions = None):
+    if simulation_val["skip_core"] == None:
+        cladding_positions = core_positions
     cladding = circuit.add_segment(
         position=(0, 0, 0),
         offset=(0, 0, Taper_length),
@@ -745,25 +765,28 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
         core.set_name(core_names[j])
         # circuit.attach(core, cladding, 0, 0, 0)
         core_segments.append(core)
+    if Simulation_params["add_cladding_to_cores"] is not None:
+        for j, (x, y) in enumerate(cladding_positions):
+            if Simulation_params["add_cladding_to_cores"] is not None:
+                for i in Simulation_params["add_cladding_to_cores"]:
+                    if i == j:
+                        if fixed_params["core_cladding_diam"] is not None:
+                            core_cladding_beg_dims = (fixed_params["core_cladding_diam"] / taper,fixed_params["core_cladding_diam"] / taper)
+                            core_cladding_end_dims = (fixed_params["core_cladding_diam"], fixed_params["core_cladding_diam"])
+                            core_cladding = circuit.add_segment(
+                                position=(x / taper, y / taper, 0),
+                                offset=(x, y, Taper_length),
+                                dimensions=core_cladding_beg_dims,
+                                dimensions_end=core_cladding_end_dims
+                            )
+                            core_cladding.color('0')
+                            core_cladding.set_name(f"Core {i+1} Cladding")
 
-        if Simulation_params["add_cladding_to_cores"] is not None:
-            for i in Simulation_params["add_cladding_to_cores"]:
-                if i == j:
-                    if fixed_params["core_cladding_diam"] is not None:
-                        core_cladding_beg_dims = (fixed_params["core_cladding_diam"] / taper,fixed_params["core_cladding_diam"] / taper)
-                        core_cladding_end_dims = (fixed_params["core_cladding_diam"], fixed_params["core_cladding_diam"])
-                        core_cladding = circuit.add_segment(
-                            position=(x / taper, y / taper, 0),
-                            offset=(x, y, Taper_length),
-                            dimensions=core_cladding_beg_dims,
-                            dimensions_end=core_cladding_end_dims
-                        )
-                        core_cladding.color('0')
-                        core_cladding.set_name(f"Core {i} Cladding")
-
-                    else:
-                        raise Exception("core_cladding_diam cannot be None!!!!")
-
+                        else:
+                            raise Exception("core_cladding_diam cannot be None!!!!")
+            else:
+                continue
+    
     if Launch_params["mon_type"] == "port_mon":
         for j, (x, y) in enumerate(core_positions):
             # Place monitor at the end of the segment, note that these are not offset from anything and so need the extra distance to line up with the segments
@@ -871,7 +894,10 @@ def transfer_matrix_component(csv_path, row, port_mon = False):
 
     monitor_columns = [col for col in df.columns if col.startswith("Monitor_")]        
     if port_mon:
-        ms_col = f"Monitor_{Simulation_params['core_to_monitor']}_Amplitude"
+        if Simulation_params["skip_core"] is not None:
+            ms_col = f"Monitor_{Simulation_params['core_to_monitor']-len(Simulation_params['skip_core'])}_Amplitude"
+        else:
+            ms_col = f"Monitor_{Simulation_params['core_to_monitor']}_Amplitude"
     else:
         ms_col = f"Monitor_{Simulation_params['core_to_monitor'] - 1}"
     
@@ -1210,7 +1236,7 @@ def reorder_tf_vectors(tf_vector, simulation_val):
     labels = []
     core_num = simulation_val["core_num"]
     geo = simulation_val["grid_type"]
-    plot_centre_core  =simulation_val["plot_centre_core"]
+    plot_centre_core = simulation_val["plot_centre_core"]
 
     for label, vec in tf_vector:
         labels.append(label)
@@ -1219,15 +1245,20 @@ def reorder_tf_vectors(tf_vector, simulation_val):
             if core_num == 19:
                 reorder_indices = [9, 10, 14, 13, 8, 4, 5, 11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
             elif core_num == 7:
-                if plot_centre_core:
-                    reorder_indices = [6, 0, 1, 2, 3, 4, 5]
+                if Simulation_params["skip_core"] is not None:
+                    if plot_centre_core:
+                        reorder_indices = [5, 0, 1, 2, 3, 4]
                 else:
-                    reorder_indices = [0, 1, 2, 3, 4, 5]
+                    if plot_centre_core:
+                        reorder_indices = [6, 0, 1, 2, 3, 4, 5]
+                    else:
+                        reorder_indices = [0, 1, 2, 3, 4, 5]
         elif geo == "Pent":
             if core_num == 6:
                 # not much of a change since these positions are 
                 # calculated in an anti-clockwise fashion to begin with
                 reorder_indices = [5, 1, 2, 3, 4, 0] 
+
         vec = np.array(vec)[reorder_indices]
 
         tf_matrix.append(vec)
@@ -1308,10 +1339,8 @@ def plot_tf_matrix(tf_vectors, simulation_val, matrix_type="", ax=None, cbar=Tru
 
     ax.set_ylabel("Core No.")
     ax.set_xlabel("Excited Mode")
-    if not plot_centre_core:
-        ax.set_yticks(ticks=np.arange(core_num-1), labels=np.arange(1, core_num))
-    else:
-        ax.set_yticks(ticks=np.arange(core_num), labels=np.arange(1, core_num + 1))
+    monitored_cores = core_num - len(simulation_val["skip_core"]) if simulation_val.get("skip_core") else core_num
+    ax.set_yticks(ticks=np.arange(monitored_cores), labels=np.arange(1, monitored_cores + 1))
     ax.set_xticks(ticks=np.arange(len(tf_vectors)), labels=label, rotation=90)
     ax.set_title(f"{matrix_type} Matrix")
     ax.tick_params(axis='both', which='major', labelsize=14)

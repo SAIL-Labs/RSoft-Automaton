@@ -189,32 +189,32 @@ def old_generate_filled_pentagon_grid(radius, grid_spacing, y_shift_factor = 0.5
     vcoord = [c[2] for c in coord]
     return hcoord, vcoord
 
-def estimate_pentagon_radius(n_points, grid_spacing, tolerance = 0):
-    distance_per_point = grid_spacing ** 2
-    pentagon_area_factor = 5/2 * np.sin(2*np.pi/5)
+# def estimate_pentagon_radius(n_points, grid_spacing, tolerance = 0):
+#     distance_per_point = grid_spacing ** 2
+#     pentagon_area_factor = 5/2 * np.sin(2*np.pi/5)
 
-    radius_squared = (n_points * distance_per_point) / pentagon_area_factor
-    radius = np.sqrt(radius_squared)
+#     radius_squared = (n_points * distance_per_point) / pentagon_area_factor
+#     radius = np.sqrt(radius_squared)
 
-    # Due to the imperfect geometry of a pentagon grid need to include a loop that fixes the number of positions reported, 
-    # otherwise the desired number of positions will always be less than the actual number of positions
-    max_iterations = 50
-    for _ in range(max_iterations):
-        hcoord, vcoord= generate_filled_pentagon_grid(radius, grid_spacing)
-        actual_points = len(hcoord)
+#     # Due to the imperfect geometry of a pentagon grid need to include a loop that fixes the number of positions reported, 
+#     # otherwise the desired number of positions will always be less than the actual number of positions
+#     max_iterations = 50
+#     for _ in range(max_iterations):
+#         hcoord, vcoord= generate_filled_pentagon_grid(radius, grid_spacing)
+#         actual_points = len(hcoord)
 
-        if abs(actual_points - n_points) <= tolerance:
-            print(f"Matched points: {actual_points} points (within ±{tolerance})")
-            return radius
+#         if abs(actual_points - n_points) <= tolerance:
+#             print(f"Matched points: {actual_points} points (within ±{tolerance})")
+#             return radius
 
-        # Adjust radius based on whether we have too many or too few points
-        if actual_points < n_points:
-            radius *= 1.02  # Slightly expand
-        else:
-            radius *= 0.98  # Slightly contract
+#         # Adjust radius based on whether we have too many or too few points
+#         if actual_points < n_points:
+#             radius *= 1.02  # Slightly expand
+#         else:
+#             radius *= 0.98  # Slightly contract
 
-    print(f"Warning: maximum iterations reached. Final points = {actual_points}")
-    return radius
+#     print(f"Warning: maximum iterations reached. Final points = {actual_points}")
+#     return radius
 ##############################################################################
 def generate_hex_ring_grid(max_radius, core_spacing, core_number, include_center=True):
     """

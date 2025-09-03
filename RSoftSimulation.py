@@ -51,7 +51,22 @@ class RSoftSim:
                 # hcoord, vcoord = generate_hex_grid(row_num, core_sep, include_centre = SimParam["plot_centre_core"])
                 # self.core_positions = list(zip(hcoord, vcoord))
             hcoord, vcoord = generate_hex_ring_grid(fixed_params["MCFCladd"]/2, core_sep, SimParam["core_num"], include_center = SimParam["plot_centre_core"])
-            self.core_positions = list(zip(hcoord, vcoord))
+            # code to skip cores if desired
+            if Simulation_params["skip_core"] is not None:
+                x_val, y_val = [], []
+                for i, (xval, yval) in enumerate(zip(hcoord, vcoord)):
+                    for j in Simulation_params["skip_core"]:
+                        if i != j:
+                            x_val.append(xval)
+                            y_val.append(yval)
+                self.core_positions = list(zip(x_val, y_val))
+                self.cladd_positions = list(zip(hcoord,vcoord))
+                with open("cladding_position.json", "w") as cladd_positioning:
+                    json.dump(self.cladd_positions, cladd_positioning)
+            else:
+                self.core_positions = list(zip(hcoord, vcoord))
+                self.cladd_positions = None
+            
             with open("core_positions.json", "w") as g:
                 json.dump(self.core_positions, g)
 
@@ -191,7 +206,10 @@ class RSoftSim:
         
         elif Launch_params["mon_type"] == "port_mon":
             x_all, y_all, z_all = uf.get_arrays()
-            num_monitors = (z_all.shape[1] - Simulation_params["core_num"])
+            if Simulation_params["skip_core"] is not None:
+                num_monitors = (z_all.shape[1] - (Simulation_params["core_num"] - len(Simulation_params["skip_core"])))
+            else:
+                num_monitors = (z_all.shape[1] - Simulation_params["core_num"])
 
             # Write throughput CSV to same folder
             csv_tag = f"Throughput_{name_tag}.csv"
@@ -334,7 +352,7 @@ class RSoftSim:
                 else:
                     # pass
                     # use preconfigured values to specify core parameters
-                    core_diam = 6.5 #core_params[core_key]["core_diam"]
+                    core_diam = 8.3 #core_params[core_key]["core_diam"]
                     core_delta = simulation_val["core_delta"]
                     core_taper = param_dict["taper"]
 
@@ -365,11 +383,11 @@ class RSoftSim:
                         simulation_val)
 
         elif structure == "PL":
-            path_num = build_PL(self.circuit, path_num, self.core_positions, 
+            path_num = build_PL(self.circuit, path_num, self.core_positions,
                     core_name, taper, Taper_L,
                     cladding_beg_dims, cladding_end_dims,
                     core_beg_dims_list, core_end_dims_list,
-                    simulation_val)
+                    simulation_val,self.cladd_positions)
             
         if simulation_val["launch_type"] == LaunchType.SM:
             launch_mode = simulation_val["launch_mode"]
@@ -644,18 +662,18 @@ WIP: gridding portion needs to be fixed
 import copy
 
 def multiple_mode_tf(arg_list):
-
-    sim_val, custom_priors, m, rm, params, taper_min, taper_max, gridding = arg_list
     '''
     TO DO: fix up the gridding part of this code.
     '''
+    sim_val, custom_priors, m, rm, params, taper_min, taper_max, gridding = arg_list
     if gridding:
-        # sim_val = copy.deepcopy(simulation_val_list)
-        # sim_val["grid_size"] = gr
-        # sim_val["grid_size_y"] = gr
-        # sim_val["launch_type"] = LaunchType.MM
-        # sim_val["launch_tilt"] = 0
-        # sim_val["launch_mode_radial"] = "*"
+        sim_val, custom_priors, gr, params, taper_min, taper_max, gridding = arg_list
+        sim_val = copy.deepcopy(sim_val)
+        sim_val["grid_size"] = gr
+        sim_val["grid_size_y"] = gr
+        sim_val["launch_type"] = LaunchType.MM
+        sim_val["launch_tilt"] = 0
+        sim_val["launch_mode_radial"] = "*"
 
         # CONTINUE HERE
 
@@ -669,6 +687,7 @@ def multiple_mode_tf(arg_list):
         # optimizer_result = f"Grid_{gr}_Optimizer_Result.csv"
         # param_num = f"Grid {gr}"
     else:
+        sim_val, custom_priors, m, rm, params, taper_min, taper_max, gridding = arg_list
         sim_val = copy.deepcopy(sim_val)
         sim_val["launch_mode"] = m
         sim_val["launch_mode_radial"] = rm
@@ -913,12 +932,9 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         save_path = os.path.join(image_dir, filename)
         tf_figure.savefig(save_path, dpi=300)
         plt.close()
-        # # plot the combined amplitude and phase matrix
-        # plot_combined_tf_matrix(simulation_val, amp, phase, core_number, amp_max = max_value,
-        #                         dir = r"C:\Users\justinvella\Desktop\Github Code\RSoft-Automaton", 
-        #                         name = f"TF_Combined_{simulation_val['core_num']}c{simulation_val['grid_type']}PL.png")
-    hyp_param_b = simulation_val["hyp_param_b"]
-    hyp_param_c = simulation_val["hyp_param_c"]
+
+    hyp_param_b = simulation_val.get("hyp_param_b", Simulation_params["hyp_param_b"])
+    hyp_param_c = simulation_val.get("hyp_param_c", Simulation_params["hyp_param_c"])
     loss, arr_results = mode_selective_tf_matrix_metric(
         tf_list,
         hyp_param_b,
@@ -927,7 +943,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         modes_to_monitor=modes_to_monitor,
     )
         
-    return loss, arr_results
+    return loss, arr_results, amp, phase
 
 def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding, total_calls, simulate_tf_metric = True):
     
@@ -969,7 +985,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             param_batch = opt.ask()
             print(f"Trying core_delta: {param_batch[0]:.3f}, core_diam: {param_batch[1]:.3f}, taper: {param_batch[2]:.3f}")
             # run simulation
-            result_batch, arr_results = run_all_modes_for_params(param_batch, batch_idx + 1, 
+            result_batch, arr_results, amp, phase = run_all_modes_for_params(param_batch, batch_idx + 1, 
                                                                       simulation_val, custom_priors, mode_vals, 
                                                                       radial_mode_vals, taper_min, 
                                                                       taper_max, gridding = gridding)
@@ -979,12 +995,16 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             array_of_results.append(arr_results)
             print(f"Iteration {batch_idx + 1}: {result_batch}\n"
                   f"Loss metric iteration {batch_idx + 1} (a, b, c, c): {array_of_results[batch_idx]}")
-            all_results.append({'params': param_batch, 'result': result_batch, 'Iteration': batch_idx + 1, "Loss Metric": array_of_results})
+            all_results.append({'params': param_batch, 'result': result_batch, 'Iteration': batch_idx + 1, "Loss Metric": array_of_results, "Core Amplitudes": amp, "Core Phases": phase})
         
         return all_results
     # if false, run tf code for the template parameters
     else:
         param_names = ["core_delta", "core_diam"]
         params = [variable_params[k] for k in param_names]
-        tf_list = run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals,taper_min, taper_max, gridding)
+        if gridding:
+            grid_size_range, tf_list = run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals,taper_min, taper_max, gridding)
+            return grid_size_range, tf_list
+        else:
+            tf_list = run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals,taper_min, taper_max, gridding)
         return tf_list
