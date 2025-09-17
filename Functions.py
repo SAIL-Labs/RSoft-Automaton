@@ -1626,7 +1626,8 @@ def make_animation(data_folder="", file_pattern="", output_gif="", interval=100)
     amp, phase = dat[:, ::2], dat[:, 1::2]
     Z = amp*np.exp(1j * phase)
 
-    Nx, Ny = dat.shape
+    Nx, Ny = Z.shape#dat.shape
+    # Ny = Nx
     new_x = np.linspace(-Nx//2, Nx//2, Nx)
     new_y = np.linspace(-Ny//2, Ny//2, Ny)
 
