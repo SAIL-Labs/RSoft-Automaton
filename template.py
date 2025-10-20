@@ -4,15 +4,16 @@ import random, numpy as np
 NOTE: Using values from 19CorePL_July2021_noOuter_MMtoSM_extraMM.ind
 '''
 fixed_params = {
-    "core_sep": 120, #35, # 120
-    "MCFCladd": 380, # 380 #125
+    "core_sep": 35, #35, # 120
+    "MCFCladd": 125, # 380 #125
     # "core_claddings": None, 
-    "core_cladding_diam": 125, # None #80,
-    "cladding_delta": 0.0095, #0.0055,
+    "core_cladding_diam": None, # None #80,
+    # "cladding_delta": ,#0.0055, #0.0095,
     "core_cladding_delta": None,
     "cen_core_cladding_delta": None,#0.00949,
-    "Taper_L": 50000, #45000
+    # "Taper_L": 50000, #45000
     # "core_delta": 0.0122895, #0.015,
+    "taper": 7.33207692,
     # "core_diam": 8.2,
     "alpha": 0,
     "length_hyperparam": 0.01
@@ -48,6 +49,7 @@ RSoft_params = {
     "fem_nev": 1
 }
 RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
+fixed_params["cladding_delta"] =  1.44-RSoft_params["background_index"]
 
 Launch_params = {
     "monitor_type": Monitor_Prop.FIBRE_MODE_POWER,
@@ -86,16 +88,24 @@ Simulation_params = {
     "core_to_monitor": 4,
     "port_mon_file": None,
     "skip_core": None, # if you want to skip a certain core, set this to the 0-index core number
-    "fixed_fem_file": False
+    "fixed_fem_file": False,
+    # specify industry values
+    "industry_neff_values": False,
+    "industry_neff_file": None
 }
 
 variable_params= {
-    "core_delta": 0.0157,#0.0122895,
-    "core_diam": 8.3, #6.5
-    "taper": 22#6.55789308 #8.53
+    "core_diam": 6.5, #8.3, 
+    "core_delta": 1.4467895-RSoft_params["background_index"],#0.0122895, #0.0157,#
+    # "taper": 6.55789308, #22, #8.53
+    "Taper_L": 50000,
 }       
-        
-Launch_params["core_delta"] = variable_params["core_delta"]
+
+# Assign core_deltas here 
+Launch_params["core_delta"] = variable_params.get("core_delta", fixed_params.get("core_delta"))
+if Launch_params["core_delta"] is None:
+    raise KeyError("core_delta missing from both variable_params and fixed_params")
+
 for k in variable_params.keys():
     if k == "free_space_wavelength":
         RSoft_params[k] = variable_params[k]
@@ -106,21 +116,27 @@ RSoft_params["height"] = variable_params["core_diam"]
 Launch_params["core_to_monitor"] = Simulation_params["core_to_monitor"]
 Launch_params["launch_random_set"] = 0 #random.randint(0,Simulation_params["num_paras"]) # ensures that every simulation sees a different field
 RSoft_params["random_set"] = Launch_params["launch_random_set"]
-fixed_params["MMF_Taper"] = variable_params["taper"]
+fixed_params["MMF_Taper"] = variable_params.get("taper", fixed_params.get("taper"))
 
 core_params = {}
 
 for i in range(1, Simulation_params["core_num"] + 1):
     if "core_diam" in fixed_params and "core_delta" in fixed_params:
         core_params[f"core_{i}"] = {
-        "core_diam": fixed_params["core_diam"],
-        "delta": fixed_params["core_delta"],
-        "taper": variable_params["taper"]
+        "core_diam": fixed_params.get("core_diam"),
+        "delta": fixed_params.get("core_delta"),
+        "taper": variable_params.get("taper")
         }
 
     elif "core_diam" in variable_params and "core_delta" in variable_params:
         core_params[f"core_{i}"] = {
-        "core_diam": 8.3,# 6.5,variable_params["core_diam"],
-        "delta": 0.0157, #0.0122895 ,#variable_params["core_delta"]
-        "taper": variable_params["taper"]
+        "core_diam": 6.5,#variable_params["core_diam"],
+        "delta": 1.4467895-RSoft_params["background_index"], #variable_params["core_delta"]
+        "taper": variable_params.get("taper", fixed_params.get("taper"))
+        }
+    elif "core_delta" in fixed_params:
+        core_params[f"core_{i}"] = {
+        "core_diam": 6.5,#variable_params["core_diam"],
+        "delta": fixed_params.get("core_delta"), #variable_params["core_delta"]
+        "taper": fixed_params.get("taper")
         }

@@ -17,31 +17,23 @@
   ],
   "launch_type": "LAUNCH_WGMODE",
   "mon_type": "port_mon",
-  "port_mon_file": "femtmp.m00",
+  "port_mon_file": "7MCF.m00",
   "grid_type": "Hex",
   "plot_centre_core": true,
-  "core_delta": 0.0157,
-  "grid_size": 4,
-  "grid_size_y": 4,
+  "core_delta": 0.012289499999999842,
+  "grid_size": 2,
+  "grid_size_y": 2,
   "step_size": 1,
   "launch_tilt": 1,
   "launch_normalization": 1,
-  "core_to_monitor": 6,
+  "core_to_monitor": 7,
   "metric": "TF",
-  "num_paras": 100,
-  "skip_core": [
-    6
-  ],
-  "add_cladding_to_cores": [
-    0,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6
-  ],
-  "fixed_fem_file": true,
+  "num_paras": 5,
+  "skip_core": null,
+  "add_cladding_to_cores": null,
+  "fixed_fem_file": false,
   "mode_selective": 1,
-  "core_num": 7
+  "core_num": 7,
+  "industry_neff_values": false,
+  "industry_neff_file": "C:\\Users\\justinvella\\OneDrive - The University of Sydney (Students)\\New Caprica Backup\\industry_neff_values.txt"
 }

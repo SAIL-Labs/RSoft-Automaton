@@ -425,6 +425,8 @@ end launch_field
             for param, val in param_dict.items():
                 if param == "core_diam":
                     core_diam_replaced = val
+                elif param == "Taper_L":
+                    taper_length_replaced = val
                 if line_strip.startswith(f"{param} ="):
                     arr_name.append(f"{param} = {val:.6f}\n")
                     replaced = True
@@ -453,7 +455,7 @@ end launch_field
 
                 # forecfully fix certain port monitor parameters that appear as default otherwise  for port monitors
                 port_mon_text_arr = ["phi = default", "begin.width = default", "begin.height = default"]
-                port_mon_text_replace = ["phi = 0", "begin.width = 8.3", "begin.height = 8.3"]
+                port_mon_text_replace = ["phi = 0", "begin.width = 6.5", "begin.height = 6.5"]
                 port_mon_text_replace_special = ["phi = 0", f"begin.width = {core_diam_replaced}", f"begin.height = {core_diam_replaced}"]
                             
                 # for p, r, s in zip(port_mon_text_arr, port_mon_text_replace, port_mon_text_replace_special):
@@ -533,7 +535,10 @@ end launch_field
                     ])
                 # Insert domain_min after dimension = 3
                 if stripped == "dimension = 3":
-                    output_lines.append(f"domain_min = {fixed_params['Taper_L']}\n")
+                    if "Taper_L" in variable_params:
+                        output_lines.append(f"domain_min = {taper_length_replaced}\n")
+                    else:
+                        output_lines.append(f"domain_min = {fixed_params['Taper_L']}\n")
 
             # Process other replacements in a second pass
             final_lines = []
@@ -1453,9 +1458,12 @@ def assign_core_properties(simulation_val):
     core diameter and core delta prior to dumping json. If mode selective (=1) then the monitored core
     will be set to None so that skopt may optimise its parameters alone.
     '''
-    if "core_num" in simulation_val and "core_delta" in simulation_val:
+    if "core_num" in simulation_val: #and "core_delta" in simulation_val:
         ms_diam = [variable_params["core_diam"]] * simulation_val["core_num"]
-        ms_delta = [variable_params["core_delta"]] * simulation_val["core_num"]
+        if "core_delta" in variable_params:
+            ms_delta = [variable_params["core_delta"]] * simulation_val["core_num"]
+        else:
+            ms_delta = [fixed_params["core_delta"]] * simulation_val["core_num"]
 
         if len(ms_diam) != simulation_val["core_num"] or len(ms_delta) != simulation_val["core_num"]:
             raise Exception("Number of specified core properties does not match the number of modelled cores")
@@ -1927,3 +1935,8 @@ class lanternfiber:
         plt.gca().add_patch(core_circle)
         plt.pause(0.001)
         print('LP mode %d, %d' % (self.allmodes_l[mode_to_plot], self.allmodes_m[mode_to_plot]))
+########################################################################################################################################################################################################################################################################################
+def read_neff_values(filepath):
+    with open(filepath, "r") as f:
+        # convert to floats, remove empty lines
+        return [float(line.strip()) for line in f if line.strip()]

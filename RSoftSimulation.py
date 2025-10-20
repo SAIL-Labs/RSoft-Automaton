@@ -2,7 +2,7 @@ import numpy as np, os, shutil, csv
 import subprocess, json, time
 from pathlib import Path
 from skopt import Optimizer
-from skopt.space import Real
+from skopt.space import Real, Categorical
 from skopt.utils import dump
 import multiprocessing as mp
 import matplotlib.gridspec as gridspec
@@ -103,10 +103,11 @@ class RSoftSim:
         filename = f"{name_tag}.ind"
         filename_FS = f"{femsim_name_tag}.ind"
         sim_tool = simulation_val.get("sim_tool", RSoft_params["sim_tool"])
+        iter_number = simulation_val["iter_num"]
         # Run RSoft simulation
         if sim_tool == "ST_BEAMPROP":
             prefix_BP   = f"prefix={name_tag}"
-            folder_BP   = f"BP_{name_tag}"
+            folder_BP   = f"BP_SimulationNum_{iter_number}"
             prefix_FS = f"prefix={femsim_name_tag}"
 
             results_folder = create_folders(folder_BP, "Desktop")
@@ -179,8 +180,9 @@ class RSoftSim:
             # copy important files to Onedrive
             for l in file_extensions_to_move:
                 if file == l:
+                    os.makedirs(onedrive_results_folder, exist_ok=True)
                     shutil.copy(file, os.path.join(onedrive_results_folder,file))
-
+                    
             # move everything to the desktop
             if (file in files_to_move or file.startswith(name_tag) or file.startswith(femsim_name_tag)):
                 shutil.move(file, os.path.join(results_folder, file))
@@ -312,7 +314,16 @@ class RSoftSim:
             else:
                 raise RuntimeError("Failed to load prior_space.json after retries.")
             
-        para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
+        if Simulation_params["industry_neff_values"] == True:
+            neff_val = read_neff_values(Simulation_params["industry_neff_file"])
+            para_space = []
+            for prior_name, (low, high) in param_range.items():
+                if prior_name == "core_delta":
+                    para_space.append(Categorical(neff_val, name=prior_name))
+                else:
+                    para_space.append(Real(low, high, name=prior_name))
+        else:
+            para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
         param_dict = {dim.name: val for dim, val in zip(para_space, params)}
         
         # update template file with chosen values from scikit.Optimize()
@@ -378,15 +389,15 @@ class RSoftSim:
             for j, core_key in enumerate(core_name, start=1):
                 if j == Simulation_params["core_to_monitor"]:
                     # core to be optimized by skopt
-                    core_diam = variable_params["core_diam"]
-                    core_delta = variable_params["core_delta"]
-                    core_taper = param_dict["taper"]
+                    core_diam = variable_params.get("core_diam")
+                    core_delta = variable_params.get("core_delta", fixed_params.get("core_delta"))
+                    core_taper = param_dict.get("taper", fixed_params.get("taper"))
                 else:
                     # pass
                     # use preconfigured values to specify core parameters
-                    core_diam = 8.3 #core_params[core_key]["core_diam"]
-                    core_delta = simulation_val["core_delta"]
-                    core_taper = param_dict["taper"]
+                    core_diam = 6.5 #core_params[core_key]["core_diam"]
+                    core_delta = simulation_val.get("core_delta", fixed_params.get("core_delta"))
+                    core_taper = param_dict.get("taper", fixed_params.get("taper"))
 
                 # Store dimensions for this core
                 core_beg_dims_list.append((core_diam / taper, core_diam / taper))
@@ -424,7 +435,8 @@ class RSoftSim:
         if simulation_val["launch_type"] == LaunchType.SM:
             launch_mode = simulation_val["launch_mode"]
             launch_mode_radial = simulation_val["launch_mode_radial"]
-            name_tag = f"_LP{launch_mode}{launch_mode_radial}_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
+            param_string = "_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
+            name_tag = f"LP{launch_mode}{launch_mode_radial}_{param_string}"
         else:
             grid = simulation_val["grid_size"] # use only when trying to find the optimal gridding to run BeamPROP in.
             name_tag = f"_Grid{grid}".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
@@ -697,7 +709,7 @@ def multiple_mode_tf(arg_list):
     '''
     TO DO: fix up the gridding part of this code.
     '''
-    sim_val, custom_priors, m, rm, params, taper_min, taper_max, gridding = arg_list
+    sim_val, custom_priors, m, rm, params, taper_min, taper_max, gridding, iteration_num = arg_list
     if gridding:
         sim_val, custom_priors, gr, params, taper_min, taper_max, gridding = arg_list
         sim_val = copy.deepcopy(sim_val)
@@ -719,10 +731,11 @@ def multiple_mode_tf(arg_list):
         # optimizer_result = f"Grid_{gr}_Optimizer_Result.csv"
         # param_num = f"Grid {gr}"
     else:
-        sim_val, custom_priors, m, rm, params, taper_min, taper_max, gridding = arg_list
+        sim_val, custom_priors, m, rm, params, taper_min, taper_max, gridding, iteration_num = arg_list
         sim_val = copy.deepcopy(sim_val)
         sim_val["launch_mode"] = m
         sim_val["launch_mode_radial"] = rm
+        sim_val["iter_num"] = iteration_num
 
         # write core diameter properties to simulation_val and set special core properties to None for SKOPT to overwrite
         assign_core_properties(sim_val)
@@ -777,14 +790,14 @@ def multiple_mode_tf(arg_list):
     plotting_optimizer_results(data, param_names, tf=tf_vectors, plot= False)
     return (param_num, tf_vectors)
 
-def run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding = False): 
+def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding = False): 
 
     tf_list = []
     if not gridding:
         # initialise global parent argument list. This creates multiple instances of args_list based on the length of
         # mode_vals or radial_mode_vals. i.e. 
         # [(simulation_val, 0, 1, params, False),(simulation_val, 1, 1, params, False),(simulation_val, -1, 1, params, False), .....]
-        args_list = [(simulation_val, custom_priors,m, rm, params, taper_min, taper_max, gridding) for m, rm in zip(mode_vals, radial_mode_vals)] 
+        args_list = [(simulation_val, custom_priors,m, rm, params, taper_min, taper_max, gridding, iteration_num) for m, rm in zip(mode_vals, radial_mode_vals)] 
     else:
         # run gridding determination
         grid_size_list = np.arange(0.1, 2.1, 0.1)
@@ -824,11 +837,11 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
 
     if gridding:
         # run gridding determination
-        grid_size_range, tf_list = run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals, params, taper_min, taper_max, gridding)
+        grid_size_range, tf_list = run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, params, taper_min, taper_max, gridding)
         return grid_size_range, tf_list
     else:
         # multiprocessing in here, we only want multiprocessing in this function and not in main_optimizer!!!!
-        tf_list = run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding)
+        tf_list = run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding)
     
     # Aggregate result (compute scalar loss/metric for this parameter vector)
     """
@@ -997,7 +1010,22 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
         raise RuntimeError(f"Failed to load {prior_space_pid} after retries.")
     
     # read in prior space to inform optimiser of the dimensions
-    para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
+    if simulation_val["industry_neff_values"] == True:
+        neff_val = read_neff_values(simulation_val["industry_neff_file"])
+        para_space = []
+        for prior_name, (low, high) in param_range.items():
+            if prior_name == "core_delta":
+                para_space.append(Categorical(neff_val, name=prior_name))
+            else:
+                para_space.append(Real(low, high, name=prior_name))
+    else:
+        para_space = []
+        for prior_name, (low, high) in param_range.items():
+            if prior_name == "core_delta":
+                para_space.append(Real(low, high, name=prior_name))
+            else:
+                para_space.append(Real(low, high, name=prior_name))
+        # para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
     
     # initialise optimiser
     opt = Optimizer(
@@ -1015,20 +1043,38 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
         for batch_idx in range(total_calls):
             # ask for 1 set of parameter vectors only to prevent daemonic process having children 
             param_batch = opt.ask()
-            print(f"Trying core_delta: {param_batch[0]:.3f}, core_diam: {param_batch[1]:.3f}, taper: {param_batch[2]:.3f}")
-            # run simulation
+
+            print("Trying " + ", ".join(
+                f"Core neff: {param_batch[l]:.3f}" if text == "core_delta"
+                else f"{text}: {param_batch[l]:.3f}"
+                for l, text in enumerate(variable_params.keys())
+            ))         
+            
+            # adjust how core neff is fed to RSoft. It requires neff for the cores to be in terms of the background index, so modify chosen values to be core_delta instead
+            for j, variable_text in enumerate(variable_params.keys()):
+                if variable_text == "core_delta":
+                    param_batch[j] = param_batch[j] - RSoft_params["background_index"]   
+
             result_batch, arr_results, amp, phase = run_all_modes_for_params(param_batch, batch_idx + 1, 
                                                                       simulation_val, custom_priors, mode_vals, 
                                                                       radial_mode_vals, taper_min, 
                                                                       taper_max, gridding = gridding)
+            # convert back into core neff
+            for j, variable_text in enumerate(variable_params.keys()):
+                if variable_text == "core_delta":
+                    param_batch[j] = param_batch[j] + RSoft_params["background_index"] 
             # tell optimiser the performance of the chosen parameters
             opt.tell(param_batch, result_batch)
             # log iteration of parameters, store for later use
             array_of_results.append(arr_results)
             print(f"Iteration {batch_idx + 1}: {result_batch}\n"
                   f"Loss metric iteration {batch_idx + 1} (a, b, c, c): {array_of_results[batch_idx]}")
+            
+            # for j, variable_text in enumerate(variable_params.keys()):
+            #     if variable_text == "core_delta":
+            #         param_batch[j] = param_batch[j] + RSoft_params["background_index"]   
+
             all_results.append({'params': param_batch, 'result': result_batch, 'Iteration': batch_idx + 1, "Loss Metric": array_of_results, "Core Amplitudes": amp, "Core Phases": phase})
-        
         return all_results
     # if false, run tf code for the template parameters
     else:
@@ -1038,5 +1084,5 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             grid_size_range, tf_list = run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals,taper_min, taper_max, gridding)
             return grid_size_range, tf_list
         else:
-            tf_list = run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals,taper_min, taper_max, gridding)
+            tf_list = run_tf_multproc(params, 1,simulation_val, custom_priors, mode_vals, radial_mode_vals,taper_min, taper_max, gridding)
         return tf_list
