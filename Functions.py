@@ -344,21 +344,21 @@ end launch_field
 
     for core_key in core_name:
         lines = insert_after_match(lines, "begin.width =", [
-            f"\tbegin.delta = {core_params[core_key]['delta']}\n",
-            f"\tend.delta = {core_params[core_key]['delta']}\n"
+            f"\tbegin.delta = {core_params[core_key]['delta'] - RSoft_params['background_index']}\n",
+            f"\tend.delta = {core_params[core_key]['delta'] - RSoft_params['background_index']}\n"
         ], segment_filter=f"{core_key}")
         lines_fs = insert_after_match(lines_fs, "begin.width =", [
-            f"\tbegin.delta = {core_params[core_key]['delta']}\n",
-            f"\tend.delta = {core_params[core_key]['delta']}\n"
+            f"\tbegin.delta = {core_params[core_key]['delta'] - RSoft_params['background_index']}\n",
+            f"\tend.delta = {core_params[core_key]['delta'] - RSoft_params['background_index']}\n"
         ], segment_filter=f"{core_key}")
 
     lines = insert_after_match(lines, "begin.width =", [
-        f"\tbegin.delta = {launch_array['cladding_delta']}\n",
-        f"\tend.delta = {launch_array['cladding_delta']}\n"
+        f"\tbegin.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n",
+        f"\tend.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n"
     ], segment_filter="Super Cladding") 
     lines_fs = insert_after_match(lines_fs, "begin.width =", [
-        f"\tbegin.delta = {launch_array['cladding_delta']}\n",
-        f"\tend.delta = {launch_array['cladding_delta']}\n"
+        f"\tbegin.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n",
+        f"\tend.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n"
     ], segment_filter="Super Cladding") 
 
     if Simulation_params["add_cladding_to_cores"] is not None:
@@ -366,13 +366,13 @@ end launch_field
         ], segment_filter="Super Cladding") 
         for cladd_num in Simulation_params["add_cladding_to_cores"]:
             lines = insert_after_match(lines, "begin.width =", [
-            f"\tbegin.delta = {launch_array['cladding_delta']}\n",
-            f"\tend.delta = {launch_array['cladding_delta']}\n"
+            f"\tbegin.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n",
+            f"\tend.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n"
             ], segment_filter=f"Core {cladd_num + 1} Cladding") 
                 
             lines_fs = insert_after_match(lines_fs, "begin.width =", [
-                f"\tbegin.delta = {launch_array['cladding_delta']}\n",
-                f"\tend.delta = {launch_array['cladding_delta']}\n"
+                f"\tbegin.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n",
+                f"\tend.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n"
             ], segment_filter=f"Core {cladd_num + 1} Cladding") 
    
 

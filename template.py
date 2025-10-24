@@ -8,7 +8,7 @@ fixed_params = {
     "MCFCladd": 125, # 380 #125
     # "core_claddings": None, 
     "core_cladding_diam": None, # None #80,
-    # "cladding_delta": ,#0.0055, #0.0095,
+    "cladding_delta": 1.44,#0.0055, #0.0095,
     "core_cladding_delta": None,
     "cen_core_cladding_delta": None,#0.00949,
     # "Taper_L": 50000, #45000
@@ -49,7 +49,6 @@ RSoft_params = {
     "fem_nev": 1
 }
 RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
-fixed_params["cladding_delta"] =  1.44-RSoft_params["background_index"]
 
 Launch_params = {
     "monitor_type": Monitor_Prop.FIBRE_MODE_POWER,
@@ -96,7 +95,7 @@ Simulation_params = {
 
 variable_params= {
     "core_diam": 6.5, #8.3, 
-    "core_delta": 1.4467895-RSoft_params["background_index"],#0.0122895, #0.0157,#
+    "core_delta": 1.4467895,#0.0122895, #0.0157,#
     # "taper": 6.55789308, #22, #8.53
     "Taper_L": 50000,
 }       
@@ -124,7 +123,7 @@ for i in range(1, Simulation_params["core_num"] + 1):
     if "core_diam" in fixed_params and "core_delta" in fixed_params:
         core_params[f"core_{i}"] = {
         "core_diam": fixed_params.get("core_diam"),
-        "delta": fixed_params.get("core_delta"),
+        "delta": fixed_params.get("core_delta") - RSoft_params["background_index"],
         "taper": variable_params.get("taper")
         }
 
@@ -137,6 +136,6 @@ for i in range(1, Simulation_params["core_num"] + 1):
     elif "core_delta" in fixed_params:
         core_params[f"core_{i}"] = {
         "core_diam": 6.5,#variable_params["core_diam"],
-        "delta": fixed_params.get("core_delta"), #variable_params["core_delta"]
+        "delta": fixed_params.get("core_delta") - RSoft_params["background_index"], #variable_params["core_delta"]
         "taper": fixed_params.get("taper")
         }

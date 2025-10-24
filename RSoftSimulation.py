@@ -1050,19 +1050,12 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                 for l, text in enumerate(variable_params.keys())
             ))         
             
-            # adjust how core neff is fed to RSoft. It requires neff for the cores to be in terms of the background index, so modify chosen values to be core_delta instead
-            for j, variable_text in enumerate(variable_params.keys()):
-                if variable_text == "core_delta":
-                    param_batch[j] = param_batch[j] - RSoft_params["background_index"]   
 
             result_batch, arr_results, amp, phase = run_all_modes_for_params(param_batch, batch_idx + 1, 
                                                                       simulation_val, custom_priors, mode_vals, 
                                                                       radial_mode_vals, taper_min, 
                                                                       taper_max, gridding = gridding)
-            # convert back into core neff
-            for j, variable_text in enumerate(variable_params.keys()):
-                if variable_text == "core_delta":
-                    param_batch[j] = param_batch[j] + RSoft_params["background_index"] 
+             
             # tell optimiser the performance of the chosen parameters
             opt.tell(param_batch, result_batch)
             # log iteration of parameters, store for later use
