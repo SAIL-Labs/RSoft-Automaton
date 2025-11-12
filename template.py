@@ -46,7 +46,7 @@ RSoft_params = {
     "structure": Struct_type.FIBRE,
     "slice_display_mode": "DISPLAY_CONTOURMAPXZ",
     "fem_iterations": 1000,
-    "fem_nev": 1
+    "fem_nev": 12
 }
 RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
 
@@ -94,7 +94,7 @@ Simulation_params = {
 }
 
 variable_params= {
-    "core_diam": 6.5, #8.3, 
+    "core_diam": 18.0,#6.5, #8.3, np.array([30.0])
     "core_delta": 1.4467895,#0.0122895, #0.0157,#
     # "taper": 6.55789308, #22, #8.53
     "Taper_L": 50000,

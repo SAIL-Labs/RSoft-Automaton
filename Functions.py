@@ -444,6 +444,7 @@ end launch_field
             in_time_monitor = False
             inserted = False
             mon_number = 0
+            extra_monitors = 0
 
             for line in arr_name:
                 
@@ -465,6 +466,12 @@ end launch_field
                     in_time_monitor = True
                     inserted = False  # reset insertion flag for each time_monitor
 
+                if line_strip.startswith(f"time_monitor {simulation_val['core_num'] * 2 + 1 + extra_monitors}"):
+                    in_extra_time_monitor = True
+                    inserted_extra = False  # reset insertion flag for each time_monitor
+                else:
+                    in_extra_time_monitor = False
+
                 if in_time_monitor:
                     if mon_number == core_to_monitor:
                         for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
@@ -481,37 +488,105 @@ end launch_field
 
                 final_lines.append(line)
 
-                
                 if in_time_monitor and line_strip.startswith("monitoroutputmask") and not inserted:
                     final_lines.append("\tmonitoroutputformat = OUTPUT_AMP_PHASE\n")
                     final_lines.append("\toverlap_type = 1\n")
 
-                    if Simulation_params["skip_core"] is not None and Simulation_params["fixed_fem_file"] is False:
-                        first_mode_first_pol_file = f"monitor_file = {FS_file_name}.m00"
-                        final_lines.append(f"\t{first_mode_first_pol_file}\n")
-                    elif Simulation_params["skip_core"] is not None and Simulation_params["fixed_fem_file"] is True:
-                        first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
-                        final_lines.append(f"\t{first_mode_first_pol_file}\n")
-                    elif Simulation_params["fixed_fem_file"] is True:
-                        first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
-                        final_lines.append(f"\t{first_mode_first_pol_file}\n")
-                    else:
-                        if mon_number == (core_to_monitor - 1):
-                            first_mode_first_pol_file = f"monitor_file = {FS_file_name}.m00"
-                            final_lines.append(f"\t{first_mode_first_pol_file}\n")
+                    # Extra modes we want for the *central* core:
+                    # LP11a, LP11b, LP21a, LP21b, LP02
+                    higher_mode_indices = [2, 4, 6, 8, 10]
 
+                    # Case 1: using a fixed external FEM file (no per-mode FEMSIM)
+                    if Simulation_params["fixed_fem_file"]:
+                        # All monitors use the same supplied port_mon_file
+                        final_lines.append(f"\tmonitor_file = {Simulation_params['port_mon_file']}\n")
+
+                    # Case 2: skip_core is set and we’re doing standard FEMSIM modes
+                    elif Simulation_params["skip_core"] is not None:
+                        # You can customize this branch as needed; for now keep old behavior
+                        final_lines.append(f"\tmonitor_file = {FS_file_name}.m00\n")
+
+                    else:
+                        # --- Normal dynamic case ---
+
+                        # Per-core monitors (first core_num monitors)
+                        if mon_number < core_num:
+                            if mon_number == (core_to_monitor - 1):
+                                # This is the main monitor on the core we care about → LP01 (m00)
+                                final_lines.append(f"\tmonitor_file = {FS_file_name}.m00\n")
+                            else:
+                                # Other cores use the generic launch field / file
+                                final_lines.append(f"\tmonitor_file = {Simulation_params['port_mon_file']}\n")
+
+                        # Extra monitors after the first core_num ports:
                         else:
-                            first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
-                            final_lines.append(f"\t{first_mode_first_pol_file}\n")     
-                            # for p, r in zip(port_mon_text_arr, port_mon_text_replace):
-                            #     if line_strip.startswith(p):
-                            #         line_strip = line_strip.replace(p,r)               
-                    final_lines.append(f"\tpolarizer = 2\n")
+                            # index of this extra monitor among the higher modes
+                            idx_extra = mon_number - core_num  # 0,1,2,3,4,...
+
+                            if 0 <= idx_extra < len(higher_mode_indices) and mon_number >= (core_to_monitor - 1):
+                                # Map 16→.m02, 17→.m04, 18→.m06, 19→.m08, 20→.m10, etc.
+                                mode_idx = higher_mode_indices[idx_extra]
+                                if mode_idx >= 10:
+                                    final_lines.append(f"\tmonitor_file = {FS_file_name}.m{mode_idx}\n")
+                                else:
+                                    final_lines.append(f"\tmonitor_file = {FS_file_name}.m0{mode_idx}\n")
+                            else:
+                                # Fallback (shouldn't normally hit if counts are consistent)
+                                final_lines.append(f"\tmonitor_file = {Simulation_params['port_mon_file']}\n")
+
+                    final_lines.append("\tpolarizer = 2\n")
                     inserted = True
                     mon_number += 1
+                # if in_time_monitor and line_strip.startswith("monitoroutputmask") and not inserted:
+                #     final_lines.append("\tmonitoroutputformat = OUTPUT_AMP_PHASE\n")
+                #     final_lines.append("\toverlap_type = 1\n")
 
+                #     if Simulation_params["skip_core"] is not None and Simulation_params["fixed_fem_file"] is False:
+                #         first_mode_first_pol_file = f"monitor_file = {FS_file_name}.m00" #LP01
+                #         final_lines.append(f"\t{first_mode_first_pol_file}\n")
+
+                #     elif Simulation_params["skip_core"] is not None and Simulation_params["fixed_fem_file"] is True:
+                #         first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
+                #         final_lines.append(f"\t{first_mode_first_pol_file}\n")
+                #     elif Simulation_params["fixed_fem_file"] is True:
+                #         first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
+                #         final_lines.append(f"\t{first_mode_first_pol_file}\n")
+                #     else:
+                #         if mon_number == (core_to_monitor - 1):
+                #             first_mode_first_pol_file = f"monitor_file = {FS_file_name}.m00" #LP01
+                            
+                #             final_lines.append(f"\t{first_mode_first_pol_file}\n")
+                #         else:
+                #             first_mode_first_pol_file = f"monitor_file = {Simulation_params['port_mon_file']}"
+                #             final_lines.append(f"\t{first_mode_first_pol_file}\n")     
+
+                #     if in_extra_time_monitor and not inserted_extra:
+                #         # each value corresponds to an additional port monitor
+                #         higher_mode_indices = [2, 4, 6, 8, 10]  # LP11a, LP11b, LP21a, LP21b, LP02
+                #         # find where these "extra" monitors start
+                #         start_index = (simulation_val["core_num"] * 2 + 1)
+                #         for i, mode_idx in enumerate(higher_mode_indices):
+                #             time_mon_num = start_index + i  # e.g., 16, 17, 18, 19, 20
+                #             # Write corresponding monitor block only if present downstream
+                #             # if line_strip.startswith(f"time_monitor {time_mon_num}"):
+                #             final_lines.append(f"\tmonitor_file = {FS_file_name}.m0{mode_idx}\n")
+                #             extra_monitors += 1
+                #     inserted_extra = True
+
+                        
+                            
+                            # for p, r in zip(port_mon_text_arr, port_mon_text_replace):
+                            #     if line_strip.startswith(p):
+                            #         line_strip = line_strip.replace(p,r)   
+      
+                    # final_lines.append(f"\tpolarizer = 2\n")
+                    # inserted = True
+                    # mon_number += 1
+                
                 if in_time_monitor and line_strip.startswith("end monitor"):
                     in_time_monitor = False
+                if in_extra_time_monitor and line_strip.startswith("end monitor"):
+                    in_extra_time_monitor = False
                     
             with open(f"{curr_file_name}.ind", "w") as out:
                 out.writelines(final_lines)
@@ -807,11 +882,17 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
             port = circuit.add_portmonitor(dimensions = core_final_dims_list[j])
             port_monitors.append(port)
 
-    # Attach port monitors to core segments
-    if Launch_params["mon_type"] == "port_mon":
+        # Attach port monitors to core segments
         for core_seg, port_mon in zip(core_segments, port_monitors):
             # Attach monitor to the *output end* of the segment
             circuit.attach(port_mon, core_seg, 1, 0, attach_angles = 0, attach_dimensions = 1) 
+
+        # Add extra port monitors to monitor higher LP modes
+        for k in range(len(port_monitors) - 2):
+            port = circuit.add_portmonitor(dimensions = core_final_dims_list[0])
+            circuit.attach(port, core_segments[-1], 1, 0, attach_angles = 0, attach_dimensions = 1) 
+            port_monitors.append(port)
+    # if Launch_params["mon_type"] == "port_mon":
     return path_num
 
 # def build_pigtail(circuit, path_num, core_positions, core_names, taper, Taper_length,

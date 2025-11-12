@@ -1071,7 +1071,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
         return all_results
     # if false, run tf code for the template parameters
     else:
-        param_names = ["core_delta", "core_diam"]
+        param_names = ["core_diam", "core_delta"]
         params = [variable_params[k] for k in param_names]
         if gridding:
             grid_size_range, tf_list = run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals,taper_min, taper_max, gridding)
