@@ -43,28 +43,62 @@ class RSoftSim:
             Generate hexagonal core coordinates and store internally.
             """
             
-            if core_num % 2 == 0:
-                raise ValueError(f"The number of cores must be odd to perfectly fit inside the hex grid. Received: {core_num}")
+            # if core_num % 2 == 0:
+            #     raise ValueError(f"The number of cores must be odd to perfectly fit inside the hex grid. Received: {core_num}")
 
-            # row_numbers = [number_rows(core_num)]
-            # for row_num in row_numbers:
-                # hcoord, vcoord = generate_hex_grid(row_num, core_sep, include_centre = SimParam["plot_centre_core"])
-                # self.core_positions = list(zip(hcoord, vcoord))
-            hcoord, vcoord = generate_hex_ring_grid(fixed_params["MCFCladd"]/2, core_sep, SimParam["core_num"], include_center = SimParam["plot_centre_core"])
-            # code to skip cores if desired
+            # # row_numbers = [number_rows(core_num)]
+            # # for row_num in row_numbers:
+            #     # hcoord, vcoord = generate_hex_grid(row_num, core_sep, include_centre = SimParam["plot_centre_core"])
+            #     # self.core_positions = list(zip(hcoord, vcoord))
+            # hcoord, vcoord = generate_hex_ring_grid(fixed_params["MCFCladd"]/2, core_sep, SimParam["core_num"], include_center = SimParam["plot_centre_core"])
+            row_num, excess = number_rows(core_num)
+            hcoord, vcoord = old_generate_hex_grid(row_num, fixed_params["core_sep"], include_centre = Simulation_params["plot_centre_core"])
+            
+            # if core_num == 19:
+            #     reorder_indices = [9, 10, 14, 13, 8, 4, 5, 11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
+            # elif core_num == 7:
+            #     if Simulation_params["plot_centre_core"]:
+            #         reorder_indices = [3,4,6,5,2,0,1]
+            #         x, y = np.array(hcoord)[reorder_indices], np.array(vcoord)[reorder_indices]
+            #     else:
+            #         reorder_indices = [0,1,2,3,4,5]
+            #         x, y = np.array(hcoord), np.array(vcoord)
+            if Simulation_params["plot_centre_core"]:
+                if 19 < core_num <= 37:
+                    reorder_index = [18, 19, 25, 24, 17, 11, 12,
+                                    20, 26, 31, 30, 29, 23, 16, 10, 5, 6, 7, 13,
+                                    21, 27, 32, 36, 35, 34, 33, 28, 22, 15, 9, 4, 0, 1, 2, 3, 8, 14]
+                elif 7 < core_num <= 19:
+                    reorder_index = [9, 10, 14, 13, 8, 4, 5,
+                                11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
+                elif core_num <= 7:
+                    reorder_index = [3,4,6,5,2,0,1]
+            else:
+                if 19 < core_num <= 37:
+                    reorder_index = [18, 19, 25, 24, 17, 11, 12,
+                                    20, 26, 31, 30, 29, 23, 16, 10, 5, 6, 7, 13,
+                                    21, 27, 32, 35, 34, 33, 28, 22, 15, 9, 4, 0, 1, 2, 3, 8, 14]
+                elif 7 < core_num <= 19:
+                    reorder_index = [9, 10, 14, 13, 8, 4, 5,
+                            11, 15, 17, 16, 12, 7, 3, 0, 1, 2, 6]
+                elif core_num <= 7:
+                    reorder_index = [3,4,6,5,2,0,1]
+
+            xcoord_og, ycoord_og, xcoord_relist, ycoord_relist = plot_excess(excess, hcoord, vcoord, reorder_index)
+            # # code to skip cores if desired
             if Simulation_params["skip_core"] is not None:
                 x_val, y_val = [], []
-                for i, (xval, yval) in enumerate(zip(hcoord, vcoord)):
+                for i, (xval, yval) in enumerate(zip(xcoord_relist, ycoord_relist)):
                     for j in Simulation_params["skip_core"]:
                         if i != j:
                             x_val.append(xval)
                             y_val.append(yval)
                 self.core_positions = list(zip(x_val, y_val))
-                self.cladd_positions = list(zip(hcoord,vcoord))
+                self.cladd_positions = list(zip(xcoord_relist, ycoord_relist))
                 with open("cladding_position.json", "w") as cladd_positioning:
                     json.dump(self.cladd_positions, cladd_positioning)
             else:
-                self.core_positions = list(zip(hcoord, vcoord))
+                self.core_positions = list(zip(xcoord_relist, ycoord_relist))
                 self.cladd_positions = None
             
             with open("core_positions.json", "w") as g:
@@ -74,9 +108,31 @@ class RSoftSim:
             """
             Generate pentagon core coordinates and store internally.
             """
-            # estimated_radius = estimate_pentagon_radius(core_num,core_sep)
-            hcoord, vcoord = generate_pentagon_grid(fixed_params["MCFCladd"] / 2, core_sep, Simulation_params["core_num"], include_centre = SimParam["plot_centre_core"])
-            self.core_positions = list(zip(hcoord, vcoord))
+            row_num, excess = number_rows(core_num, grid_type="pent")
+            hcoord, vcoord= generate_pent_grid(row_num, grid_spacing=fixed_params["core_sep"], include_centre=Simulation_params["plot_centre_core"])
+            if Simulation_params["plot_centre_core"]:
+                if core_num <= 6:
+                    reorder_index_pent = [0, 5, 1, 2, 3, 4]
+                elif 6 < core_num <= 16:
+                    reorder_index_pent = [0, 1, 2, 3, 4, 5,
+                                        14, 15, 6, 7, 8, 9, 10, 11, 12, 13]
+                elif 16 < core_num <= 31:
+                    reorder_index_pent = [0, 1, 2, 3, 4, 5,
+                                        14, 15, 6, 7, 8, 9, 10, 11, 12, 13,
+                                        27, 28, 29, 30, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,26]
+            else:
+                if core_num <= 6:
+                    reorder_index_pent = [0, 1, 2, 3, 4]
+                elif 6 < core_num <= 16:
+                    reorder_index_pent = [4, 0, 1, 2, 3,
+                                        13, 14, 5, 6, 7, 8, 9, 10, 11, 12]
+                elif 16< core_num <= 31:
+                    reorder_index_pent = [4, 0, 1, 2, 3,
+                                        13, 14, 15, 5, 6, 7, 8, 9, 10, 11, 12,
+                                        27, 28, 29, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+
+            xcoord_og, ycoord_og, xcoord_relist, ycoord_relist = plot_excess(excess, hcoord, vcoord, reorder_index_pent)
+            self.core_positions = list(zip(xcoord_relist, ycoord_relist))
             with open("core_positions.json", "w") as g:
                 json.dump(self.core_positions, g)
 
@@ -318,7 +374,7 @@ class RSoftSim:
             neff_val = read_neff_values(Simulation_params["industry_neff_file"])
             para_space = []
             for prior_name, (low, high) in param_range.items():
-                if prior_name == "core_delta":
+                if prior_name == "core_neff":
                     para_space.append(Categorical(neff_val, name=prior_name))
                 else:
                     para_space.append(Real(low, high, name=prior_name))
@@ -390,13 +446,13 @@ class RSoftSim:
                 if j == Simulation_params["core_to_monitor"]:
                     # core to be optimized by skopt
                     core_diam = variable_params.get("core_diam")
-                    core_delta = variable_params.get("core_delta", fixed_params.get("core_delta"))
+                    core_neff = variable_params.get("core_neff", fixed_params.get("core_neff"))
                     core_taper = param_dict.get("taper", fixed_params.get("taper"))
                 else:
                     # pass
                     # use preconfigured values to specify core parameters
                     core_diam = 6.5 #core_params[core_key]["core_diam"]
-                    core_delta = simulation_val.get("core_delta", fixed_params.get("core_delta"))
+                    core_neff = simulation_val.get("core_neff", fixed_params.get("core_neff"))
                     core_taper = param_dict.get("taper", fixed_params.get("taper"))
 
                 # Store dimensions for this core
@@ -404,19 +460,19 @@ class RSoftSim:
                 core_end_dims_list.append((core_diam, core_diam))
 
                 core_params[core_key]["core_diam"] = core_diam
-                core_params[core_key]["delta"] = core_delta
+                core_params[core_key]["neff"] = core_neff
                 core_params[core_key]["taper"] = core_taper
         else: 
             for j, core_key in enumerate(core_name, start=1):
                 core_diam = core_params[core_key]["core_diam"]
-                core_delta = core_params[core_key]["delta"]
+                core_neff = core_params[core_key]["neff"]
 
                 # Store dimensions for this core
                 core_beg_dims_list.append((core_diam / taper, core_diam / taper))
                 core_end_dims_list.append((core_diam, core_diam))
 
                 core_params[core_key]["core_diam"] = core_diam
-                core_params[core_key]["delta"] = core_delta
+                core_params[core_key]["neff"] = core_neff
 
         # functions to generate the core layout, either a standard fibre or a complicated photonic lantern setup (either in hex, pent or circular geometry)
         path_num = 0
@@ -861,7 +917,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
 
         tf_vals = np.array(tf_vals)
 
-        amp, phase, grid_size, tf_result = extract_portmon_amp_phase(tf_vals, grid_size_range)
+        amp, phase, grid_size, tf_result = extract_portmon_amp_phase(tf_vals, core_number,grid_size_range)
         phase = np.unwrap(phase)
         
         amp_data = []
@@ -903,16 +959,24 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
 
         tf_vals = np.array(tf_vals)
 
-        amp, phase, tf_result = extract_portmon_amp_phase(tf_vals)
-        
+        amp, phase, ex_amp, ex_phase, tf_result = extract_portmon_amp_phase(tf_vals,core_number)
+        mode_reorder = [0, 5, 1, 2, 3, 4]
         max_value = print_max_amp_or_phase_value(amp)
 
         reorder = True
         tf_labels = ["Amplitude", "Phase"]
-        tf_to_plot = [amp, phase]
 
-        tf_figure = plt.figure(figsize = (16,12))
-        tf_figure.suptitle(f"Iteration {iteration_num}\n Parameters:{params}", y=0.72)
+        tf_to_plot = [amp, phase]
+        ex_amp = [ex_amp[k] for k in mode_reorder]
+        ex_phase = [ex_phase[k] for k in mode_reorder]
+        tf_to_plot_ex = [ex_amp, ex_phase]
+
+        tf_figure = plt.figure(figsize = (20,12))
+        param_str = ", ".join(f"{p:.3f}" for p in params)
+        tf_figure.suptitle(
+            f"Iteration {iteration_num}\nParameters: [{param_str}]",
+            y=0.7, x=0.24
+        )        
         gs = gridspec.GridSpec(1,3, width_ratios=[1,1,1])
         
         # ensure each plot is the same height
@@ -928,8 +992,6 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         # plot core skeleton to highlight the special core
         if simulation_val["grid_type"] == "Pent":
             x, y = generate_pentagon_grid(fixed_params["MCFCladd"] / 2, fixed_params["core_sep"], simulation_val["core_num"])
-            # reorder_indices = [5, 1, 2, 3, 4, 0] 
-            # x, y = np.array(x)[reorder_indices], np.array(y)[reorder_indices]
             ax0.scatter(x,y)
             ax0.scatter(x[simulation_val["core_to_monitor"] - 1], y[simulation_val["core_to_monitor"] - 1], color="r", label = "H-Core")
             ax0.set_xlabel(r"x ($\mu m$)")
@@ -938,24 +1000,40 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             ax0.legend(loc="upper right")
             
         elif simulation_val["grid_type"] == "Hex":
-            hcoord, vcoord = generate_hex_ring_grid(fixed_params["MCFCladd"]/2, fixed_params["core_sep"], simulation_val["core_num"], include_center = simulation_val["plot_centre_core"])
-            if simulation_val["core_num"] == 19:
-                reorder_indices = [9, 10, 14, 13, 8, 4, 5, 11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
-            elif simulation_val["core_num"] == 7:
-                if simulation_val["plot_centre_core"]:
-                    reorder_indices = [6, 0, 1, 2, 3, 4, 5]
-                    x, y = np.array(hcoord)[reorder_indices], np.array(vcoord)[reorder_indices]
-                else:
-                    reorder_indices = [0,1,2,3,4,5]
-                    x, y = np.array(hcoord), np.array(vcoord)
-                
-            for i, (xval, yval) in enumerate(zip(x,y)):
+            row_num, excess = number_rows(simulation_val["core_num"])
+            hcoord, vcoord = old_generate_hex_grid(row_num, fixed_params["core_sep"], include_centre = simulation_val["plot_centre_core"])
+            
+            if simulation_val["plot_centre_core"]:
+                if 19 < simulation_val["core_num"] <= 37:
+                    reorder_index = [18, 19, 25, 24, 17, 11, 12,
+                                    20, 26, 31, 30, 29, 23, 16, 10, 5, 6, 7, 13,
+                                    21, 27, 32, 36, 35, 34, 33, 28, 22, 15, 9, 4, 0, 1, 2, 3, 8, 14]
+                elif 7 < simulation_val["core_num"] <= 19:
+                    reorder_index = [9, 10, 14, 13, 8, 4, 5,
+                                11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
+                elif simulation_val["core_num"] <= 7:
+                    reorder_index = [3,4,6,5,2,0,1]
+            else:
+                if 19 < simulation_val["core_num"] <= 37:
+                    reorder_index = [18, 19, 25, 24, 17, 11, 12,
+                                    20, 26, 31, 30, 29, 23, 16, 10, 5, 6, 7, 13,
+                                    21, 27, 32, 35, 34, 33, 28, 22, 15, 9, 4, 0, 1, 2, 3, 8, 14]
+                elif 7 < simulation_val["core_num"] <= 19:
+                    reorder_index = [9, 10, 14, 13, 8, 4, 5,
+                            11, 15, 17, 16, 12, 7, 3, 0, 1, 2, 6]
+                elif simulation_val["core_num"] <= 7:
+                    reorder_index = [3,4,6,5,2,0,1]
+
+            xcoord_og, ycoord_og, xcoord_relist, ycoord_relist = plot_excess(excess, hcoord, vcoord, reorder_index)
+            for i, (xval, yval) in enumerate(zip(xcoord_relist, ycoord_relist)):
                 if yval > 0:
                     ax0.annotate(f"{i+1}", (xval -1, yval - 5))
                 else:
                     ax0.annotate(f"{i+1}", (xval -1, yval + 2))
-            ax0.scatter(x,y)
-            ax0.scatter(x[simulation_val["core_to_monitor"]%core_number], y[simulation_val["core_to_monitor"]%core_number], color="r", label = "H-Core")
+            ax0.scatter(xcoord_relist, ycoord_relist)
+            ax0.scatter(xcoord_relist[simulation_val["core_to_monitor"]-1], 
+                        ycoord_relist[simulation_val["core_to_monitor"]-1], 
+                        color="r", label = "H-Core")
             ax0.set_xlabel(r"x ($\mu m$)")
             ax0.set_ylabel(r"y ($\mu m$)")
             ax0.set_aspect('equal')
@@ -963,13 +1041,21 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             
         # plot the individual amplitude and phase matrix
         axes = [ax1, ax2]
-        for i, (lab, tf_type) in enumerate(zip(tf_labels, tf_to_plot)):
+        for i, (lab, tf_type, ex_type) in enumerate(zip(tf_labels, tf_to_plot, tf_to_plot_ex)):
             plot_phase = False
 
             if lab == "Phase":
                 plot_phase = True
-            plot_tf_matrix(tf_type, simulation_val, matrix_type=f"{lab}", ax=axes[i], cbar=True, reorder = reorder, phase = plot_phase)
+            plot_tf_matrix(tf_type, simulation_val, ex_type, matrix_type=f"{lab}", ax=axes[i], cbar=True, reorder = reorder, phase = plot_phase)
             ax2.set_ylabel(None)
+            plt.close()
+            plt.close()
+
+        # tf_figure.savefig("Grif+Amplitude+Phase TF Matrix.png", dpi=300)
+        # plot the combined amplitude and phase matrix
+        plot_combined_tf_matrix(simulation_val, amp, phase, ex_amp, ex_phase, core_number, amp_max = max_value,
+                                dir = r"C:\Users\justinvella\Desktop\Github Code\RSoft-Automaton", 
+                                name = f"TF_Combined_{simulation_val['core_num']}c{simulation_val['grid_type']}PL.png")
         
         image_dir = r"C:\Users\justinvella\Desktop\Results\Images"
         monitored_mode = modes_to_monitor[0]
@@ -988,7 +1074,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         modes_to_monitor=modes_to_monitor,
     )
         
-    return loss, arr_results, amp, phase
+    return loss, arr_results, amp, phase, ex_amp, ex_phase
 
 def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding, total_calls, simulate_tf_metric = True):
     
@@ -1014,14 +1100,14 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
         neff_val = read_neff_values(simulation_val["industry_neff_file"])
         para_space = []
         for prior_name, (low, high) in param_range.items():
-            if prior_name == "core_delta":
+            if prior_name == "core_neff":
                 para_space.append(Categorical(neff_val, name=prior_name))
             else:
                 para_space.append(Real(low, high, name=prior_name))
     else:
         para_space = []
         for prior_name, (low, high) in param_range.items():
-            if prior_name == "core_delta":
+            if prior_name == "core_neff":
                 para_space.append(Real(low, high, name=prior_name))
             else:
                 para_space.append(Real(low, high, name=prior_name))
@@ -1045,13 +1131,13 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             param_batch = opt.ask()
 
             print("Trying " + ", ".join(
-                f"Core neff: {param_batch[l]:.3f}" if text == "core_delta"
+                f"Core neff: {param_batch[l]:.3f}" if text == "core_neff"
                 else f"{text}: {param_batch[l]:.3f}"
                 for l, text in enumerate(variable_params.keys())
             ))         
             
 
-            result_batch, arr_results, amp, phase = run_all_modes_for_params(param_batch, batch_idx + 1, 
+            result_batch, arr_results, amp, phase, ex_amp, ex_phase = run_all_modes_for_params(param_batch, batch_idx + 1, 
                                                                       simulation_val, custom_priors, mode_vals, 
                                                                       radial_mode_vals, taper_min, 
                                                                       taper_max, gridding = gridding)
@@ -1064,14 +1150,17 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                   f"Loss metric iteration {batch_idx + 1} (a, b, c, c): {array_of_results[batch_idx]}")
             
             # for j, variable_text in enumerate(variable_params.keys()):
-            #     if variable_text == "core_delta":
+            #     if variable_text == "core_neff":
             #         param_batch[j] = param_batch[j] + RSoft_params["background_index"]   
 
-            all_results.append({'params': param_batch, 'result': result_batch, 'Iteration': batch_idx + 1, "Loss Metric": array_of_results, "Core Amplitudes": amp, "Core Phases": phase})
+            all_results.append({'params': param_batch, 'result': result_batch, 
+                                'Iteration': batch_idx + 1, "Loss Metric": array_of_results, 
+                                "Core Amplitudes": amp, "Core Phases": phase,
+                                "Extra Core Amplitudes": ex_amp, "Extra Core Phases": ex_phase})
         return all_results
     # if false, run tf code for the template parameters
     else:
-        param_names = ["core_diam", "core_delta"]
+        param_names = ["core_diam", "core_neff"]
         params = [variable_params[k] for k in param_names]
         if gridding:
             grid_size_range, tf_list = run_tf_multproc(params, simulation_val, custom_priors, mode_vals, radial_mode_vals,taper_min, taper_max, gridding)

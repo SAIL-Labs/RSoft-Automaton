@@ -344,21 +344,21 @@ end launch_field
 
     for core_key in core_name:
         lines = insert_after_match(lines, "begin.width =", [
-            f"\tbegin.delta = {core_params[core_key]['delta'] - RSoft_params['background_index']}\n",
-            f"\tend.delta = {core_params[core_key]['delta'] - RSoft_params['background_index']}\n"
+            f"\tbegin.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n",
+            f"\tend.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n"
         ], segment_filter=f"{core_key}")
         lines_fs = insert_after_match(lines_fs, "begin.width =", [
-            f"\tbegin.delta = {core_params[core_key]['delta'] - RSoft_params['background_index']}\n",
-            f"\tend.delta = {core_params[core_key]['delta'] - RSoft_params['background_index']}\n"
+            f"\tbegin.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n",
+            f"\tend.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n"
         ], segment_filter=f"{core_key}")
 
     lines = insert_after_match(lines, "begin.width =", [
-        f"\tbegin.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n",
-        f"\tend.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n"
+        f"\tbegin.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n",
+        f"\tend.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n"
     ], segment_filter="Super Cladding") 
     lines_fs = insert_after_match(lines_fs, "begin.width =", [
-        f"\tbegin.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n",
-        f"\tend.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n"
+        f"\tbegin.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n",
+        f"\tend.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n"
     ], segment_filter="Super Cladding") 
 
     if Simulation_params["add_cladding_to_cores"] is not None:
@@ -366,26 +366,26 @@ end launch_field
         ], segment_filter="Super Cladding") 
         for cladd_num in Simulation_params["add_cladding_to_cores"]:
             lines = insert_after_match(lines, "begin.width =", [
-            f"\tbegin.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n",
-            f"\tend.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n"
+            f"\tbegin.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n",
+            f"\tend.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n"
             ], segment_filter=f"Core {cladd_num + 1} Cladding") 
                 
             lines_fs = insert_after_match(lines_fs, "begin.width =", [
-                f"\tbegin.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n",
-                f"\tend.delta = {launch_array['cladding_delta']- RSoft_params['background_index']}\n"
+                f"\tbegin.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n",
+                f"\tend.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n"
             ], segment_filter=f"Core {cladd_num + 1} Cladding") 
    
 
     # for i in range(1, core_num + 1):
     #     if i == core_to_monitor:
     #         lines = insert_after_match(lines, "begin.width =", [
-    #             f"\tbegin.delta = {launch_array['cen_core_cladding_delta']}\n",
-    #             f"\tend.delta = {launch_array['cen_core_cladding_delta']}\n"
+    #             f"\tbegin.delta = {launch_array['cen_core_cladding_neff']}\n",
+    #             f"\tend.delta = {launch_array['cen_core_cladding_neff']}\n"
     #         ], segment_filter=f"Cladding: {i}")
     #     else:
     #         lines = insert_after_match(lines, "begin.width =", [
-    #             f"\tbegin.delta = {launch_array['core_cladding_delta']}\n",
-    #             f"\tend.delta = {launch_array['core_cladding_delta']}\n"
+    #             f"\tbegin.delta = {launch_array['core_cladding_neff']}\n",
+    #             f"\tend.delta = {launch_array['core_cladding_neff']}\n"
     #         ], segment_filter=f"Cladding: {i}")
 
     # Build the updated lines
@@ -456,7 +456,7 @@ end launch_field
 
                 # forecfully fix certain port monitor parameters that appear as default otherwise  for port monitors
                 port_mon_text_arr = ["phi = default", "begin.width = default", "begin.height = default"]
-                port_mon_text_replace = ["phi = 0", "begin.width = 6.5", "begin.height = 6.5"]
+                port_mon_text_replace = ["phi = 0", "begin.width = default", "begin.height = default"]
                 port_mon_text_replace_special = ["phi = 0", f"begin.width = {core_diam_replaced}", f"begin.height = {core_diam_replaced}"]
                             
                 # for p, r, s in zip(port_mon_text_arr, port_mon_text_replace, port_mon_text_replace_special):
@@ -481,6 +481,14 @@ end launch_field
                         for p, r in zip(port_mon_text_arr, port_mon_text_replace):
                             if p in line:
                                 line = line.replace(p, r)
+                elif in_extra_time_monitor:
+                    for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
+                        if p in line:
+                            line = line.replace(p, r)
+                    # else:
+                    #     for p, r in zip(port_mon_text_arr, port_mon_text_replace):
+                    #         if p in line:
+                    #             line = line.replace(p, r)
 
                 # Remove 'comp_name' and 'portnum' lines
                 if line_strip.startswith("portnum"): 
@@ -528,8 +536,14 @@ end launch_field
                                 mode_idx = higher_mode_indices[idx_extra]
                                 if mode_idx >= 10:
                                     final_lines.append(f"\tmonitor_file = {FS_file_name}.m{mode_idx}\n")
+                                    for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
+                                        if p in line:
+                                            line = line.replace(p, r)
                                 else:
                                     final_lines.append(f"\tmonitor_file = {FS_file_name}.m0{mode_idx}\n")
+                                    for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
+                                        if p in line:
+                                            line = line.replace(p, r)
                             else:
                                 # Fallback (shouldn't normally hit if counts are consistent)
                                 final_lines.append(f"\tmonitor_file = {Simulation_params['port_mon_file']}\n")
@@ -789,7 +803,7 @@ def plotting_optimizer_results(df, param_names, tf = None, plot = True, csv_path
             ax.set_ylabel("Throughput", fontsize=12)
             if param_name == "core_diam":
                 ax.set_xlabel(param_name + r" ($\mu$m)", fontsize = 12)
-            elif param_name == "core_delta":
+            elif param_name == "core_neff":
                 ax.set_xlabel(param_name + r" ($n_{\mathrm{eff}}$)", fontsize = 12)
             elif param_name == "taper":
                 ax.set_xlabel(param_name + " ratio (MCF Diam/ MMF Diam)", fontsize = 12)
@@ -890,7 +904,7 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
         # Add extra port monitors to monitor higher LP modes
         for k in range(len(port_monitors) - 2):
             port = circuit.add_portmonitor(dimensions = core_final_dims_list[0])
-            circuit.attach(port, core_segments[-1], 1, 0, attach_angles = 0, attach_dimensions = 1) 
+            circuit.attach(port, core_segments[0], 1, 0, attach_angles = 0, attach_dimensions = 1) 
             port_monitors.append(port)
     # if Launch_params["mon_type"] == "port_mon":
     return path_num
@@ -1041,13 +1055,7 @@ def mode_selective_tf_matrix_metric(tf_list, hyp_param_b, hyp_param_c, core_to_m
     }
 
     tf_list = tf_list[0]
-    # with open(f"worker_debug_{os.getpid()}.txt", "w") as f:
-    #     f.write(f"tf_list = {repr(tf_list)}\n")
-    #     for i, item in enumerate(tf_list):
-    #         try:
-    #             f.write(f"tf_list[{i}] = {item}, len={len(item) if hasattr(item, '__len__') else 'N/A'}\n")
-    #         except Exception as e:
-    #             f.write(f"tf_list[{i}] = {item}, error: {e}\n")
+
     # relabel
     new_tf_list = [
         (label_replacements.get(label, label), arr)
@@ -1137,16 +1145,16 @@ def overwrite_template_val(json_file):
         core_key = f"core_{i}"
         if core_key in simulation_val:
             core_params[core_key] = simulation_val[core_key]
-        elif "core_diam" in fixed_params and "core_delta" in fixed_params:
+        elif "core_diam" in fixed_params and "core_neff" in fixed_params:
             core_params[core_key] = {
                 "core_diam": fixed_params["core_diam"],
-                "delta": fixed_params["core_delta"]
+                "neff": fixed_params["core_neff"]
             }
-        elif "core_diam" in variable_params and "core_delta" in variable_params:
+        elif "core_diam" in variable_params and "core_neff" in variable_params:
             if i != core_to_monitor:
                 core_params[core_key] = {
                     "core_diam": variable_params["core_diam"],
-                    "delta": variable_params["core_delta"]
+                    "neff": variable_params["core_neff"]
                 }
 #######################################################################################################################################################
 def plot_lp_modes(V):
@@ -1289,32 +1297,44 @@ def mode_wanted_considering_mode_orientations(LP_mode_dict, mode_desired):
 
     raise ValueError(f"Desired mode {mode_desired} exceeds total number of available mode orientations ({mode_number}).")
 
-def extract_portmon_amp_phase(tf_list, grid_size_range = None):
-    """
-    Function used to comb through the complete list of transfer vectors from BeamPROP to extract the amplitude and phase values recorded by each 
-    port monitor.
+def extract_portmon_amp_phase(tf_list, core_num, grid_size_range=None):
 
-    Arguments:
-        - tf_list: list of transfer vectors from RSoft
-        - grid_size_range: range of grid sizes to test RSoft simulations on
-    Returns:
-        - arrays for the amplitude, phase and list of transfer vectors, as well as grid sizes if specified.
-    """
+    og_amp_list = []
+    og_phase_list = []
+    ex_amp_list = []
+    ex_phase_list = []
     tf_result = []
-    amp = []
-    phase = []
 
     for tf in tf_list:
         arrs = np.array(tf).flatten()
         tf_result.append(arrs)
-        amp.append(arrs[1::2])
-        phase.append(np.deg2rad(arrs[2::2])) 
 
+        amps = arrs[1::2]
+        phases = np.deg2rad(arrs[2::2])
+
+        # Correct separation:
+        og_amp = amps[:core_num]
+        og_phase = phases[:core_num]
+
+        ex_amp = amps[core_num:]
+        ex_phase = phases[core_num:]
+
+        og_amp_list.append(og_amp)
+        og_phase_list.append(og_phase)
+        ex_amp_list.append(ex_amp)
+        ex_phase_list.append(ex_phase)
+
+    # Convert to 2D arrays (modes × cores)
+    og_amp_arr = np.array(og_amp_list)
+    og_phase_arr = np.array(og_phase_list)
+    ex_amp_arr = np.array(ex_amp_list)
+    ex_phase_arr = np.array(ex_phase_list)
+
+    # Optional grid-size return
     if grid_size_range is not None:
-        grid_size = list(grid_size_range)
-        return amp, phase, grid_size, tf_result
-    else:
-        return amp, phase, tf_result
+        return og_amp_arr, og_phase_arr, list(grid_size_range), tf_result
+
+    return og_amp_arr, og_phase_arr, ex_amp_arr, ex_phase_arr, tf_result
 
 def reorder_tf_vectors(tf_vector, simulation_val):
     """
@@ -1331,33 +1351,33 @@ def reorder_tf_vectors(tf_vector, simulation_val):
     labels = []
     core_num = simulation_val["core_num"]
     geo = simulation_val["grid_type"]
-    plot_centre_core = simulation_val["plot_centre_core"]
+    plot_centre_core = simulation_val.get("plot_centre_core", Simulation_params["plot_centre_core"])
 
     for label, vec in tf_vector:
         labels.append(label)
-        
-        if geo == "Hex":
-            if core_num == 19:
-                reorder_indices = [9, 10, 14, 13, 8, 4, 5, 11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
-            elif core_num == 7:
-                if Simulation_params["skip_core"] is not None:
-                    if plot_centre_core:
-                        reorder_indices = [5, 0, 1, 2, 3, 4]
-                else:
-                    if plot_centre_core:
-                        reorder_indices = [6, 0, 1, 2, 3, 4, 5]
-                    else:
-                        reorder_indices = [0, 1, 2, 3, 4, 5]
-        elif geo == "Pent":
-            if core_num == 6:
-                # not much of a change since these positions are 
-                # calculated in an anti-clockwise fashion to begin with
-                reorder_indices = [5, 1, 2, 3, 4, 0] 
-
-        vec = np.array(vec)[reorder_indices]
+        # if geo == "Hex":
+        #     if core_num == 19:
+        #         reorder_indices = [9, 10, 14, 13, 8, 4, 5, 11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
+        #     elif core_num == 7:
+        #         if simulation_val["skip_core"] is not None:
+        #             if plot_centre_core:
+        #                 reorder_indices = [5, 0, 1, 2, 3, 4]
+        #         else:
+        #             if plot_centre_core:
+        #                 reorder_indices = [6, 0, 1, 2, 3, 4, 5]
+        #             else:
+        #                 reorder_indices = [0, 1, 2, 3, 4, 5]
+        # elif geo == "Pent":
+        #     if core_num == 6:
+        #         # not much of a change since these positions are 
+        #         # calculated in an anti-clockwise fashion to begin with
+        #         reorder_indices = [5, 1, 2, 3, 4, 0] 
+        # print(reorder_indices)
+        vec = np.array(vec)#[reorder_indices]
 
         tf_matrix.append(vec)
     return labels, tf_matrix
+
 
 def phase_to_pixel(phase_val, phase_min, phase_max, resolution):
     # Maps phase_val to a pixel index for a colorbar image
@@ -1398,51 +1418,84 @@ def assign_17modes_to_tflist(tf_list, simulation_val):
         ]
     return tf_vectors_phase
 
-def plot_tf_matrix(tf_vectors, simulation_val, matrix_type="", ax=None, cbar=True, reorder = False, phase = False):
-    '''
-    Plot the transfer matrix for a given number of cores in some geometry AFTER running RSoftSimulation.py
+def plot_tf_matrix(tf_vectors, simulation_val, extra_modes,
+                   matrix_type="", ax=None, cbar=True,
+                   reorder=False, phase=False):
 
-    Parameters:
-        tf_vectors: array of transfer vectors and their labels, organised as (label, vector), produced by RSoftSimulation.py. Each vector is a 1D array
-        simulation_val: dictionary of values set to overwrite preset definitions in RSoftSimulation.py. Must contain core_num and optionally grid_type
-    Returns:
-        Plot of the transfer matrix
-    '''
     core_num = simulation_val["core_num"]
-    plot_centre_core = simulation_val["plot_centre_core"]
-    tf_matrix = []
+    core_to_monitor = simulation_val["core_to_monitor"]
 
+    # reordering value index and assigning labels 
     tf_vectors = assign_17modes_to_tflist(tf_vectors, simulation_val)
+
     if reorder:
         label, tf_matrix = reorder_tf_vectors(tf_vectors, simulation_val)
-
-    tf_matrix = np.array(tf_matrix)  # ensure 2D shape
-
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(10, 8))
-
-    if phase:
-        im = ax.imshow(tf_matrix.T, cmap = 'twilight_shifted')
     else:
-        im = ax.imshow(tf_matrix.T, cmap='viridis') #, norm=norm
-    if cbar:
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="4%", pad=0.05)  
+        label, tf_matrix = [(lab, vec) for lab, vec in tf_vectors]
+
+    
+    tf_matrix = np.array(tf_matrix).T          # shape (cores × modes)
+    extra_matrix = np.array(extra_modes).T     # shape (extra × modes)
+
+    vmin = min(tf_matrix.min(), extra_matrix.min())
+    vmax = max(tf_matrix.max(), extra_matrix.max())
+
+    cmap = "twilight_shifted" if phase else "viridis"
+
+    fig = None
+
+    if isinstance(ax, plt.Axes):
+
         fig = ax.get_figure()
-        cb = fig.colorbar(im, cax=cax)
-        cb.set_label(f"{matrix_type}")
 
-    ax.set_ylabel("Core No.")
-    ax.set_xlabel("Excited Mode")
-    monitored_cores = core_num - len(simulation_val["skip_core"]) if simulation_val.get("skip_core") else core_num
-    ax.set_yticks(ticks=np.arange(monitored_cores), labels=np.arange(1, monitored_cores + 1))
-    ax.set_xticks(ticks=np.arange(len(tf_vectors)), labels=label, rotation=90)
-    ax.set_title(f"{matrix_type} Matrix")
-    ax.tick_params(axis='both', which='major', labelsize=14)
+        # hide original axis
+        ax.set_visible(False)
 
-    return im
+        # create inset sub-axes
+        gs = ax.get_subplotspec().subgridspec(
+            2, 1, height_ratios=[1, 0.5], hspace=0.05
+        )
 
-def plot_combined_tf_matrix(simulation_val, amp, phase, core_num, phase_max = 2*np.pi, amp_max = 1.0, dir = "", name = ""):
+        ax1 = fig.add_subplot(gs[0])
+        ax2 = fig.add_subplot(gs[1])
+
+    else:
+        # assume ax is iterable of length 2
+        ax1, ax2 = ax
+        fig = ax1.get_figure()
+
+    # ----------------------------------------------------
+    # Plot main transfer matrix
+    # ----------------------------------------------------
+    im_main = ax1.imshow(tf_matrix, cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
+    ax1.set_xticks([])
+    ax1.set_yticks(range(core_num))
+    ax1.set_yticklabels([f"{i+1}" for i in range(core_num)], fontsize=10)
+    ax1.set_ylabel("Output Core", fontsize=12)
+
+    # ----------------------------------------------------
+    # Plot extra-modes matrix
+    # ----------------------------------------------------
+    im_extra = ax2.imshow(extra_matrix, cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
+
+    ax2.set_xticks(range(len(label)))
+    ax2.set_xticklabels(label, rotation=90, fontsize=10)
+
+    # dynamic labels (auto trims if fewer extra rows)
+    lp_names = ["LP11a", "LP11b", "LP21a", "LP21b", "LP02"]
+    ax2.set_yticks(range(extra_matrix.shape[0]))
+    ax2.set_yticklabels([fr"${core_to_monitor}_{{{m}}}$" for m in lp_names[:extra_matrix.shape[0]]], fontsize=10)
+
+    ax2.set_xlabel("Input Mode", fontsize=12)
+
+    # make shared colourbar
+    if cbar:
+        cbar_obj = fig.colorbar(im_main, ax=[ax1, ax2])
+        cbar_obj.set_label(matrix_type, fontsize=14)
+
+    return im_main, im_extra
+
+def plot_combined_tf_matrix(simulation_val, amp, phase, ex_amp, ex_phase, core_num, phase_max = 2*np.pi, amp_max = 1.0, dir = "", name = ""):
     """
     Function used to combine both amplitude and phase transfer matrices into one joined matrix.
 
@@ -1464,31 +1517,41 @@ def plot_combined_tf_matrix(simulation_val, amp, phase, core_num, phase_max = 2*
 
     amp_matrix = np.vstack(amp)
     phase_matrix = np.vstack(phase)
+    ex_amp_matrix = np.vstack(ex_amp)
+    ex_phase_matrix = np.vstack(ex_phase)
 
     comp_matrix = amp_matrix * np.exp(1j * phase_matrix)
+    ex_comp_matrix = ex_amp_matrix * np.exp(1j * ex_phase_matrix)
+
     comp_tf_vector = assign_17modes_to_tflist(comp_matrix, simulation_val)
 
     label, tf_matrix = reorder_tf_vectors(comp_tf_vector, simulation_val)
 
     amp_phase_img = np.transpose(apply_complex_map(tf_matrix, cmocean.cm.phase), (1, 0, 2))
+    ex_amp_phase_img = np.transpose(apply_complex_map(ex_comp_matrix, cmocean.cm.phase), (1, 0, 2))
     amp_phase_colorbar = generate_complex_colorbar(resolution = resolution)
     norm = Normalize(vmin = 0, vmax = 1.0)
 
-    fig, ax = plt.subplots(figsize=(14,8))
-    im = ax.imshow(amp_phase_img, aspect='auto', origin='lower')
+    fig, ax = plt.subplots(2, 1, figsize=(14,8))
+    ax1, ax2 = ax
+    im1 = ax1.imshow(amp_phase_img, aspect='auto', origin='lower')
+    ax1.set_xticks([])
+    ax1.set_yticks(range(core_num))
+    ax1.set_yticklabels([f"{i+1}" for i in range(core_num)], fontsize=10)
+    ax1.set_ylabel("Output Core", fontsize=12)
+    ax1.set_title("Complex Transfer Matrix (Amplitude+Phase)", fontsize = 18)
+
+    im2 = ax2.imshow(ex_amp_phase_img, aspect='auto', origin='lower')
+    ax2.set_xticks(range(len(label)))
+    ax2.set_xticklabels(label, rotation=90, fontsize=10)
+
+    # dynamic labels (auto trims if fewer extra rows)
+    lp_names = ["LP11a", "LP11b", "LP21a", "LP21b", "LP02"]
+    ax2.set_yticks(range(ex_amp_phase_img.shape[0]))
+    ax2.set_yticklabels([f"${simulation_val['core_to_monitor']}_{{{m}}}$" for m in lp_names[:ex_amp_phase_img.shape[0]]], fontsize=10)
+
+    ax2.set_xlabel("Input Mode", fontsize=12)
     plt.gca().invert_yaxis()
-
-    # Set mode and core labels
-    ax.set_yticks(np.arange(comp_matrix.shape[1]))
-    ax.set_xticks(np.arange(comp_matrix.shape[0]))
-
-    ax.set_ylabel("Core No.", fontsize = 14, labelpad = 10)
-    ax.set_xlabel("Excited Mode", fontsize = 14, labelpad = 10)
-    ax.set_yticks(ticks=np.arange(core_num - 1), labels=np.arange(1, core_num))
-    ax.set_xticks(ticks=np.arange(len(amp)), labels=(labels for labels, _ in comp_tf_vector), rotation=90)
-
-    ax.set_title("Complex Transfer Matrix (Amplitude+Phase)", fontsize = 18)
-    ax.tick_params(axis='both', which='major', labelsize=14)
 
     cb_ax = fig.add_axes([1, 0.15, 0.03, 0.8])  
     cb_ax.imshow(amp_phase_colorbar, aspect='auto', origin='lower') #, norm = norm
@@ -1516,7 +1579,7 @@ def plot_combined_tf_matrix(simulation_val, amp, phase, core_num, phase_max = 2*
     plt.tight_layout()
     save_dir = dir + "\\" + name
     plt.savefig(save_dir, bbox_inches="tight", dpi = 300)
-    plt.show()
+    plt.close()
 
 def print_max_amp_or_phase_value(array):
         """
@@ -1536,29 +1599,29 @@ def print_max_amp_or_phase_value(array):
 def assign_core_properties(simulation_val):
     '''
     Function that takes in the dictionary simulation_val and assigns template parameters such as 
-    core diameter and core delta prior to dumping json. If mode selective (=1) then the monitored core
+    core diameter and core neff prior to dumping json. If mode selective (=1) then the monitored core
     will be set to None so that skopt may optimise its parameters alone.
     '''
-    if "core_num" in simulation_val: #and "core_delta" in simulation_val:
+    if "core_num" in simulation_val: #and "core_neff" in simulation_val:
         ms_diam = [variable_params["core_diam"]] * simulation_val["core_num"]
-        if "core_delta" in variable_params:
-            ms_delta = [variable_params["core_delta"]] * simulation_val["core_num"]
+        if "core_neff" in variable_params:
+            ms_delta = [variable_params["core_neff"]] * simulation_val["core_num"]
         else:
-            ms_delta = [fixed_params["core_delta"]] * simulation_val["core_num"]
+            ms_delta = [fixed_params["core_neff"]] * simulation_val["core_num"]
 
         if len(ms_diam) != simulation_val["core_num"] or len(ms_delta) != simulation_val["core_num"]:
             raise Exception("Number of specified core properties does not match the number of modelled cores")
 
-        for i, (diam, delta) in enumerate(zip(ms_diam, ms_delta), start=1):
+        for i, (diam, neff) in enumerate(zip(ms_diam, ms_delta), start=1):
             if simulation_val["mode_selective"] == 1 and i == simulation_val["core_to_monitor"]:
                 simulation_val[f"core_{i}"] = {
                     "core_diam": None,
-                    "core_delta": None
+                    "core_neff": None
                 }
             else:
                 simulation_val[f"core_{i}"] = {
                     "core_diam": diam,
-                    "core_delta": delta
+                    "core_neff": neff
                 }
 #######################################################################################################################################################
 def apply_complex_map(field, cmap, power=1.0, normalise=True, shift=0.0):

@@ -8,11 +8,11 @@ fixed_params = {
     "MCFCladd": 125, # 380 #125
     # "core_claddings": None, 
     "core_cladding_diam": None, # None #80,
-    "cladding_delta": 1.44,#0.0055, #0.0095,
-    "core_cladding_delta": None,
-    "cen_core_cladding_delta": None,#0.00949,
+    "cladding_neff": 1.44,#0.0055, #0.0095,
+    "core_cladding_neff": None,
+    "cen_core_cladding_neff": None,#0.00949,
     # "Taper_L": 50000, #45000
-    # "core_delta": 0.0122895, #0.015,
+    # "core_neff": 0.0122895, #0.015,
     "taper": 7.33207692,
     # "core_diam": 8.2,
     "alpha": 0,
@@ -66,10 +66,10 @@ Launch_params = {
     # "monitor_output": 0,
     # "monitor_step_size": 10,
     # "monitoroutputformat": "OUTPUT_AMP_PHASE",
-    # "core_delta": fixed_params["core_delta"],
-    "cladding_delta": fixed_params["cladding_delta"],
-    # "core_cladding_delta": fixed_params["core_cladding_delta"],
-    # "cen_core_cladding_delta": fixed_params["cen_core_cladding_delta"]
+    # "core_neff": fixed_params["core_neff"],
+    "cladding_neff": fixed_params["cladding_neff"],
+    # "core_cladding_neff": fixed_params["core_cladding_neff"],
+    # "cen_core_cladding_neff": fixed_params["cen_core_cladding_neff"]
 }
 
 Simulation_params = {
@@ -94,16 +94,16 @@ Simulation_params = {
 }
 
 variable_params= {
-    "core_diam": 18.0,#6.5, #8.3, np.array([30.0])
-    "core_delta": 1.4467895,#0.0122895, #0.0157,#
+    "core_diam": 6.5, #8.3, np.array([30.0])
+    "core_neff": 1.4467895,#0.0122895, #0.0157,#
     # "taper": 6.55789308, #22, #8.53
     "Taper_L": 50000,
 }       
 
-# Assign core_deltas here 
-Launch_params["core_delta"] = variable_params.get("core_delta", fixed_params.get("core_delta"))
-if Launch_params["core_delta"] is None:
-    raise KeyError("core_delta missing from both variable_params and fixed_params")
+# Assign core_neffs here 
+Launch_params["core_neff"] = variable_params.get("core_neff", fixed_params.get("core_neff"))
+if Launch_params["core_neff"] is None:
+    raise KeyError("core_neff missing from both variable_params and fixed_params")
 
 for k in variable_params.keys():
     if k == "free_space_wavelength":
@@ -120,22 +120,22 @@ fixed_params["MMF_Taper"] = variable_params.get("taper", fixed_params.get("taper
 core_params = {}
 
 for i in range(1, Simulation_params["core_num"] + 1):
-    if "core_diam" in fixed_params and "core_delta" in fixed_params:
+    if "core_diam" in fixed_params and "core_neff" in fixed_params:
         core_params[f"core_{i}"] = {
         "core_diam": fixed_params.get("core_diam"),
-        "delta": fixed_params.get("core_delta") - RSoft_params["background_index"],
+        "neff": fixed_params.get("core_neff") - RSoft_params["background_index"],
         "taper": variable_params.get("taper")
         }
 
-    elif "core_diam" in variable_params and "core_delta" in variable_params:
+    elif "core_diam" in variable_params and "core_neff" in variable_params:
         core_params[f"core_{i}"] = {
         "core_diam": 6.5,#variable_params["core_diam"],
-        "delta": 1.4467895-RSoft_params["background_index"], #variable_params["core_delta"]
+        "neff": 1.4467895-RSoft_params["background_index"], #variable_params["core_neff"]
         "taper": variable_params.get("taper", fixed_params.get("taper"))
         }
-    elif "core_delta" in fixed_params:
+    elif "core_neff" in fixed_params:
         core_params[f"core_{i}"] = {
         "core_diam": 6.5,#variable_params["core_diam"],
-        "delta": fixed_params.get("core_delta") - RSoft_params["background_index"], #variable_params["core_delta"]
+        "neff": fixed_params.get("core_neff") - RSoft_params["background_index"], #variable_params["core_neff"]
         "taper": fixed_params.get("taper")
         }

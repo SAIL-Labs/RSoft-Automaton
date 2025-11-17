@@ -71,7 +71,7 @@ def estimate_circle_radius_with_autofit(n_points, grid_spacing, tolerance=0):
 '''
 Functions to generate a pentagon grid
 '''
-def generate_pentagon_grid(max_radius, core_spacing, core_number, include_center=True):
+def old_generate_pentagon_grid(max_radius, core_spacing, core_number, include_center=True):
     """
     Generate a pentagon-based ring grid of points. Note this does not completely fill the grid, rather just points along the vertices.
     
@@ -118,103 +118,64 @@ def generate_pentagon_grid(max_radius, core_spacing, core_number, include_center
 
     return Xarrs, Yarrs
 
-def old_generate_filled_pentagon_grid(radius, grid_spacing, y_shift_factor = 0.5):
+
+"Stuff to do with pent grids"
+def generate_pent_grid(row_num, grid_spacing, include_centre=True):
     """
-    Generate a filled pentagon grid, row-by-row.
-    
-    Args:
-        radius (float): Distance from center to pentagon vertices
-        grid_spacing (float): Desired spacing between points
+    Generate coordinates on a pentagonal grid (built from concentric pentagon rings).
 
-    Returns:
-        hcoord, vcoord, df: X, Y coordinate lists and DataFrame
+    Parameters
+    ----------
+    row_num : int
+        Number of 'rows' (2*r + 1) obtained from number_rows(..., grid_type='pent').
+        Internally determines how many rings of the pentagon are drawn.
+    grid_spacing : float
+        Spacing between consecutive rings.
+    include_centre : bool, optional
+        Whether to include the centre coordinate (0, 0). Default is True.
+
+    Returns
+    -------
+    x, y : np.ndarray
+        Arrays of x and y coordinates for each point in the pentagonal grid.
     """
-    # Define pentagon vertices
-    vertices = []
-    starting_angle = -54  # so the base is flat
-    vertex = 5
-    for i in range(vertex):
-        angle_deg = starting_angle + i * (360 / vertex)
-        angle_rad = np.deg2rad(angle_deg)
-        x = radius * np.cos(angle_rad)
-        y = radius * np.sin(angle_rad)
-        vertices.append((x, y))
-    vertices.append(vertices[0])  # Close the pentagon
 
-    # Define all edges
-    edges = []
-    for i in range(vertex):
-        x1, y1 = vertices[i]
-        x2, y2 = vertices[i+1]
-        edges.append(((x1, y1), (x2, y2)))
+    # infer number of rings r from number of rows
+    r = (row_num - 1) // 2
 
-    # Create points row by row
-    ymin = min(v[1] for v in vertices)
-    ymax = max(v[1] for v in vertices)
+    coords = []
 
-    coord = []
-    row_num = 0
-    y = ymin
-    dy = grid_spacing * np.sqrt(3) / 2
+    # include the central point if desired
+    if include_centre:
+        coords.append((0.0, 0.0))
 
-    while y <= ymax:
-        intersections = []
+    # generate ring by ring
+    for ring in range(1, r + 1):
+        # each ring has 5 * ring points (5 sides × ring subdivisions)
+        n_side = ring  # number of divisions per side
+        side_points = 5 * n_side
+        radius = ring * grid_spacing
 
-        # Find intersections of this horizontal line with pentagon edges
-        for (x1, y1), (x2, y2) in edges:
-            if (y1 - y) * (y2 - y) <= 0 and y1 != y2:  # Check if y is between y1 and y2
-                # Linearly interpolate x at this y
-                x = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
-                intersections.append(x)
+        # compute pentagon vertices for this radius
+        # regular pentagon, vertex angle spacing = 72°
+        angles = np.deg2rad(np.linspace(90, 450, 6))  # 6 so last vertex == first for closure
+        vertices = np.column_stack((radius * np.cos(angles),
+                                    radius * np.sin(angles)))
 
-        if len(intersections) >= 2:
-            x_left, x_right = sorted(intersections)[:2]
-            num_points = int(np.floor((x_right - x_left) / grid_spacing)) 
-            if num_points > 0:
-                for i in range(num_points):
-                    x = x_left + i * (x_right - x_left) / (num_points - 1) if num_points > 1 else (x_left + x_right) / 2
-                    coord.append([row_num, x, y, 0])
-            else:
-                # No points in this row — skip adding anything
-                pass
+        # interpolate along each of the 5 edges
+        for i in range(5):
+            start = vertices[i]
+            end = vertices[i + 1]
+            # place `n_side` points per edge (excluding endpoint to avoid duplicates)
+            for j in range(n_side):
+                t = j / n_side
+                x = start[0] + t * (end[0] - start[0])
+                y = start[1] + t * (end[1] - start[1])
+                coords.append((x, y))
 
-        y += dy
-        row_num += 1
-
-    y_shift = y_shift_factor * grid_spacing
-    for c in coord:
-        c[2] -= y_shift
-
-    hcoord = [c[1] for c in coord]
-    vcoord = [c[2] for c in coord]
-    return hcoord, vcoord
-
-# def estimate_pentagon_radius(n_points, grid_spacing, tolerance = 0):
-#     distance_per_point = grid_spacing ** 2
-#     pentagon_area_factor = 5/2 * np.sin(2*np.pi/5)
-
-#     radius_squared = (n_points * distance_per_point) / pentagon_area_factor
-#     radius = np.sqrt(radius_squared)
-
-#     # Due to the imperfect geometry of a pentagon grid need to include a loop that fixes the number of positions reported, 
-#     # otherwise the desired number of positions will always be less than the actual number of positions
-#     max_iterations = 50
-#     for _ in range(max_iterations):
-#         hcoord, vcoord= generate_filled_pentagon_grid(radius, grid_spacing)
-#         actual_points = len(hcoord)
-
-#         if abs(actual_points - n_points) <= tolerance:
-#             print(f"Matched points: {actual_points} points (within ±{tolerance})")
-#             return radius
-
-#         # Adjust radius based on whether we have too many or too few points
-#         if actual_points < n_points:
-#             radius *= 1.02  # Slightly expand
-#         else:
-#             radius *= 0.98  # Slightly contract
-
-#     print(f"Warning: maximum iterations reached. Final points = {actual_points}")
-#     return radius
+    coords = np.array(coords)
+    x, y = coords[:, 0], coords[:, 1]
+    return x, y
 ##############################################################################
 def generate_hex_ring_grid(max_radius, core_spacing, core_number, include_center=True):
     """
@@ -261,11 +222,20 @@ def generate_hex_ring_grid(max_radius, core_spacing, core_number, include_center
         Yarrs.append(0)
 
     return Xarrs, Yarrs
-##############################################################################
-'''
-Functions to generate a hex grid
-'''
+########################################################################
+"Stuff to do with hex grids"
 def old_generate_hex_grid(row_num, grid_spacing, include_centre = True):
+    """
+    Function to generate coordinates on a hexagonal grid.
+    Parameters:
+        - row_num: integer determining how many rows are plotted. This is determined from using the 
+        number_rows() function,
+        - grid_spaceing: float that determines the spacing between coordinates,
+        include_centre: bool that determines if the centrer coordinate is plotted or not. True: the centre 
+        coordinate is plotted, False: it is not.
+    Returns:
+        - Returns x and y coordinates as separate numpy arrays.
+    """
     coord = []
     dx = grid_spacing
     dy = np.sqrt(3) * grid_spacing / 2
@@ -288,11 +258,72 @@ def old_generate_hex_grid(row_num, grid_spacing, include_centre = True):
     if not include_centre:
         # Find indices of (0,0) point(s), which can occur for even/odd row_num
         filtered = [(x, y) for x, y in zip(hcoord, vcoord) if not (np.isclose(x, 0) and np.isclose(y, 0))]
-        hcoord = [x for x, y in filtered]
-        vcoord = [y for x, y in filtered]
-    return hcoord, vcoord
+        hcoord = [x for x, _ in filtered]
+        vcoord = [y for _, y in filtered]
+    return np.array(hcoord), np.array(vcoord)
 
-def number_rows(n_points):
+########################################################################
+"Number of rows needed for both grid types"
+def number_rows(n_points, grid_type="hex"):
+    """
+    Determine how many 'rows' (i.e. rings → rows = 2*r+1) are needed to place
+    `n_points` in a regular polygonal grid.
+
+    Parameters
+    ----------
+    n_points : int
+        number of cores / points requested
+    grid_type : str
+        "hex" for hexagonal (default),
+        "pent" for pentagonal-style rings
+
+    Returns
+    -------
+    n_rows : int
+        2*r + 1, where r is the number of rings around the centre
+    excess : int
+        how many 'slots' in that pattern are left unused
+    """
+    r = 0
+    while True:
+        if grid_type.lower() == "hex":
+            # hex pattern: 1 + 3 r (r+1)
+            total = 1 + 3 * r * (r + 1)
+        elif grid_type.lower() == "pent":
+            # pent pattern: 1 + 5/2 * r (r+1)
+            total = 1 + (5 * r * (r + 1)) // 2   # integer version
+            # if you prefer exact math, do:
+            # total = 1 + 5 * r * (r + 1) / 2
+        else:
+            raise ValueError(f"Unknown grid_type: {grid_type}")
+
+        if total >= n_points:
+            if total != n_points:
+                excess = total - n_points
+                warnings.warn(
+                    f"Warning: the requested {grid_type} structure supports {total} cores, "
+                    f"but {n_points} have been provided.\n"
+                    f"Total number of unused cores: {excess}"
+                )
+            else:
+                excess = 0
+            return 2 * r + 1, excess
+
+        r += 1
+
+def plot_excess(excess, xcoord, ycoord, reorder_indices):
+    if excess > 0:
+        xcoord_og, ycoord_og = xcoord, ycoord
+        xcoord_relist, ycoord_relist = xcoord_og[reorder_indices], ycoord_og[reorder_indices]
+        xcoord_relist, ycoord_relist = xcoord_relist[:-excess], ycoord_relist[:-excess]
+
+    else:
+        xcoord_og, ycoord_og = xcoord, ycoord
+        xcoord_relist, ycoord_relist = xcoord_og[reorder_indices], ycoord_og[reorder_indices]
+    
+    return xcoord_og, ycoord_og, xcoord_relist, ycoord_relist
+
+def old_number_rows(n_points):
     r = 0
     while True:
         # the total number of points that can fit within a hexagon = 1 + 3r(r+1)
