@@ -167,6 +167,7 @@ class RSoftSim:
             prefix_FS = f"prefix={femsim_name_tag}"
 
             results_folder = create_folders(folder_BP, "Desktop")
+            # self.sym["Result_directory"] = results_folder
 
             # we want to copy the important files in Onedrive for backup purposes
             onedrive_results_folder = create_folders(folder_BP, "Onedrive")
@@ -223,9 +224,11 @@ class RSoftSim:
         onedrive_filename = name_tag + ".ind"
         onedrive_filename_results = name_tag + "_mon.dat"
         onedrive_femsim_filename_results = femsim_name_tag + ".ind"
+        onedrive_neff_csv_path = Path(onedrive_results_folder) / f"Guided Modes.csv"
+        neff_csv_path = Path(results_folder) / f"Guided Modes.csv"
 
         file_extensions_to_copy = [
-           onedrive_filename, onedrive_filename_results, onedrive_femsim_filename_results
+           onedrive_filename, onedrive_filename_results, onedrive_femsim_filename_results,
         ]
 
         # Normalize to basenames in case paths are used
@@ -255,16 +258,43 @@ class RSoftSim:
 
         elif Launch_params["mon_type"] == "port_mon" and sim_tool != "ST_FEMSIM":
             mon_path = Path(results_folder) / f"{name_tag}_mon.dat"
+            nef_path = Path(results_folder) / f"{femsim_name_tag}.nef"
+
             timeout = 10
             t_start = time.time()
             while not mon_path.exists():
                 if time.time() - t_start > timeout:
                     raise FileNotFoundError(f"{mon_path} not found within {timeout} seconds after simulation.")
                 time.sleep(0.1)
+            while not nef_path.exists():
+                if time.time() - t_start > timeout:
+                    raise FileNotFoundError(f"{nef_path} not found within {timeout} seconds after simulation.")
+                time.sleep(0.1)
 
         # Read .mon file from moved location
         uf = RSoftUserFunction()
         uf.read(str(mon_path))
+
+        # make guided modes save to output csv
+        uf_neff = RSoftUserFunction()
+        uf_neff.read(str(nef_path))
+        x_neff, y_neff = uf_neff.get_arrays()
+
+        guided_mask = y_neff > fixed_params["cladding_neff"]
+        guided_neff = np.array(y_neff[guided_mask])
+
+        with open(neff_csv_path, mode="w", newline="") as f_neff:
+            writer = csv.writer(f_neff)
+            writer.writerow(["Mode_Index", "n_eff"])
+            for idx, nval in enumerate(guided_neff, start=1):
+                writer.writerow([idx, nval])
+
+        with open(onedrive_neff_csv_path, mode="w", newline="") as f_neff_od:
+            writer = csv.writer(f_neff_od)
+            writer.writerow(["Mode_Index", "n_eff"])
+            for idx, nval in enumerate(guided_neff, start=1):
+                writer.writerow([idx, nval])
+
         if Launch_params["mon_type"] == "pathway_mon":
             x_all, y_all, z_all = uf.get_arrays()
             num_monitors = z_all.shape[1]
@@ -327,10 +357,10 @@ class RSoftSim:
         if Simulation_params["metric"] == "TF":
             if Launch_params["mon_type"] == "port_mon":
                 transfer_vector, throughput = transfer_matrix_component(csv_pathway, row, port_mon = True)
-                return transfer_vector, -throughput
+                return transfer_vector, -throughput, results_folder
             else:
                 transfer_vector, throughput = transfer_matrix_component(csv_pathway, row)
-                return transfer_vector, -throughput
+                return transfer_vector, -throughput, results_folder
 
     def build_circuit(self, params, build_tf, json_config, csv_path, simulation_val, prior_space_pid): # maybe put this into its own function. Make it universal.
         """
@@ -517,17 +547,17 @@ class RSoftSim:
         '''
 
         if Simulation_params['metric'] != 'TF':
-            average_throughput = self.RunRSoftSim(name_tag, femsim_name_tag, fixed, 
+            average_throughput, res_folder = self.RunRSoftSim(name_tag, femsim_name_tag, fixed, 
                                                   vars, fixed_length, param_range, 
                                                   simulation_val, csv_path, json_config, 
                                                   prior_space_pid)
-            return average_throughput
+            return average_throughput, res_folder
         else: 
-            transfer_vector, average_throughput = self.RunRSoftSim(name_tag, femsim_name_tag, fixed, 
+            transfer_vector, average_throughput, res_folder = self.RunRSoftSim(name_tag, femsim_name_tag, fixed, 
                                                                    vars, fixed_length, param_range, 
                                                                    simulation_val, csv_path, json_config, 
                                                                    prior_space_pid)
-            return transfer_vector, average_throughput
+            return transfer_vector, average_throughput, res_folder
 
     def MultProc(self, build_tf, json_config, csv_path, simulation_val, prior_space_pid): #csv_path
         images_dir = Path(os.path.expanduser("~/Desktop/Results/Images"))
@@ -715,10 +745,10 @@ class RSoftSim:
 
         # -- If not multi-mode: do just the single template simulation
         if Simulation_params['metric'] != 'TF':
-            seed_result = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
+            seed_result, res_folder = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
             tf_vector = None
         else:
-            tf_vector, seed_result = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
+            tf_vector, seed_result, res_folder = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
 
         results_folder = log_optimizer_results(
             x_iters=[seed_params],
@@ -733,7 +763,7 @@ class RSoftSim:
             csv_path = csv_path,
             name_tag = self.sym["Name"]
         )
-        return results_folder
+        return results_folder, res_folder
 
 def run_rsoft_sim(args):
     from RSoftSimulation import RSoftSim  
@@ -826,7 +856,7 @@ def multiple_mode_tf(arg_list):
     sim.init_priors(prior_space_pid, build_tf, custom_priors)
 
     # run simulation
-    results_folder = sim.RunRSoft(sim_val, prior_space_pid, csv_path = optimizer_result, json_config = code_config, pid = pid, build_tf = build_tf)
+    results_folder, res_folder = sim.RunRSoft(sim_val, prior_space_pid, csv_path = optimizer_result, json_config = code_config, pid = pid, build_tf = build_tf)
 
     # Load results
     best_para_log = os.path.join(results_folder, f"best_params_log_{pid}.csv")    
@@ -844,7 +874,7 @@ def multiple_mode_tf(arg_list):
 
     # Call plotting function
     plotting_optimizer_results(data, param_names, tf=tf_vectors, plot= False)
-    return (param_num, tf_vectors)
+    return (param_num, tf_vectors, res_folder)
 
 def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding = False): 
 
@@ -872,17 +902,20 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_v
         # Since the number of processes match the length of the mode_vals/radial_mode_vals
         # then each worker gets an instance of arg_list. i.e. arg_list[i]
         results = pool.map(multiple_mode_tf, args_list)
-
-    for param, result in results:
+    
+    res_folder = results[-1][2]
+    for param, result, _ in results:
         # print(f"Param: {param}, Result: {result}")
-        tf_list.append(results)
+        # tf_list.append(results)
+        tf_list.append((param, result))
         
     if gridding:
-        return grid_size_range, tf_list
+        return grid_size_range, tf_list, res_folder
     else:
-        return tf_list
+        return tf_list, res_folder
 
 def run_all_modes_for_params(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding=False):
+    # from RSoftSimulation import RSoftSim
     """
     For a single param vector, run all modes and aggregate result.
     params: list of optimized parameter values (from skopt)
@@ -893,11 +926,11 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
 
     if gridding:
         # run gridding determination
-        grid_size_range, tf_list = run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, params, taper_min, taper_max, gridding)
+        grid_size_range, tf_list, res_folder = run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, params, taper_min, taper_max, gridding)
         return grid_size_range, tf_list
     else:
         # multiprocessing in here, we only want multiprocessing in this function and not in main_optimizer!!!!
-        tf_list = run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding)
+        tf_list, res_folder = run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding)
     
     # Aggregate result (compute scalar loss/metric for this parameter vector)
     """
@@ -955,7 +988,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
 
     else:
         for i in range(len(mode_vals)):
-            tf_vals.append(tf_list[0][i][1])
+            tf_vals.append(tf_list[i][1])
 
         tf_vals = np.array(tf_vals)
 
@@ -1066,12 +1099,14 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
 
     hyp_param_b = simulation_val.get("hyp_param_b", Simulation_params["hyp_param_b"])
     hyp_param_c = simulation_val.get("hyp_param_c", Simulation_params["hyp_param_c"])
+    # sim = RSoftSim()
     loss, arr_results = mode_selective_tf_matrix_metric(
-        tf_list,
+        tf_list, res_folder,
         hyp_param_b,
         hyp_param_c,
         core_to_monitor=core_to_monitor,
         modes_to_monitor=modes_to_monitor,
+        simulation_val = simulation_val
     )
         
     return loss, arr_results, amp, phase, ex_amp, ex_phase

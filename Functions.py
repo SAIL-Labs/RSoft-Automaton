@@ -1023,17 +1023,25 @@ def transfer_matrix_component(csv_path, row, port_mon = False):
         return row, throughput
 
             
-def mode_selective_tf_matrix_metric(tf_list, hyp_param_b, hyp_param_c, core_to_monitor, modes_to_monitor):
+def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, core_to_monitor, modes_to_monitor, simulation_val):
     """
     Function that will sort through tf_list, extract the mode selective core values in ms/non-ms modes and return the loss function needed by scikit
     Arguments:
         - tf_list: transfer matrix resulting from RSoft multiprocessing
+        - sim_obj: RSoftSim() class used to access file directories
         - core_to_monitor: special core to have ms capabilities. Must be a single integer
         - modes_to_monitor: modes to couple into the ms core. Must be an array of values (e.g. ["LP01", "LP11a",...])
     Returns:
         - loss function that will maximise the ms core in the ms mode(s), overall power in non-ms cores in non-ms modes, 
         while minimising ms core in non-ms modes and non-ms cores in ms-mode(s)
     """
+    core_num = simulation_val["core_num"]
+    
+    guided_path = os.path.join(folder, "Guided Modes.csv")
+    df = pd.read_csv(guided_path)
+    num_modes = len(df[2::2]["Mode_Index"].values) # this only takes the first polarisation of each mode (excluding LP01)
+                              # into account as that is what the port monitors are setup to measure
+
     label_replacements = {
         'LP01': 'LP01',
         'LP11': 'LP11a',
@@ -1054,7 +1062,7 @@ def mode_selective_tf_matrix_metric(tf_list, hyp_param_b, hyp_param_c, core_to_m
         'LP-51': 'LP51b'
     }
 
-    tf_list = tf_list[0]
+    # tf_list = tf_list[0]
 
     # relabel
     new_tf_list = [
@@ -1064,10 +1072,25 @@ def mode_selective_tf_matrix_metric(tf_list, hyp_param_b, hyp_param_c, core_to_m
 
     mode_list = [label for label, _ in new_tf_list]
     # extract the amplitudes only and leave the phase information
-    mode_result = {
-        f"{label}_result": new_tf_list[idx][1][0][1::2]
-        for idx, label in enumerate(mode_list)
-    }
+    mode_result = {}
+    extra_result = {}
+
+    # mode_result = {
+    #     f"{label}_result": new_tf_list[idx][1][0][1::2]
+    #     for idx, label in enumerate(mode_list)
+    # }
+    for label, arr in new_tf_list:
+        arr = np.array(arr).flatten()
+
+        amps = arr[1::2]
+        
+        # split amplitude values into main LP01 values (for each core) and extra values (higher order modes on special core)
+        main_amps = amps[:core_num]
+        extra_amps = amps[core_num:]
+
+        # store into dictionaries
+        mode_result[f"{label}_result"] = main_amps
+        extra_result[f"{label}_extra"] = extra_amps
 
     # Select which core and mode are mode-selective
     ms_core = core_to_monitor            # Index (0-based) for the mode-selective core
@@ -1078,11 +1101,16 @@ def mode_selective_tf_matrix_metric(tf_list, hyp_param_b, hyp_param_c, core_to_m
     ms_modes = ms_mode_index         # Index for the mode-selective mode(s) 
 
     for mode_idx in ms_modes:
-        mode_label = mode_list[mode_idx]          # 'LP01', specifies the label for the MS mode 
-        ms_mode_vals = mode_result[f"{mode_label}_result"]   # extracts the core amplitudes for the MS mode 
 
+        mode_label = mode_list[mode_idx]          # 'LP01', specifies the label for the MS mode 
+        ms_mode_vals = mode_result[f"{mode_label}_result"]   # extracts the core amplitudes of the 7 cores for the MS mode 
+        ex_ms_mode_vals = extra_result[f"{mode_label}_extra"] # extracts the higher order mode amplitudes for the MS core
+        
         # 1. MS core in MS mode:
-        ms_core_mode = np.abs(ms_mode_vals[ms_core])**2 
+        if Simulation_params["all_modes"]:
+            ms_core_mode = np.abs(ms_mode_vals[ms_core])**2 + np.sum(np.abs(ex_ms_mode_vals[:num_modes])**2)
+        else:
+            ms_core_mode = np.abs(ms_mode_vals[ms_core])**2 - np.sum(np.abs(ex_ms_mode_vals[:num_modes])**2)
 
         # 2. All non-MS cores in MS mode:
         nonms_core_ms_mode = [np.abs(val)**2 for idx, val in enumerate(ms_mode_vals) if idx != ms_core] 

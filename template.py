@@ -85,6 +85,7 @@ Simulation_params = {
     "add_cladding_to_cores": None, # This must be zero-indexed!
     "mode_selective": 0, # 0 == False, 1 == True
     "core_to_monitor": 4,
+    "all_modes": False,
     "port_mon_file": None,
     "skip_core": None, # if you want to skip a certain core, set this to the 0-index core number
     "fixed_fem_file": False,
