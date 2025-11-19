@@ -1110,7 +1110,7 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
         if Simulation_params["all_modes"]:
             ms_core_mode = np.abs(ms_mode_vals[ms_core])**2 + np.sum(np.abs(ex_ms_mode_vals[:num_modes])**2)
         else:
-            ms_core_mode = np.abs(ms_mode_vals[ms_core])**2 - np.sum(np.abs(ex_ms_mode_vals[:num_modes])**2)
+            ms_core_mode = np.abs(ms_mode_vals[ms_core])**2 #- np.sum(np.abs(ex_ms_mode_vals[:num_modes])**2)
 
         # 2. All non-MS cores in MS mode:
         nonms_core_ms_mode = [np.abs(val)**2 for idx, val in enumerate(ms_mode_vals) if idx != ms_core] 
