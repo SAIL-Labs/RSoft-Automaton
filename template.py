@@ -93,9 +93,9 @@ Simulation_params = {
     "industry_neff_values": False,
     "industry_neff_file": None
 }
-
+           
 variable_params= {
-    "core_diam": 6.5, #8.3, np.array([30.0])
+    "core_diam": 6.5, # np.array([30.0])
     "core_neff": 1.4467895,#0.0122895, #0.0157,#
     # "taper": 6.55789308, #22, #8.53
     "Taper_L": 50000,
@@ -130,8 +130,8 @@ for i in range(1, Simulation_params["core_num"] + 1):
 
     elif "core_diam" in variable_params and "core_neff" in variable_params:
         core_params[f"core_{i}"] = {
-        "core_diam": 6.5,#variable_params["core_diam"],
-        "neff": 1.4467895-RSoft_params["background_index"], #variable_params["core_neff"]
+        "core_diam": 6.5, #6.5,#variable_params["core_diam"],
+        "neff": 1.4467895-RSoft_params["background_index"], #variable_params["core_neff"] 
         "taper": variable_params.get("taper", fixed_params.get("taper"))
         }
     elif "core_neff" in fixed_params:

@@ -1036,8 +1036,12 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
         while minimising ms core in non-ms modes and non-ms cores in ms-mode(s)
     """
     core_num = simulation_val["core_num"]
-    
-    guided_path = os.path.join(folder, "Guided Modes.csv")
+    # search for each Guided Mode csv file created and pick only the most recent one to read, since they are all the same.
+    guided_mode_pattern = os.path.join(folder, "Guided Modes_*.csv")
+    matches = glob.glob(guided_mode_pattern)
+    if not matches:
+        raise FileNotFoundError(f"No Guided Modes_*.csv files found in {folder}")
+    guided_path = max(matches, key=os.path.getmtime)
     df = pd.read_csv(guided_path)
     num_modes = len(df[2::2]["Mode_Index"].values) # this only takes the first polarisation of each mode (excluding LP01)
                               # into account as that is what the port monitors are setup to measure
@@ -1134,7 +1138,7 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
                                                                     # This is what should be maximised and is equivelant to taking 
                                                                     # the average of each non-ms core in each individual non-ms mode
 
-        loss_func = -ms_core_mode -hyp_param_b*nonms_core_other_mode + hyp_param_c*(nonms_core_ms_mode + ms_core_other_mode)
+        loss_func = -ms_core_mode -hyp_param_b*nonms_core_other_mode + hyp_param_c*(nonms_core_ms_mode + ms_core_other_mode) + 2
         array_of_results = [ms_core_mode, #a
                             nonms_core_other_mode, #b
                             nonms_core_ms_mode, #c

@@ -82,7 +82,7 @@ class RSoftSim:
                     reorder_index = [9, 10, 14, 13, 8, 4, 5,
                             11, 15, 17, 16, 12, 7, 3, 0, 1, 2, 6]
                 elif core_num <= 7:
-                    reorder_index = [3,4,6,5,2,0,1]
+                    reorder_index = [3,5,4,2,0,1]
 
             xcoord_og, ycoord_og, xcoord_relist, ycoord_relist = plot_excess(excess, hcoord, vcoord, reorder_index)
             # # code to skip cores if desired
@@ -211,40 +211,33 @@ class RSoftSim:
                 print("stderr:\n", e.stderr)
                 return -1e6
         
+        # invoke special identifier for csv files to prevent multiprocessing from overwriting the same file
+        pid_csv = os.getpid()
         # Move all output files immediately after simulation
+        
+        # files to copy to Onedrive
+        onedrive_filename = name_tag + ".ind"
+        onedrive_filename_results = name_tag + "_mon.dat"
+        onedrive_femsim_filename_results = femsim_name_tag + ".ind"
+        onedrive_neff_csv_path = Path(onedrive_results_folder) / f"Guided Modes_{pid_csv}.csv"
+        neff_csv_path = Path(results_folder) / f"Guided Modes_{pid_csv}.csv"
+
+        file_extensions_to_copy = [
+           onedrive_filename, onedrive_filename_results, onedrive_femsim_filename_results,onedrive_neff_csv_path
+        ]
+
         files_to_move = [
             filename,
             filename_FS,
             femsim_name_tag,
             csv_path,
             json_config,
-            prior_space_pid]
+            prior_space_pid,
+            neff_csv_path]
         
-        # files to copy to Onedrive
-        onedrive_filename = name_tag + ".ind"
-        onedrive_filename_results = name_tag + "_mon.dat"
-        onedrive_femsim_filename_results = femsim_name_tag + ".ind"
-        onedrive_neff_csv_path = Path(onedrive_results_folder) / f"Guided Modes.csv"
-        neff_csv_path = Path(results_folder) / f"Guided Modes.csv"
-
-        file_extensions_to_copy = [
-           onedrive_filename, onedrive_filename_results, onedrive_femsim_filename_results,
-        ]
-
         # Normalize to basenames in case paths are used
         files_to_move = [os.path.basename(f) for f in files_to_move]
         file_extensions_to_move = [os.path.basename(k) for k in file_extensions_to_copy]
-
-        for file in os.listdir():
-            # copy important files to Onedrive
-            for l in file_extensions_to_move:
-                if file == l:
-                    os.makedirs(onedrive_results_folder, exist_ok=True)
-                    shutil.copy(file, os.path.join(onedrive_results_folder,file))
-                    
-            # move everything to the desktop
-            if (file in files_to_move or file.startswith(name_tag) or file.startswith(femsim_name_tag)):
-                shutil.move(file, os.path.join(results_folder, file))
 
         # Safely access the .mon file in its new location
         if Launch_params["mon_type"] == "pathway_mon" and sim_tool != "ST_FEMSIM":
@@ -257,8 +250,10 @@ class RSoftSim:
                 time.sleep(0.1)
 
         elif Launch_params["mon_type"] == "port_mon" and sim_tool != "ST_FEMSIM":
-            mon_path = Path(results_folder) / f"{name_tag}_mon.dat"
-            nef_path = Path(results_folder) / f"{femsim_name_tag}.nef"
+            # mon_path = Path(results_folder) / f"{name_tag}_mon.dat"
+            # nef_path = Path(results_folder) / f"{femsim_name_tag}.nef"
+            mon_path = Path(f"{name_tag}_mon.dat")
+            nef_path = Path(f"{femsim_name_tag}.nef")
 
             timeout = 10
             t_start = time.time()
@@ -294,6 +289,18 @@ class RSoftSim:
             writer.writerow(["Mode_Index", "n_eff"])
             for idx, nval in enumerate(guided_neff, start=1):
                 writer.writerow([idx, nval])
+
+        # move files AFTER they have been read
+        for file in os.listdir():
+            # copy important files to Onedrive
+            for l in file_extensions_to_move:
+                if file == l:
+                    os.makedirs(onedrive_results_folder, exist_ok=True)
+                    shutil.copy(file, os.path.join(onedrive_results_folder,file))
+                    
+            # move everything to the desktop
+            if (file in files_to_move or file.startswith(name_tag) or file.startswith(femsim_name_tag)):
+                shutil.move(file, os.path.join(results_folder, file))
 
         if Launch_params["mon_type"] == "pathway_mon":
             x_all, y_all, z_all = uf.get_arrays()
@@ -1155,7 +1162,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
         acq_func="EI", #LCB
         acq_func_kwargs={"xi": 0.8}, #{"kappa": 2.5}
         acq_optimizer = "sampling",
-        random_state=42,
+        random_state=None,
         n_initial_points=50
     )
     # if true, run optimisation testing the loss metric
