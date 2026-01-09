@@ -28,7 +28,7 @@
   "launch_normalization": 1,
   "core_to_monitor": 1,
   "metric": "TF",
-  "num_paras": 200,
+  "num_paras": 60,
   "skip_core": null,
   "add_cladding_to_cores": null,
   "fixed_fem_file": false,
@@ -36,5 +36,5 @@
   "core_num": 7,
   "all_modes": true,
   "industry_neff_values": false,
-  "industry_neff_file": "C:\\Users\\justinvella\\OneDrive - The University of Sydney (Students)\\New Caprica Backup\\industry_neff_values.txt"
+  "industry_neff_file": "C:\\Users\\RSoft Things\\OneDrive - The University of Sydney (Students)\\New Caprica Backup\\industry_neff_values.txt"
 }

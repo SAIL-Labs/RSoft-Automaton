@@ -181,7 +181,7 @@ def create_folders(folder_name, pos):
         os.makedirs(results_folder, exist_ok=True)
         return results_folder
     elif pos == "Onedrive":
-        onedrive_path = os.path.join(user_home, r"C:\Users\justinvella\OneDrive - The University of Sydney (Students)\RSoft Automaton Results")
+        onedrive_path = os.path.join(user_home, r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\RSoft Automaton Results")
         results_root_onedrive = os.path.join(onedrive_path, "Results")
         results_folder_onedrive = os.path.join(results_root_onedrive, folder_name)
         os.makedirs(results_folder_onedrive, exist_ok=True)
@@ -1347,20 +1347,21 @@ def extract_portmon_amp_phase(tf_list, core_num, grid_size_range=None):
         # Correct separation:
         og_amp = amps[:core_num]
         og_phase = phases[:core_num]
-
-        ex_amp = amps[core_num:]
-        ex_phase = phases[core_num:]
-
         og_amp_list.append(og_amp)
         og_phase_list.append(og_phase)
-        ex_amp_list.append(ex_amp)
-        ex_phase_list.append(ex_phase)
+
+        if grid_size_range is None:
+            ex_amp = amps[core_num:]
+            ex_phase = phases[core_num:]
+            ex_amp_list.append(ex_amp)
+            ex_phase_list.append(ex_phase)
 
     # Convert to 2D arrays (modes × cores)
     og_amp_arr = np.array(og_amp_list)
     og_phase_arr = np.array(og_phase_list)
-    ex_amp_arr = np.array(ex_amp_list)
-    ex_phase_arr = np.array(ex_phase_list)
+    if grid_size_range is None:
+        ex_amp_arr = np.array(ex_amp_list)
+        ex_phase_arr = np.array(ex_phase_list)
 
     # Optional grid-size return
     if grid_size_range is not None:
@@ -2116,3 +2117,29 @@ def read_neff_values(filepath):
     with open(filepath, "r") as f:
         # convert to floats, remove empty lines
         return [float(line.strip()) for line in f if line.strip()]
+
+def sample_range(custom_priors, bestvals, shrink=15.0):
+    """
+    Builds a 1D dictionary for new prior ranges, centred on the best values provided in bestvals.
+
+    Arguments:
+        custom_priors: the original dictionary of prior ranges with which skopt chooses from originally
+        bestvals: dictionary containing the best values from KDE estimations. Must contain the same string entries as custom_priors
+        shrink: affects how wide the new sampling region is. Defaults to 15.
+    Returns:
+        sample_spaces: dictionary containing focused prior spaces of each parameter in the same configuration as custom_priors.
+    """
+    sample_spaces = {}
+    for name, (pmin, pmax) in custom_priors.items():
+        if name not in bestvals:
+            raise KeyError(f"Best value for '{name}' is not present in bestvals.")
+        prior_range = np.array([pmin, pmax])
+        prior_std = np.std(prior_range)
+
+        centre_val = bestvals[name]
+        half_width = prior_std / shrink
+        low = max(pmin, centre_val - half_width)
+        high = min(pmax, centre_val + half_width)
+
+        sample_spaces[name] = (low, high)
+    return sample_spaces

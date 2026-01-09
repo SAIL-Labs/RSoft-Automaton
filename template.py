@@ -93,7 +93,13 @@ Simulation_params = {
     "industry_neff_values": False,
     "industry_neff_file": None
 }
-           
+
+bestvals = {                      
+    "core_diam": 7.697149,
+    "core_neff": 1.446386,
+    "Taper_L": 43864.607645
+}
+
 variable_params= {
     "core_diam": 6.5, # np.array([30.0])
     "core_neff": 1.4467895,#0.0122895, #0.0157,#
