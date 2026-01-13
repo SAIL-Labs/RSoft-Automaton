@@ -13,6 +13,7 @@ from matplotlib.colors import Normalize
 import glob
 import ehtplot.color
 import cmocean
+from HexProperties import *
 #######################################################################################################################################################
 # Function to extract parameters from the .ind file
 def Extract_params(param=""):
@@ -1035,6 +1036,8 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
         - loss function that will maximise the ms core in the ms mode(s), overall power in non-ms cores in non-ms modes, 
         while minimising ms core in non-ms modes and non-ms cores in ms-mode(s)
     """
+    params, results, waves = zip(*tf_list)
+    tf_list_params_results = list(zip(params, results))
     core_num = simulation_val["core_num"]
     # search for each Guided Mode csv file created and pick only the most recent one to read, since they are all the same.
     guided_mode_pattern = os.path.join(folder, "Guided Modes_*.csv")
@@ -1067,11 +1070,15 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
     }
 
     # tf_list = tf_list[0]
+    # tf_list = np.array(tf_list) #.reshape(simulation_val["free_space_wavelength"].size,simulation_val["mode_vals"].size)
 
+    loss_arr = []
+    collected_arr = []
+# for tf in tf_list:
     # relabel
     new_tf_list = [
         (label_replacements.get(label, label), arr)
-        for label, arr in tf_list
+        for label, arr in tf_list_params_results
     ]
 
     mode_list = [label for label, _ in new_tf_list]
@@ -1139,12 +1146,15 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
                                                                     # the average of each non-ms core in each individual non-ms mode
 
         loss_func = -ms_core_mode -hyp_param_b*nonms_core_other_mode + hyp_param_c*(nonms_core_ms_mode + ms_core_other_mode) + 2
-        array_of_results = [ms_core_mode, #a
+        array_of_results = np.array([ms_core_mode, #a
                             nonms_core_other_mode, #b
                             nonms_core_ms_mode, #c
                             ms_core_other_mode #c
-                            ]
-        return loss_func, array_of_results
+                            ])
+        loss_arr.append(loss_func)
+        collected_arr.append(array_of_results)
+        return loss_func, array_of_results, waves
+        # return np.asarray(loss_func, dtype=float), np.asarray(collected_arr, dtype=float)
 
 def read_port_mon_file(filepath = ""):
     dat = pd.read_csv(filepath, skiprows = 3, sep=r'\s+', header = None)
@@ -1328,6 +1338,236 @@ def mode_wanted_considering_mode_orientations(LP_mode_dict, mode_desired):
             return i + 1 
 
     raise ValueError(f"Desired mode {mode_desired} exceeds total number of available mode orientations ({mode_number}).")
+
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+
+def plot_pl_results(
+    *,
+    simulation_val: dict,
+    iteration_num: int,
+    params,
+    gridding: bool,
+    # gridding inputs
+    tf_list=None,
+    grid_size_range=None,
+    # polychromatic inputs
+    df_wave_log: pd.DataFrame | None = None,
+    modes_to_monitor=("LP01",),
+    mode_reorder=(0, 5, 1, 2, 3, 4),
+    reorder=True,
+    image_dir=r"C:\Users\RSoft Things\Desktop\Results\Images",
+    combined_dir=r"C:\Users\RSoft Things\Desktop\RSoft-Automaton",
+    # plotting helpers you already have
+    extract_portmon_amp_phase=None,
+    plot_tf_matrix=None,
+    plot_combined_tf_matrix=None,
+    print_max_amp_or_phase_value=None,
+    use_seaborn_grid_plot=False,
+    sns=None,
+):
+    """
+    Plot either:
+      - grid survey results (gridding=True), OR
+      - wavelength-resolved results from df_wave_log (gridding=False)
+    """
+
+    core_number = simulation_val["core_num"]
+    modes_to_monitor = list(modes_to_monitor)
+    mode_reorder = list(mode_reorder)
+
+    os.makedirs(image_dir, exist_ok=True)
+
+    # ------------------------------------------------------------
+    # 1) GRID SURVEY
+    # ------------------------------------------------------------
+    if gridding:
+        if tf_list is None or grid_size_range is None:
+            raise ValueError("For gridding=True you must provide tf_list and grid_size_range.")
+        if extract_portmon_amp_phase is None:
+            raise ValueError("extract_portmon_amp_phase must be passed in.")
+
+        tf_vals = []
+        for i in range(len(grid_size_range)):
+            tf_vals.append(tf_list[0][i][1])  # your existing convention
+        tf_vals = np.array(tf_vals)
+
+        amp, phase, grid_size, _ = extract_portmon_amp_phase(tf_vals, core_number, grid_size_range)
+        phase = np.unwrap(phase)
+
+        amp_data, phase_data = [], []
+        for gsize, a_vals, p_vals in zip(grid_size, amp, phase):
+            for core_idx, val in enumerate(a_vals):
+                amp_data.append({"Grid": gsize, "Core": core_idx + 1, "Amplitude": val})
+            for core_idx, val in enumerate(p_vals):
+                phase_data.append({"Grid": gsize, "Core": core_idx + 1, "Phase": val})
+
+        amp_df = pd.DataFrame(amp_data)
+        phase_df = pd.DataFrame(phase_data)
+        phase_df["Phase_norm"] = phase_df.groupby("Core")["Phase"].transform(lambda x: x - x.iloc[0])
+
+        fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+        if use_seaborn_grid_plot:
+            if sns is None:
+                raise ValueError("use_seaborn_grid_plot=True but sns is None.")
+            sns.lineplot(data=amp_df, x="Grid", y="Amplitude", hue="Core", marker="o", ax=axes[0])
+            sns.lineplot(data=phase_df, x="Grid", y="Phase_norm", hue="Core", marker="o", ax=axes[1])
+        else:
+            # fallback: matplotlib only
+            for core_id in sorted(amp_df["Core"].unique()):
+                sub = amp_df[amp_df["Core"] == core_id]
+                axes[0].plot(sub["Grid"], sub["Amplitude"], marker="o", label=f"Core {core_id}")
+            for core_id in sorted(phase_df["Core"].unique()):
+                sub = phase_df[phase_df["Core"] == core_id]
+                axes[1].plot(sub["Grid"], sub["Phase_norm"], marker="o", label=f"Core {core_id}")
+
+        axes[0].set_title("Effect of grid size on BeamPROP Results")
+        axes[0].set_ylabel("Amplitude")
+        axes[0].legend(loc="upper right", title="Core")
+
+        axes[1].set_ylabel("Normalised Phase")
+        axes[1].set_xlabel(r"Grid Size ($\mu m$)")
+        axes[1].legend(loc="lower right", title="Core")
+
+        plt.tight_layout()
+        out = f"{core_number}c{simulation_val['grid_type']}PL_Grid_Survey.png"
+        fig.savefig(out, dpi=100)
+        plt.close(fig)
+        return {"grid_plot": out}
+
+    # ------------------------------------------------------------
+    # 2) WAVELENGTH-RESOLVED (mono or poly)
+    # ------------------------------------------------------------
+    if df_wave_log is None or len(df_wave_log) == 0:
+        raise ValueError("For gridding=False you must provide a non-empty df_wave_log.")
+    if plot_tf_matrix is None or plot_combined_tf_matrix is None or print_max_amp_or_phase_value is None:
+        raise ValueError("plot_tf_matrix, plot_combined_tf_matrix, print_max_amp_or_phase_value must be passed in.")
+
+    written = []
+    tf_labels = ["Amplitude", "Phase"]
+
+    for _, row in df_wave_log.sort_values("wavelength").iterrows():
+        w = float(row["wavelength"])
+
+        amp = np.asarray(row["Core Amplitudes"])
+        phase = np.asarray(row["Core Phases"])
+        ex_amp = np.asarray(row["Extra Amplitudes"])
+        ex_phase = np.asarray(row["Extra Phases"])
+
+        # reorder modes along axis 0
+        amp = amp[mode_reorder, :]
+        phase = phase[mode_reorder, :]
+
+        if ex_amp.size:
+            ex_amp = ex_amp[mode_reorder, :]
+        if ex_phase.size:
+            ex_phase = ex_phase[mode_reorder, :]
+
+        max_value = print_max_amp_or_phase_value(amp)
+
+        tf_figure = plt.figure(figsize=(20, 12))
+        param_str = ", ".join(f"{p:.3f}" for p in params)
+        tf_figure.suptitle(
+            f"Iteration {iteration_num} @ λ={w:.4g} μm\nParameters: [{param_str}]",
+            y=0.7, x=0.24
+        )
+
+        gs = gridspec.GridSpec(1, 3, width_ratios=[1, 1, 1])
+        ax0 = tf_figure.add_subplot(gs[0])
+        ax1 = tf_figure.add_subplot(gs[1])
+        ax2 = tf_figure.add_subplot(gs[2], sharey=ax1)
+
+        plt.setp(ax0.get_yticklabels(), visible=True)
+        plt.setp(ax1.get_yticklabels(), visible=True)
+        plt.setp(ax2.get_yticklabels(), visible=False)
+
+        # plot core skeleton to highlight the special core
+        if simulation_val["grid_type"] == "Pent":
+            x, y = old_generate_pentagon_grid(fixed_params["MCFCladd"] / 2, fixed_params["core_sep"], simulation_val["core_num"])
+            ax0.scatter(x,y)
+            ax0.scatter(x[simulation_val["core_to_monitor"] - 1], y[simulation_val["core_to_monitor"] - 1], color="r", label = "H-Core")
+            ax0.set_xlabel(r"x ($\mu m$)")
+            ax0.set_ylabel(r"y ($\mu m$)")
+            ax0.set_aspect('equal')
+            ax0.legend(loc="upper right")
+            
+        elif simulation_val["grid_type"] == "Hex":
+            row_num, excess = number_rows(simulation_val["core_num"])
+            hcoord, vcoord = old_generate_hex_grid(row_num, fixed_params["core_sep"], include_centre = simulation_val["plot_centre_core"])
+            
+            if simulation_val["plot_centre_core"]:
+                if 19 < simulation_val["core_num"] <= 37:
+                    reorder_index = [18, 19, 25, 24, 17, 11, 12,
+                                    20, 26, 31, 30, 29, 23, 16, 10, 5, 6, 7, 13,
+                                    21, 27, 32, 36, 35, 34, 33, 28, 22, 15, 9, 4, 0, 1, 2, 3, 8, 14]
+                elif 7 < simulation_val["core_num"] <= 19:
+                    reorder_index = [9, 10, 14, 13, 8, 4, 5,
+                                11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
+                elif simulation_val["core_num"] <= 7:
+                    reorder_index = [3,4,6,5,2,0,1]
+            else:
+                if 19 < simulation_val["core_num"] <= 37:
+                    reorder_index = [18, 19, 25, 24, 17, 11, 12,
+                                    20, 26, 31, 30, 29, 23, 16, 10, 5, 6, 7, 13,
+                                    21, 27, 32, 35, 34, 33, 28, 22, 15, 9, 4, 0, 1, 2, 3, 8, 14]
+                elif 7 < simulation_val["core_num"] <= 19:
+                    reorder_index = [9, 10, 14, 13, 8, 4, 5,
+                            11, 15, 17, 16, 12, 7, 3, 0, 1, 2, 6]
+                elif simulation_val["core_num"] <= 7:
+                    reorder_index = [3,4,6,5,2,0,1]
+
+            xcoord_og, ycoord_og, xcoord_relist, ycoord_relist = plot_excess(excess, hcoord, vcoord, reorder_index)
+            for i, (xval, yval) in enumerate(zip(xcoord_relist, ycoord_relist)):
+                if yval > 0:
+                    ax0.annotate(f"{i+1}", (xval -1, yval - 5))
+                else:
+                    ax0.annotate(f"{i+1}", (xval -1, yval + 2))
+            ax0.scatter(xcoord_relist, ycoord_relist)
+            ax0.scatter(xcoord_relist[simulation_val["core_to_monitor"]-1], 
+                        ycoord_relist[simulation_val["core_to_monitor"]-1], 
+                        color="r", label = "H-Core")
+            ax0.set_xlabel(r"x ($\mu m$)")
+            ax0.set_ylabel(r"y ($\mu m$)")
+            ax0.set_aspect('equal')
+            ax0.legend(loc="upper right")
+        axes = [ax1, ax2]
+        tf_to_plot = [amp, phase]
+        tf_to_plot_ex = [ex_amp, ex_phase]
+
+        for i, (lab, tf_type, ex_type) in enumerate(zip(tf_labels, tf_to_plot, tf_to_plot_ex)):
+            plot_phase = (lab == "Phase")
+            plot_tf_matrix(
+                tf_type, simulation_val, ex_type,
+                matrix_type=f"{lab}", ax=axes[i],
+                cbar=True, reorder=reorder, phase=plot_phase
+            )
+            ax2.set_ylabel(None)
+
+        # combined matrix plot
+        combined_name = (
+            f"TF_Combined_{simulation_val['core_num']}c{simulation_val['grid_type']}PL_"
+            f"iter{iteration_num:04d}_lam{w:.4g}.png"
+        )
+        plot_combined_tf_matrix(
+            simulation_val, amp, phase, ex_amp, ex_phase, core_number,
+            amp_max=max_value,
+            dir=combined_dir,
+            name=combined_name
+        )
+
+        monitored_mode = modes_to_monitor[0]
+        filename = f"transfer_matrix_{monitored_mode}_iter_{iteration_num:04d}_lam_{w:.4g}.png"
+        save_path = os.path.join(image_dir, filename)
+        tf_figure.savefig(save_path, dpi=300)
+        plt.close(tf_figure)
+
+        written.append(save_path)
+
+    return {"wavelength_plots": written}
 
 def extract_portmon_amp_phase(tf_list, core_num, grid_size_range=None):
 

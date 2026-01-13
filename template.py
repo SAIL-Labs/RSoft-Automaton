@@ -35,7 +35,6 @@ RSoft_params = {
     "slice_output_format": "OUTPUT_AMP_PHASE",
     "slice_output_individual": "None", # OUTPUT_AMP_PHASE_3D
     "background_index": 1.4345,
-    "free_space_wavelength": 1.5,
     "sim_tool": Sim_tool.BP,
     "launch_align_file": 1,
     "launch_normalization": 1,
@@ -48,7 +47,6 @@ RSoft_params = {
     "fem_iterations": 1000,
     "fem_nev": 12
 }
-RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
 
 Launch_params = {
     "monitor_type": Monitor_Prop.FIBRE_MODE_POWER,
@@ -91,8 +89,16 @@ Simulation_params = {
     "fixed_fem_file": False,
     # specify industry values
     "industry_neff_values": False,
-    "industry_neff_file": None
+    "industry_neff_file": None,
+    "free_space_wavelength": None
 }
+
+# Polychromatic/monochromatic switch
+if Simulation_params["free_space_wavelength"] is None:
+    RSoft_params["free_space_wavelength"] = [1.5]
+else:
+    RSoft_params["free_space_wavelength"] = Simulation_params["free_space_wavelength"]
+RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
 
 bestvals = {                      
     "core_diam": 7.697149,
