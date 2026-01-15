@@ -13,7 +13,7 @@ fixed_params = {
     "cen_core_cladding_neff": None,#0.00949,
     # "Taper_L": 50000, #45000
     # "core_neff": 0.0122895, #0.015,
-    "taper": 7.33207692,
+    "taper": 6.25, #7.33207692,
     # "core_diam": 8.2,
     "alpha": 0,
     "length_hyperparam": 0.01
@@ -101,9 +101,9 @@ else:
 RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
 
 bestvals = {                      
-    "core_diam": 7.697149,
-    "core_neff": 1.446386,
-    "Taper_L": 43864.607645
+    # "core_diam": 7.697149,
+    # "core_neff": 1.446386,
+    # "Taper_L": 43864.607645
 }
 
 variable_params= {

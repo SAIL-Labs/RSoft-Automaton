@@ -1159,7 +1159,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         final_loss = float(df_wave_log["loss"].iloc[0])
     else:
         L = df_wave_log["loss"].to_numpy(dtype=float)
-        final_loss = float(np.sqrt(np.mean((L - L.mean())**2))*np.mean(L))
+        final_loss = float(np.sqrt(np.mean((L - np.mean(L))**2))+np.mean(L))
 
     # return what your caller expects
     return final_loss, df_wave_log

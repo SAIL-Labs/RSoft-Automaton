@@ -1282,24 +1282,67 @@ def plot_available_modes(diam, wave, ell_num, NA):
         plt.savefig(f"Available_LP_Modes_for_V_{V:.3f}.png", dpi = 300)
         plot_lp_modes(V)
 
-def print_paras(radii, wavelengths, mode_count, mode_desired, l_modes_to_consider, NA, upper_bound, lower_bound):
-    rad_range = []
-    for i, r in enumerate(radii):
-        for j, wl in enumerate(wavelengths):
-            if mode_count[i, j] == mode_desired:
-                rad_range.append((r, wl))
+# def print_paras(radii, wavelengths, mode_count, mode_desired, l_modes_to_consider, NA, upper_bound, lower_bound):
+#     rad_range = []
+#     for i, r in enumerate(radii):
+#         for j, wl in enumerate(wavelengths):
+#             if mode_count[i, j] <= mode_desired:
+#                 rad_range.append((r, wl))
 
-    df_range = pd.DataFrame(rad_range, columns = ["Core Radius (µm)", "Wavelength (µm)"])
-    df_filtered = df_range[(df_range["Wavelength (µm)"] >= lower_bound) & (df_range["Wavelength (µm)"] < upper_bound)]
-    min_diam = 2 * min(df_filtered["Core Radius (µm)"])
-    max_diam = 2 * max(df_filtered["Core Radius (µm)"])
-    diam = [min_diam, max_diam]
+#     df_range = pd.DataFrame(rad_range, columns = ["Core Radius (µm)", "Wavelength (µm)"])
+#     df_filtered = df_range[(df_range["Wavelength (µm)"] >= lower_bound) & (df_range["Wavelength (µm)"] <= upper_bound)]
+#     min_diam = 2 * min(df_filtered["Core Radius (µm)"])
+#     max_diam = 2 * max(df_filtered["Core Radius (µm)"])
+#     diam = [min_diam, max_diam]
+
+#     taper_max = fixed_params["MCFCladd"] / min_diam
+#     taper_min = fixed_params["MCFCladd"] / max_diam
+
+#     wave = df_filtered["Wavelength (µm)"].iloc[np.argmin(df_filtered["Core Radius (µm)"])]                 
+#     plot_available_modes(diam, wave, l_modes_to_consider, NA)
+
+#     return df_filtered, taper_min, taper_max
+def lp_exists(V, ell, m):
+    b = ofiber.LP_mode_value(V, ell, m)
+    return (b is not None) and (not np.isnan(b))
+
+def print_paras(radii, wavelengths, mode_count, NA, upper_bound, lower_bound):
+    rows = []
+
+    wanted  = [(0, 1), (0, 2), (1, 1), (2, 1)]      # LP01, LP02, LP11, LP21
+    blocked = [(1, 2), (3, 1), (0, 3), (2, 2)]      # LP12, LP31, LP03, LP22
+
+    for r in radii:
+        for wl in wavelengths:
+            if not (lower_bound <= wl <= upper_bound):
+                continue
+
+            V = ofiber.V_parameter(r, NA, wl)
+
+            ok_wanted = all(lp_exists(V, ell, m) for (ell, m) in wanted)
+            ok_block  = all(not lp_exists(V, ell, m) for (ell, m) in blocked)
+
+            if ok_wanted and ok_block:
+                rows.append((r, wl, V))
+
+    df_filtered = pd.DataFrame(rows, columns=["Core Radius (µm)", "Wavelength (µm)", "V"])
+
+    if df_filtered.empty:
+        print("No (r, λ) found that supports exactly LP01, LP02, LP11, LP21 with current NA/range.")
+        return df_filtered, None, None
+
+    min_diam = 2 * df_filtered["Core Radius (µm)"].min()
+    max_diam = 2 * df_filtered["Core Radius (µm)"].max()
 
     taper_max = fixed_params["MCFCladd"] / min_diam
     taper_min = fixed_params["MCFCladd"] / max_diam
 
-    wave = df_filtered["Wavelength (µm)"].iloc[np.argmin(df_filtered["Core Radius (µm)"])]                 
-    plot_available_modes(diam, wave, l_modes_to_consider, NA)
+    # pick the smallest-radius solution to sanity-check
+    idx = df_filtered["Core Radius (µm)"].idxmin()
+    wave = float(df_filtered.loc[idx, "Wavelength (µm)"])
+    diam = [min_diam, max_diam]
+
+    plot_available_modes(diam, wave, ell_num=4, NA=NA)  # ell_num just controls plotting panels
 
     return df_filtered, taper_min, taper_max
 
