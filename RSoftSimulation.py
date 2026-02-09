@@ -42,27 +42,9 @@ class RSoftSim:
             """
             Generate hexagonal core coordinates and store internally.
             """
-            
-            # if core_num % 2 == 0:
-            #     raise ValueError(f"The number of cores must be odd to perfectly fit inside the hex grid. Received: {core_num}")
-
-            # # row_numbers = [number_rows(core_num)]
-            # # for row_num in row_numbers:
-            #     # hcoord, vcoord = generate_hex_grid(row_num, core_sep, include_centre = SimParam["plot_centre_core"])
-            #     # self.core_positions = list(zip(hcoord, vcoord))
-            # hcoord, vcoord = generate_hex_ring_grid(fixed_params["MCFCladd"]/2, core_sep, SimParam["core_num"], include_center = SimParam["plot_centre_core"])
             row_num, excess = number_rows(core_num)
             hcoord, vcoord = old_generate_hex_grid(row_num, fixed_params["core_sep"], include_centre = Simulation_params["plot_centre_core"])
             
-            # if core_num == 19:
-            #     reorder_indices = [9, 10, 14, 13, 8, 4, 5, 11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
-            # elif core_num == 7:
-            #     if Simulation_params["plot_centre_core"]:
-            #         reorder_indices = [3,4,6,5,2,0,1]
-            #         x, y = np.array(hcoord)[reorder_indices], np.array(vcoord)[reorder_indices]
-            #     else:
-            #         reorder_indices = [0,1,2,3,4,5]
-            #         x, y = np.array(hcoord), np.array(vcoord)
             if Simulation_params["plot_centre_core"]:
                 if 19 < core_num <= 37:
                     reorder_index = [18, 19, 25, 24, 17, 11, 12,
@@ -154,8 +136,17 @@ class RSoftSim:
             self.core_positions = list(zip(hcoord, vcoord))
             with open("core_positions.json", "w") as g:
                 json.dump(self.core_positions, g)
+        
+        if grid_type == "Triangle":
+            hcoord, vcoord = generate_triangular_grid(fixed_params["core_sep"])
+            self.core_positions = list(zip(hcoord, vcoord))
+            self.cladd_positions = None
 
-    def RunRSoftSim(self, name_tag, femsim_name_tag, fixed, vars, fixed_length, param_range, simulation_val, csv_path, json_config, prior_space_pid):
+            with open("core_positions.json", "w") as g:
+                json.dump(self.core_positions, g)
+    
+
+    def RunRSoftSim(self, name_tag, femsim_name_tag, fixed, vars, fixed_length, param_range, simulation_val, csv_path, json_config, prior_space_pid, fem=False):
         filename = f"{name_tag}.ind"
         filename_FS = f"{femsim_name_tag}.ind"
         sim_tool = simulation_val.get("sim_tool", RSoft_params["sim_tool"])
@@ -163,7 +154,10 @@ class RSoftSim:
         # Run RSoft simulation
         if sim_tool == "ST_BEAMPROP":
             prefix_BP   = f"prefix={name_tag}"
-            folder_BP   = f"BP_SimulationNum_{iter_number}"
+            if fem:
+                folder_BP = "FemSIM_DET"
+            else:
+                folder_BP   = f"BP_SimulationNum_{iter_number}"
             prefix_FS = f"prefix={femsim_name_tag}"
 
             results_folder = create_folders(folder_BP, "Desktop")
@@ -369,7 +363,7 @@ class RSoftSim:
                 transfer_vector, throughput = transfer_matrix_component(csv_pathway, row)
                 return transfer_vector, -throughput, results_folder
 
-    def build_circuit(self, params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave): # maybe put this into its own function. Make it universal.
+    def build_circuit(self, params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave, fem=False): # maybe put this into its own function. Make it universal.
         """
         Create the design file using template.py and 
         write to separate .ind file. Also contains function to run BeamProp
@@ -472,8 +466,10 @@ class RSoftSim:
         structure = Simulation_params["Structure"]
 
         cladd_diam = fixed["MCFCladd"]
-        cladding_beg_dims = (cladd_diam / taper, cladd_diam / taper)
+        cladding_beg_dims = (cladd_diam / taper, cladd_diam / taper) 
         cladding_end_dims = (cladd_diam , cladd_diam)
+        # capillary_beg_dims = ((cladd_diam / taper)*1.3, (cladd_diam / taper)*1.3) 
+        # capillary_end_dims = (cladd_diam * 1.3, cladd_diam * 1.3)
 
         core_beg_dims_list = []
         core_end_dims_list = []
@@ -522,6 +518,7 @@ class RSoftSim:
             path_num = build_PL(self.circuit, path_num, self.core_positions,
                     core_name, taper, Taper_L,
                     cladding_beg_dims, cladding_end_dims,
+                    # capillary_beg_dims, capillary_end_dims,
                     core_beg_dims_list, core_end_dims_list,
                     simulation_val,self.cladd_positions)
             
@@ -533,12 +530,19 @@ class RSoftSim:
         else:
             grid = simulation_val["grid_size"] # use only when trying to find the optimal gridding to run BeamPROP in.
             name_tag = f"_Grid{grid}".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
-        self.sym["Name"] = name_tag
-        self.circuit.write(f"{name_tag}.ind")
+        
+        if fem:
+            self.sym["Name"] = name_tag
+            self.circuit.write(f"{name_tag}.ind")
+            femsim_name_tag = f"FemSim_File_DET_{name_tag}"
+            self.circuit.write(f"{femsim_name_tag}.ind")
+        else:
+            self.sym["Name"] = name_tag
+            self.circuit.write(f"{name_tag}.ind")
 
-        # create separate file for FemSIM field determination
-        femsim_name_tag = f"FS_{name_tag}"
-        self.circuit.write(f"{femsim_name_tag}.ind")
+            # create separate file for FemSIM field determination
+            femsim_name_tag = f"FS_{name_tag}"
+            self.circuit.write(f"{femsim_name_tag}.ind")
 
         """
         Append all pathway, monitor, and launch field blocks based 
@@ -546,7 +550,7 @@ class RSoftSim:
         """ 
         
         AddHack(name_tag, femsim_name_tag, launch, 
-                path_num - 1, param_dict, simulation_val)
+                path_num - 1, param_dict, simulation_val, wave,fem=fem)
         '''
         Manual setup to loop through a list of values. Runs the terminal line that will initiate RSoft and will calculate the 
         metric to test.
@@ -563,7 +567,7 @@ class RSoftSim:
             transfer_vector, average_throughput, res_folder = self.RunRSoftSim(name_tag, femsim_name_tag, fixed, 
                                                                    vars, fixed_length, param_range, 
                                                                    simulation_val, csv_path, json_config, 
-                                                                   prior_space_pid)
+                                                                   prior_space_pid, fem = fem)
             return transfer_vector, average_throughput, res_folder
 
     def MultProc(self, build_tf, json_config, csv_path, simulation_val, prior_space_pid): #csv_path
@@ -698,7 +702,7 @@ class RSoftSim:
                                   csv_path = csv_path, 
                                   name_tag = self.sym["Name"])
 
-    def RunRSoft(self, simulation_val, prior_space_pid, wave, csv_path, json_config, pid, simulate=False, build_tf = True): #csv_path, 
+    def RunRSoft(self, simulation_val, prior_space_pid, wave, csv_path, json_config, pid, fem=False, simulate=False, build_tf = True): #csv_path, 
         '''
         Multiprocessing must to be run outside of a Jupyter cell or it will silently 
         fail/infinitely loop on the first batch
@@ -755,7 +759,7 @@ class RSoftSim:
             seed_result, res_folder = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave)
             tf_vector = None
         else:
-            tf_vector, seed_result, res_folder = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave)
+            tf_vector, seed_result, res_folder = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave, fem = fem)
 
         results_folder = log_optimizer_results(
             x_iters=[seed_params],
@@ -793,8 +797,6 @@ CURRENT: simultaneously chooses pairs of modes to run RSoft with to develop the 
 Multiprocessing to occur after the parameter is chosen that sequentially injects individual modes to build the transfer matrix. 
 Multiprocessing that picks a new set of parameters, injects individual LP modes to build the transfer matrix, 
 and then suggest new parameters to test.
-
-WIP: gridding portion needs to be fixed
 """
 import copy
 
@@ -802,8 +804,8 @@ def multiple_mode_tf(arg_list):
     '''
     TO DO: fix up the gridding part of this code.
     '''
-    if len(arg_list) == 10:
-        sim_val, custom_priors, wave, m, rm, params, taper_min, taper_max, gridding, iteration_num = arg_list
+    if len(arg_list) == 11:
+        sim_val, custom_priors, wave, m, rm, params, fem, taper_min, taper_max, gridding, iteration_num = arg_list
     if len(arg_list) == 8:
         sim_val, custom_priors, gr, params, taper_min, taper_max, gridding, iteration_num = arg_list
     if gridding:
@@ -828,12 +830,20 @@ def multiple_mode_tf(arg_list):
         optimizer_result = f"Grid_{gr}_Optimizer_Result.csv"
         param_num = f"Grid {gr}"
     else:
-        sim_val, custom_priors, wave, m, rm, params, taper_min, taper_max, gridding, iteration_num = arg_list
+        sim_val, custom_priors, wave, m, rm, params, fem, taper_min, taper_max, gridding, iteration_num = arg_list
         sim_val = copy.deepcopy(sim_val)
         sim_val["launch_mode"] = m
         sim_val["launch_mode_radial"] = rm
         sim_val["iter_num"] = iteration_num
         sim_val["free_space_wavelength"] = wave
+
+        # Open file containing the refractive indices determined from the Selmeier equation
+        stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
+        _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), wave)
+        sim_val["core_neff"] = stored_data["GeO2_2_mol%"].to_numpy()[idx]
+        fixed_params["cladding_neff"] = stored_data["SiO2"].to_numpy()[idx]
+        Launch_params["cladding_neff"] = fixed_params["cladding_neff"]
+        RSoft_params["background_index"] = stored_data["F_2_mol%"].to_numpy()[idx]
 
         # write core diameter properties to simulation_val and set special core properties to None for SKOPT to overwrite
         assign_core_properties(sim_val)
@@ -846,6 +856,9 @@ def multiple_mode_tf(arg_list):
         for pname, pval in zip(param_names, params):
             sim_val[f"core_{core_to_monitor}"][pname] = pval
             variable_params[pname] = pval
+        
+        if fem:
+            variable_params["core_neff"] = sim_val["core_neff"]
 
         # dump configuration paras into json for use later
         # pid is needed to avoid cross-talking between files created/used in multiprocessing tasks
@@ -868,7 +881,7 @@ def multiple_mode_tf(arg_list):
     sim.init_priors(prior_space_pid, build_tf, custom_priors)
 
     # run simulation
-    results_folder, res_folder = sim.RunRSoft(sim_val, prior_space_pid, wave,csv_path = optimizer_result, json_config = code_config, pid = pid, build_tf = build_tf)
+    results_folder, res_folder = sim.RunRSoft(sim_val, prior_space_pid, wave,csv_path = optimizer_result, json_config = code_config, pid = pid, fem = fem, build_tf = build_tf)
 
     # Load results
     best_para_log = os.path.join(results_folder, f"best_params_log_{pid}.csv")    
@@ -888,14 +901,14 @@ def multiple_mode_tf(arg_list):
     plotting_optimizer_results(data, param_names, tf=tf_vectors, plot= False)
     return (param_num, tf_vectors, wave, res_folder)
 
-def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding = False): 
+def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, fem = False, gridding = False): 
 
     tf_list = []
     if not gridding:
         # initialise global parent argument list. This creates multiple instances of args_list based on the length of
         # mode_vals or radial_mode_vals. i.e. 
         # [(simulation_val, 0, 1, params, False),(simulation_val, 1, 1, params, False),(simulation_val, -1, 1, params, False), .....]
-        args_list = [(simulation_val, custom_priors,wavelengths,m, rm, params, taper_min, taper_max, gridding, iteration_num) for wavelengths in simulation_val["free_space_wavelength"] for m, rm in zip(mode_vals, radial_mode_vals)] 
+        args_list = [(simulation_val, custom_priors,wavelengths,m, rm, params, fem, taper_min, taper_max, gridding, iteration_num) for wavelengths in simulation_val["free_space_wavelength"] for m, rm in zip(mode_vals, radial_mode_vals)] 
     else:
         # run gridding determination
         grid_size_list = np.arange(0.1, 2.1, 0.1)
@@ -909,7 +922,7 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_v
 
     # note 'spawn' means Python will start n separate processes each with their own memory of global variables. 
     # You need to define any changes within their own instance or else NOTHING changes.
-    with mp.get_context("spawn").Pool(processes=6*len(simulation_val["free_space_wavelength"]) if not gridding else 20) as pool:
+    with mp.get_context("spawn").Pool(processes=int(simulation_val["core_num"])*len(simulation_val["free_space_wavelength"]) if not gridding else 20) as pool:
         # supply multiple_mode_tf with the arguments required to run. 
         # Since the number of processes match the length of the mode_vals/radial_mode_vals
         # then each worker gets an instance of arg_list. i.e. arg_list[i]
@@ -957,159 +970,6 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
     phase = []
     tf_vals = []
 
-    # if gridding:
-    #     for i in range(len(grid_size_range)):
-    #         tf_vals.append(tf_list[0][i][1]) # if plotting grid sizes use 1, else 2 for transfer vectors
-
-    #     tf_vals = np.array(tf_vals)
-
-    #     amp, phase, grid_size, tf_result = extract_portmon_amp_phase(tf_vals, core_number,grid_size_range)
-    #     phase = np.unwrap(phase)
-        
-    #     amp_data = []
-    #     phase_data = []
-    #     int_dat = []
-
-    #     for idx, (gsize, a_vals, p_vals) in enumerate(zip(grid_size, amp, phase)):
-    #         for core_idx, val in enumerate(a_vals):
-    #             amp_data.append({"Grid": gsize, "Core": core_idx + 1, "Amplitude": val})
-    #             int_dat.append({"Grid": gsize, "Core": core_idx + 1, "Log Intensity": np.log(val**2)})
-    #         for core_idx, val in enumerate(p_vals):
-    #             phase_data.append({"Grid": gsize, "Core": core_idx + 1, "Phase": val})
-
-    #     amp_df = pd.DataFrame(amp_data)
-    #     phase_df = pd.DataFrame(phase_data)
-    #     phase_df['Phase_norm'] = phase_df.groupby('Core')['Phase'].transform(lambda x: x - x.iloc[0])
-    #     int_df = pd.DataFrame(int_dat)
-
-    #     fig_grid_sizes, axes = plt.subplots(2,1, figsize=(10, 8), sharex= True)
-
-    #     ax = axes[0]
-    #     sns.lineplot(data= amp_df, x="Grid", y="Amplitude", hue="Core", marker = "o", ax=ax)
-    #     ax.set_title("Effect of grid size on BeamPROP Results")
-    #     ax.set_ylabel("Amplitude")
-    #     ax.legend(loc='upper right', title = "Core")
-
-    #     ax = axes[1]
-    #     sns.lineplot(data=phase_df, x="Grid", y="Phase_norm", hue="Core", marker="o", ax=ax)
-    #     ax.set_ylabel("Normalised Phase")
-    #     ax.legend(loc='lower right', title = "Core")
-    #     ax.set_xlabel(r"Grid Size ($\mu m$)")
-
-    #     plt.tight_layout()
-    #     plt.savefig(f"{core_number}c{simulation_val['grid_type']}PL Grid Survey.png", dpi=100)
-
-    # else:
-    #     for i in range(len(mode_vals)):
-    #         tf_vals.append(tf_list[i][1])
-
-    #     tf_vals = np.array(tf_vals)
-
-    #     amp, phase, ex_amp, ex_phase, tf_result = extract_portmon_amp_phase(tf_vals,core_number)
-    #     mode_reorder = [0, 5, 1, 2, 3, 4]
-    #     max_value = print_max_amp_or_phase_value(amp)
-
-    #     reorder = True
-    #     tf_labels = ["Amplitude", "Phase"]
-
-    #     tf_to_plot = [amp, phase]
-    #     ex_amp = [ex_amp[k] for k in mode_reorder]
-    #     ex_phase = [ex_phase[k] for k in mode_reorder]
-    #     tf_to_plot_ex = [ex_amp, ex_phase]
-
-    #     tf_figure = plt.figure(figsize = (20,12))
-    #     param_str = ", ".join(f"{p:.3f}" for p in params)
-    #     tf_figure.suptitle(
-    #         f"Iteration {iteration_num}\nParameters: [{param_str}]",
-    #         y=0.7, x=0.24
-    #     )        
-    #     gs = gridspec.GridSpec(1,3, width_ratios=[1,1,1])
-        
-    #     # ensure each plot is the same height
-    #     ax0 = tf_figure.add_subplot(gs[0])
-    #     ax1 = tf_figure.add_subplot(gs[1])
-    #     ax2 = tf_figure.add_subplot(gs[2], sharey = ax1)
-
-    #     # remove sharey for the first axis
-    #     plt.setp(ax0.get_yticklabels(), visible=True)
-    #     plt.setp(ax1.get_yticklabels(), visible=True)
-    #     plt.setp(ax2.get_yticklabels(), visible=False)
-
-    #     # plot core skeleton to highlight the special core
-    #     if simulation_val["grid_type"] == "Pent":
-    #         x, y = old_generate_pentagon_grid(fixed_params["MCFCladd"] / 2, fixed_params["core_sep"], simulation_val["core_num"])
-    #         ax0.scatter(x,y)
-    #         ax0.scatter(x[simulation_val["core_to_monitor"] - 1], y[simulation_val["core_to_monitor"] - 1], color="r", label = "H-Core")
-    #         ax0.set_xlabel(r"x ($\mu m$)")
-    #         ax0.set_ylabel(r"y ($\mu m$)")
-    #         ax0.set_aspect('equal')
-    #         ax0.legend(loc="upper right")
-            
-    #     elif simulation_val["grid_type"] == "Hex":
-    #         row_num, excess = number_rows(simulation_val["core_num"])
-    #         hcoord, vcoord = old_generate_hex_grid(row_num, fixed_params["core_sep"], include_centre = simulation_val["plot_centre_core"])
-            
-    #         if simulation_val["plot_centre_core"]:
-    #             if 19 < simulation_val["core_num"] <= 37:
-    #                 reorder_index = [18, 19, 25, 24, 17, 11, 12,
-    #                                 20, 26, 31, 30, 29, 23, 16, 10, 5, 6, 7, 13,
-    #                                 21, 27, 32, 36, 35, 34, 33, 28, 22, 15, 9, 4, 0, 1, 2, 3, 8, 14]
-    #             elif 7 < simulation_val["core_num"] <= 19:
-    #                 reorder_index = [9, 10, 14, 13, 8, 4, 5,
-    #                             11, 15, 18, 17, 16, 12, 7, 3, 0, 1, 2, 6]
-    #             elif simulation_val["core_num"] <= 7:
-    #                 reorder_index = [3,4,6,5,2,0,1]
-    #         else:
-    #             if 19 < simulation_val["core_num"] <= 37:
-    #                 reorder_index = [18, 19, 25, 24, 17, 11, 12,
-    #                                 20, 26, 31, 30, 29, 23, 16, 10, 5, 6, 7, 13,
-    #                                 21, 27, 32, 35, 34, 33, 28, 22, 15, 9, 4, 0, 1, 2, 3, 8, 14]
-    #             elif 7 < simulation_val["core_num"] <= 19:
-    #                 reorder_index = [9, 10, 14, 13, 8, 4, 5,
-    #                         11, 15, 17, 16, 12, 7, 3, 0, 1, 2, 6]
-    #             elif simulation_val["core_num"] <= 7:
-    #                 reorder_index = [3,4,6,5,2,0,1]
-
-    #         xcoord_og, ycoord_og, xcoord_relist, ycoord_relist = plot_excess(excess, hcoord, vcoord, reorder_index)
-    #         for i, (xval, yval) in enumerate(zip(xcoord_relist, ycoord_relist)):
-    #             if yval > 0:
-    #                 ax0.annotate(f"{i+1}", (xval -1, yval - 5))
-    #             else:
-    #                 ax0.annotate(f"{i+1}", (xval -1, yval + 2))
-    #         ax0.scatter(xcoord_relist, ycoord_relist)
-    #         ax0.scatter(xcoord_relist[simulation_val["core_to_monitor"]-1], 
-    #                     ycoord_relist[simulation_val["core_to_monitor"]-1], 
-    #                     color="r", label = "H-Core")
-    #         ax0.set_xlabel(r"x ($\mu m$)")
-    #         ax0.set_ylabel(r"y ($\mu m$)")
-    #         ax0.set_aspect('equal')
-    #         ax0.legend(loc="upper right")
-            
-    #     # plot the individual amplitude and phase matrix
-    #     axes = [ax1, ax2]
-    #     for i, (lab, tf_type, ex_type) in enumerate(zip(tf_labels, tf_to_plot, tf_to_plot_ex)):
-    #         plot_phase = False
-
-    #         if lab == "Phase":
-    #             plot_phase = True
-    #         plot_tf_matrix(tf_type, simulation_val, ex_type, matrix_type=f"{lab}", ax=axes[i], cbar=True, reorder = reorder, phase = plot_phase)
-    #         ax2.set_ylabel(None)
-    #         plt.close()
-    #         plt.close()
-
-    #     # tf_figure.savefig("Grif+Amplitude+Phase TF Matrix.png", dpi=300)
-    #     # plot the combined amplitude and phase matrix
-    #     plot_combined_tf_matrix(simulation_val, amp, phase, ex_amp, ex_phase, core_number, amp_max = max_value,
-    #                             dir = r"C:\Users\RSoft Things\Desktop\RSoft-Automaton", 
-    #                             name = f"TF_Combined_{simulation_val['core_num']}c{simulation_val['grid_type']}PL.png")
-        
-    #     image_dir = r"C:\Users\RSoft Things\Desktop\Results\Images"
-    #     monitored_mode = modes_to_monitor[0]
-    #     filename = f"transfer_matrix_{monitored_mode}_iteration_{iteration_num}.png"
-    #     save_path = os.path.join(image_dir, filename)
-    #     tf_figure.savefig(save_path, dpi=300)
-    #     plt.close()
-
     hyp_param_b = simulation_val.get("hyp_param_b", Simulation_params["hyp_param_b"])
     hyp_param_c = simulation_val.get("hyp_param_c", Simulation_params["hyp_param_c"])
 
@@ -1120,8 +980,9 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
     for w in unique_waves:
         tf_list_w = [(lab, arr, wave) for (lab, arr, wave) in tf_list if float(wave) == float(w)]
         tf_list_w_arr = [arr for (lab, arr, wave) in tf_list_w]
+        mode_labels_raw = [lab for (lab, _, _) in tf_list_w]
         # compute scalar loss for this wavelength
-        loss, arr_results, _ = mode_selective_tf_matrix_metric(
+        loss, arr_results, _, len_modes_arr = mode_selective_tf_matrix_metric(
             tf_list_w, res_folder,
             hyp_param_b,
             hyp_param_c,
@@ -1143,6 +1004,8 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "x": float(params[0]),
             "y": float(params[1]),
             "z": float(params[2]),
+            "Guided Modes":len_modes_arr,
+            "Mode Labels": mode_labels_raw,
             "Core Amplitudes": og_amp,
             "Core Phases": og_phase,
             "Extra Amplitudes": ex_amp,
@@ -1201,10 +1064,12 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             else:
                 para_space.append(Real(low, high, name=prior_name))
     elif bestvals:
-        para_space = []
-        sampling_regions = sample_range(param_range, bestvals, shrink=15.0)
-        for prior_name, (low, high) in sampling_regions.items():
-            para_space.append(Real(low, high, name=prior_name))
+        # para_space = []
+        # sampling_regions = sample_range(param_range, bestvals, shrink=15.0)
+        # for prior_name, (low, high) in sampling_regions.items():
+        #     para_space.append(Real(low, high, name=prior_name))
+        para_space = coarse_sampler(bestvals)
+        print("Sampling begin.")
     else:
         para_space = []
         for prior_name, (low, high) in param_range.items():
@@ -1228,10 +1093,58 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
     if simulate_tf_metric:
         all_results = []
         wave_logs = []
+
+        if bestvals:
+            for batch_idx, para_set in enumerate(para_space):
+                param_batch = para_set
+                print("Trying " + ", ".join(
+                f"Core neff: {param_batch[l]:.3f}" if text == "core_neff"
+                else f"{text}: {param_batch[l]:.3f}"
+                for l, text in enumerate(variable_params.keys())
+                ))         
+
+                result_batch, df_wave_log = run_all_modes_for_params(param_batch, batch_idx + 1, 
+                                                                        simulation_val, custom_priors, taper_min, 
+                                                                        taper_max, gridding = gridding)
+                plot_pl_results(
+                    simulation_val=simulation_val,
+                    iteration_num=batch_idx + 1,
+                    params=param_batch,
+                    gridding=False,
+                    df_wave_log=df_wave_log,
+                    plot_tf_matrix=plot_tf_matrix,
+                    plot_combined_tf_matrix=plot_combined_tf_matrix,
+                    print_max_amp_or_phase_value=print_max_amp_or_phase_value,
+                )
+                # tell optimiser the performance of the chosen parameters
+                # opt.tell(param_batch, result_batch)
+                # log iteration of parameters, store for later use, rows are the wavelength used
+                # wave_logs.append(df_wave_log)
+                print(f"Iteration {batch_idx + 1}: {result_batch:.6f}")
+                for w, a, b, c, d in zip(df_wave_log["wavelength"], df_wave_log["loss_a"], df_wave_log["loss_b"], 
+                                        df_wave_log["loss_c"], df_wave_log["loss_d"]):
+                                    print(f"  λ={w:.3f} µm | (a, b, c, d)=({a:.6g}, {b:.6g}, {c:.6g}, {d:.6g})")
+
+                # convert df_wave_log to numpy array
+                loss_terms = df_wave_log[["wavelength","loss_a","loss_b","loss_c","loss_d"]].to_numpy()
+                amp = df_wave_log["Core Amplitudes"].to_numpy()
+                phase = df_wave_log["Core Phases"].to_numpy()
+                ex_amp = df_wave_log["Extra Amplitudes"].to_numpy()
+                ex_phase = df_wave_log["Extra Phases"].to_numpy()
+                number_of_guided_modes = df_wave_log["Guided Modes"].to_numpy()
+                all_results.append({'params': param_batch, 'result': result_batch, 
+                                    'Iteration': batch_idx + 1, "Loss Metric": loss_terms, "Number of Guided Modes": number_of_guided_modes,
+                                    "Core Amplitudes": amp, "Core Phases": phase,
+                                    "Extra Core Amplitudes": ex_amp, "Extra Core Phases": ex_phase})
+            return all_results
+        
+        # dynamically generate femsim files as a function of wavlength ONCE. Use the template file to do this.
+        param_names = ["core_diam", "core_neff"]
+        params = [variable_params[k] for k in param_names]
+        run_tf_multproc(params, 1,simulation_val, custom_priors, mode_vals, radial_mode_vals,taper_min, taper_max, fem = True, gridding=gridding)
         for batch_idx in range(total_calls):
             # ask for 1 set of parameter vectors only to prevent daemonic process having children 
-            param_batch = opt.ask()
-            # param_batch = np.asarray(param_batch, dtype=float)  
+            param_batch = opt.ask() 
 
             print("Trying " + ", ".join(
                 f"Core neff: {param_batch[l]:.3f}" if text == "core_neff"
@@ -1267,8 +1180,9 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             phase = df_wave_log["Core Phases"].to_numpy()
             ex_amp = df_wave_log["Extra Amplitudes"].to_numpy()
             ex_phase = df_wave_log["Extra Phases"].to_numpy()
+            number_of_guided_modes = df_wave_log["Guided Modes"].to_numpy()
             all_results.append({'params': param_batch, 'result': result_batch, 
-                                'Iteration': batch_idx + 1, "Loss Metric": loss_terms, 
+                                'Iteration': batch_idx + 1, "Loss Metric": loss_terms, "Number of Guided Modes": number_of_guided_modes,
                                 "Core Amplitudes": amp, "Core Phases": phase,
                                 "Extra Core Amplitudes": ex_amp, "Extra Core Phases": ex_phase})
         return all_results

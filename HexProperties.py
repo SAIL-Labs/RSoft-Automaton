@@ -354,3 +354,31 @@ def generate_square_grid(core_num, spacing):
     
     return x_vals, y_vals
 ##############################################################################
+"""
+Generate traingular grid (3 points only!!!)
+"""
+def generate_triangular_grid(grid_spacing):
+    
+    alpha = np.deg2rad(60)   # triangle opening angle
+    phi = np.deg2rad(60)    # rotation angle
+
+    points = np.array([
+        [0.0, 0.0],
+        [grid_spacing, 0.0],
+        [grid_spacing * np.cos(alpha), grid_spacing * np.sin(alpha)]
+    ])
+
+    # rotation matrix
+    R = np.array([
+        [np.cos(phi), -np.sin(phi)],
+        [np.sin(phi),  np.cos(phi)]
+    ])
+
+    points = points @ R.T
+    # want to preserve the cidtances to each point
+    centroid = points.mean(axis=0)
+    points_centered = points - centroid
+    
+    hcoord = points_centered[:,0]
+    vcoord = points_centered[:,1]
+    return np.array(hcoord), np.array(vcoord)

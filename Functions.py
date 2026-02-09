@@ -13,7 +13,9 @@ from matplotlib.colors import Normalize
 import glob
 import ehtplot.color
 import cmocean
+import itertools
 from HexProperties import *
+import shutil
 #######################################################################################################################################################
 # Function to extract parameters from the .ind file
 def Extract_params(param=""):
@@ -188,7 +190,7 @@ def create_folders(folder_name, pos):
         os.makedirs(results_folder_onedrive, exist_ok=True)
         return results_folder_onedrive
 #######################################################################################################################################################
-def AddHack(file_name, FS_file_name, json_file, core_num, param_dict, simulation_val):
+def AddHack(file_name, FS_file_name, json_file, core_num, param_dict, simulation_val, wave, fem=False):
     '''
     Hacking function to add text that will import segments to RSoft that the Python API does not currently handle.
 
@@ -237,7 +239,7 @@ end launch_field
 
         # Open file in append mode
         with open(f"{file_name}.ind", "a") as f:
-
+            
             # Write all pathways
             for i in range(1, core_num + 2):  # +1 for cladding
                 text = block_text["pathway"].format(n=i)
@@ -298,9 +300,10 @@ end launch_field
                 text = block_text["pathway"].format(n=i)
                 fs.write(text)
 
-                # Write only one launch field (for the cladding (MMF case)/core (SMF case))
+            # Write only one launch field (for the cladding (MMF case)/core (SMF case))
             text = block_text["launch_field"].format(
                 n=1,
+                cladding_idx = 1,
                 launch_type=launch_array["launch_type"],
                 launch_tilt=launch_array["launch_tilt"],
                 launch_normalization=launch_array["launch_normalization"],
@@ -322,6 +325,7 @@ end launch_field
                 # Write only one launch field (for the cladding (MMF case)/core (SMF case))
             text = block_text["launch_field"].format(
                 n=1,
+                # cladding_idx = 1,
                 launch_type=launch_array["launch_type"],
                 launch_tilt=launch_array["launch_tilt"],
                 launch_normalization=launch_array["launch_normalization"],
@@ -353,6 +357,16 @@ end launch_field
             f"\tend.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n"
         ], segment_filter=f"{core_key}")
 
+        # if core_key != f"core_{simulation_val['core_to_monitor']}":
+        #     # assign material to the cores
+        #     lines = insert_after_match(lines, "end.delta =", [
+        #         f"\tmat_name = GeO2_2_mol%\n"
+        #     ], segment_filter=f"{core_key}") 
+        #     lines_fs = insert_after_match(lines_fs, "end.delta =", [
+        #         f"\tmat_name = GeO2_2_mol%\n"
+        #     ], segment_filter=f"{core_key}") 
+
+    # append core refractive index delta into each ind file
     lines = insert_after_match(lines, "begin.width =", [
         f"\tbegin.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n",
         f"\tend.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n"
@@ -361,6 +375,14 @@ end launch_field
         f"\tbegin.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n",
         f"\tend.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n"
     ], segment_filter="Super Cladding") 
+
+    # # assign material to the cladding
+    # lines = insert_after_match(lines, "end.delta =", [
+    #     f"\tmat_name = SiO2\n",
+    # ], segment_filter="Super Cladding") 
+    # lines_fs = insert_after_match(lines_fs, "end.delta =", [
+    #     f"\tmat_name = SiO2\n"
+    # ], segment_filter="Super Cladding") 
 
     if Simulation_params["add_cladding_to_cores"] is not None:
         lines = insert_after_match(lines, "begin.width =", ["profile_type = PROF_INACTIVE"
@@ -375,7 +397,14 @@ end launch_field
                 f"\tbegin.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n",
                 f"\tend.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n"
             ], segment_filter=f"Core {cladd_num + 1} Cladding") 
-   
+
+            # assign material to thecore  claddings
+            lines = insert_after_match(lines, "end.delta =", [
+                f"\tmat_name = SiO2\n",
+            ], segment_filter=f"Core {cladd_num + 1} Cladding") 
+            lines_fs = insert_after_match(lines_fs, "end.delta =", [
+                f"\tmat_name = SiO2\n"
+            ], segment_filter=f"Core {cladd_num + 1} Cladding") 
 
     # for i in range(1, core_num + 1):
     #     if i == core_to_monitor:
@@ -505,27 +534,31 @@ end launch_field
                     # LP11a, LP11b, LP21a, LP21b, LP02
                     higher_mode_indices = [2, 4, 6, 8, 10]
 
-                    # Case 1: using a fixed external FEM file (no per-mode FEMSIM)
                     if Simulation_params["fixed_fem_file"]:
                         # All monitors use the same supplied port_mon_file
                         final_lines.append(f"\tmonitor_file = {Simulation_params['port_mon_file']}\n")
 
-                    # Case 2: skip_core is set and we’re doing standard FEMSIM modes
                     elif Simulation_params["skip_core"] is not None:
-                        # You can customize this branch as needed; for now keep old behavior
                         final_lines.append(f"\tmonitor_file = {FS_file_name}.m00\n")
-
+                    
+                    elif fem: # for femsim file determination
+                        final_lines.append(f"\tmonitor_file = {FS_file_name}.m00\n")
                     else:
-                        # --- Normal dynamic case ---
-
-                        # Per-core monitors (first core_num monitors)
                         if mon_number < core_num:
                             if mon_number == (core_to_monitor - 1):
-                                # This is the main monitor on the core we care about → LP01 (m00)
                                 final_lines.append(f"\tmonitor_file = {FS_file_name}.m00\n")
                             else:
-                                # Other cores use the generic launch field / file
-                                final_lines.append(f"\tmonitor_file = {Simulation_params['port_mon_file']}\n")
+                                # enforce other cores to have a field profile as a function of wavelength
+                                monfiledir = r"C:\Users\RSoft Things\Desktop\Results\FemSIM_DET"
+                                base_files = find_field_base_filenames(monfiledir, wave) # <- this should copy the ALL .m00 femsim files with prefix ex, ey, hx, and hy to the working directory, and list the files copied.
+                                # check if no files were copied
+                                if len(base_files) == 0:
+                                    raise FileNotFoundError(
+                                        f"No FEM field files found for wave={wave} in {monfiledir}"
+                                    )
+                                #  note that multiple files have the same field profile, only need one.
+                                monitor_file = base_files[0]
+                                final_lines.append(f"\tmonitor_file = {monitor_file}\n")
 
                         # Extra monitors after the first core_num ports:
                         else:
@@ -533,7 +566,6 @@ end launch_field
                             idx_extra = mon_number - core_num  # 0,1,2,3,4,...
 
                             if 0 <= idx_extra < len(higher_mode_indices) and mon_number >= (core_to_monitor - 1):
-                                # Map 16→.m02, 17→.m04, 18→.m06, 19→.m08, 20→.m10, etc.
                                 mode_idx = higher_mode_indices[idx_extra]
                                 if mode_idx >= 10:
                                     final_lines.append(f"\tmonitor_file = {FS_file_name}.m{mode_idx}\n")
@@ -840,6 +872,7 @@ def build_fibre(circuit, path_num, core_positions, core_names, Taper_length, beg
 
 def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
              cladd_beginning_diam, cladd_final_diam,
+            #  capillary_beg_dims, capillary_end_dims,
              core_beginning_dims_list, core_final_dims_list, 
              simulation_val,cladding_positions = None):
     if simulation_val["skip_core"] == None:
@@ -851,7 +884,13 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
         dimensions_end=cladd_final_diam
     )
     cladding.set_name("Super Cladding")
-    path_num += 1
+    path_num += 1 # account for the cladding
+    # capillary = circuit.add_segment(position=(0, 0, 0),
+    #     offset=(0, 0, Taper_length),
+    #     dimensions=capillary_beg_dims,
+    #     dimensions_end=capillary_end_dims
+    # )
+    # capillary.set_name("Capillary")
 
     # Store segments and monitors for attachment
     core_segments = []
@@ -1074,6 +1113,7 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
 
     loss_arr = []
     collected_arr = []
+    len_modes_arr = []
 # for tf in tf_list:
     # relabel
     new_tf_list = [
@@ -1094,7 +1134,6 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
         arr = np.array(arr).flatten()
 
         amps = arr[1::2]
-        
         # split amplitude values into main LP01 values (for each core) and extra values (higher order modes on special core)
         main_amps = amps[:core_num]
         extra_amps = amps[core_num:]
@@ -1149,11 +1188,12 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
         array_of_results = np.array([ms_core_mode, #a
                             nonms_core_other_mode, #b
                             nonms_core_ms_mode, #c
-                            ms_core_other_mode #c
+                            ms_core_other_mode #d
                             ])
         loss_arr.append(loss_func)
         collected_arr.append(array_of_results)
-        return loss_func, array_of_results, waves
+        len_modes_arr.append(num_modes)
+        return loss_func, array_of_results, waves, len_modes_arr
         # return np.asarray(loss_func, dtype=float), np.asarray(collected_arr, dtype=float)
 
 def read_port_mon_file(filepath = ""):
@@ -1388,6 +1428,22 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
+import re
+
+LABEL_MAP = {
+    "LP01": "LP01",
+    "LP11": "LP11a",
+    "LP-11": "LP11b",
+    "LP21": "LP21a",
+    "LP-21": "LP21b",
+    "LP02": "LP02",
+}
+
+def canonical_label(lab: str) -> str:
+    # "1.5_LP-11" -> "LP-11"
+    lab = re.sub(r"^[0-9]*\.?[0-9]+_", "", str(lab))
+    return LABEL_MAP.get(lab, lab)
+
 def plot_pl_results(
     *,
     simulation_val: dict,
@@ -1399,8 +1455,8 @@ def plot_pl_results(
     grid_size_range=None,
     # polychromatic inputs
     df_wave_log: pd.DataFrame | None = None,
-    modes_to_monitor=("LP01",),
-    mode_reorder=(0, 5, 1, 2, 3, 4),
+    modes_to_monitor=("LP01"),
+    mode_reorder=[0, 5, 1, 2, 3, 4],
     reorder=True,
     image_dir=r"C:\Users\RSoft Things\Desktop\Results\Images",
     combined_dir=r"C:\Users\RSoft Things\Desktop\RSoft-Automaton",
@@ -1420,7 +1476,6 @@ def plot_pl_results(
 
     core_number = simulation_val["core_num"]
     modes_to_monitor = list(modes_to_monitor)
-    mode_reorder = list(mode_reorder)
 
     os.makedirs(image_dir, exist_ok=True)
 
@@ -1495,20 +1550,33 @@ def plot_pl_results(
 
     for _, row in df_wave_log.sort_values("wavelength").iterrows():
         w = float(row["wavelength"])
-
+        
         amp = np.asarray(row["Core Amplitudes"])
         phase = np.asarray(row["Core Phases"])
         ex_amp = np.asarray(row["Extra Amplitudes"])
         ex_phase = np.asarray(row["Extra Phases"])
 
-        # reorder modes along axis 0
-        amp = amp[mode_reorder, :]
-        phase = phase[mode_reorder, :]
+        mode_order = ["LP01", "LP11a", "LP11b", "LP21a", "LP21b", "LP02"]
 
+        labels = row["Mode Labels"]
+        labels = [canonical_label(x) for x in labels]
+
+        # build indices to reorder rows into mode_order
+        idx = []
+        for m in mode_order:
+            if m not in labels:
+                raise ValueError(f"Missing mode {m} in labels={labels}")
+            idx.append(labels.index(m))
+
+        amp   = np.asarray(row["Core Amplitudes"])[idx, :]
+        phase = np.asarray(row["Core Phases"])[idx, :]
+
+        ex_amp   = np.asarray(row["Extra Amplitudes"])
+        ex_phase = np.asarray(row["Extra Phases"])
         if ex_amp.size:
-            ex_amp = ex_amp[mode_reorder, :]
+            ex_amp = ex_amp[idx, :]
         if ex_phase.size:
-            ex_phase = ex_phase[mode_reorder, :]
+            ex_phase = ex_phase[idx, :]
 
         max_value = print_max_amp_or_phase_value(amp)
 
@@ -1721,7 +1789,9 @@ def assign_17modes_to_tflist(tf_list, simulation_val):
         ("LP41a", tf_list[10]),
         ("LP41b", tf_list[11]),
         ("LP51a", tf_list[15]),
-        ("LP51b", tf_list[16])
+        ("LP51b", tf_list[16]),
+        ("LP32a", tf_list[17]),
+        ("LP32b", tf_list[18])
         ]
     elif core_num == 7 or geo == "Pent":
         tf_vectors_phase = [
@@ -1892,7 +1962,7 @@ def plot_combined_tf_matrix(simulation_val, amp, phase, ex_amp, ex_phase, core_n
     cb_ax.tick_params(axis='y', right=True, labelright=True, left=False, labelleft=False)
     cb_ax.yaxis.set_label_position("right")
 
-    plt.tight_layout()
+    # plt.tight_layout()
     save_dir = dir + "\\" + name
     plt.savefig(save_dir, bbox_inches="tight", dpi = 300)
     plt.close()
@@ -2396,6 +2466,30 @@ class lanternfiber:
         plt.pause(0.001)
         print('LP mode %d, %d' % (self.allmodes_l[mode_to_plot], self.allmodes_m[mode_to_plot]))
 ########################################################################################################################################################################################################################################################################################
+
+def coarse_sampler(best_vals, density = 4):
+    half_widths = []
+    best = np.array([best_vals[x] for x in best_vals])
+
+    for y in best_vals:
+        if y == "core_diam":
+            half_widths.append(best_vals[y] * 0.1)
+        if y == "core_neff":
+            half_widths.append(best_vals[y] * 0.001)
+        if y == "Taper_L":
+            half_widths.append(best_vals[y] * 0.01)
+
+    # search window
+    half_widths = np.array(half_widths)
+
+    ns = np.array([density] * len(best)) # resolution; number of samples per parameter
+
+    grids = [np.linspace(best[i]-half_widths[i], best[i]+half_widths[i], ns[i]) for i in range(len(best))]
+
+    # All parameter combinations
+    param_grid = np.array(list(itertools.product(*grids)))  # shape (N, len(best)), e.g. N = n1*n2*n3
+    return param_grid
+
 def read_neff_values(filepath):
     with open(filepath, "r") as f:
         # convert to floats, remove empty lines
@@ -2426,3 +2520,147 @@ def sample_range(custom_priors, bestvals, shrink=15.0):
 
         sample_spaces[name] = (low, high)
     return sample_spaces
+
+def plot_param_progression(tf_list, simulation_val, param_label_vector):
+    '''
+    save results for plotting/analysis
+    '''
+    # Unpack results
+    param_label_1, param_label_2, param_label_3 = param_label_vector 
+    x_iters = [r["params"] for r in tf_list]  # parameter sets
+    y_vals = [r["result"] for r in tf_list]  # throughput values
+    metric = [r["Loss Metric"] for r in tf_list] # array containing the loss metrics
+
+    simulated_wavelength = np.array([arr[:,0] for arr in metric])
+    unique_waves = np.unique(simulated_wavelength)
+    a = np.array([arr[:,1] for arr in metric])
+    b = np.array([arr[:,2] for arr in metric])
+    c = np.array([arr[:,3] for arr in metric])
+    d = np.array([arr[:,4] for arr in metric])
+
+    batch_numbers = [r['Iteration'] for r in tf_list]
+
+    # core_neff = [params[0] for params in x_iters]
+    core_diam = [params[0] for params in x_iters]
+    core_neff = [params[1] for params in x_iters]
+    taper_length = [params[2] for params in x_iters]
+    throughput = [y for y in y_vals]  
+    hyp_param_b = simulation_val.get("hyp_param_b", Simulation_params["hyp_param_b"])
+    hyp_param_c = simulation_val.get("hyp_param_c", Simulation_params["hyp_param_c"])
+
+    fig_metric, axes_metric = plt.subplots(2,2, figsize = (8,8), sharex = True)
+    for j, w in enumerate(unique_waves):
+        ax = axes_metric[0,0] 
+        ax.scatter(batch_numbers, a[:,j], label=f"{w} µm")
+        ax.set_ylabel("a")
+
+        ax = axes_metric[0,1]
+        ax.scatter(batch_numbers, b[:,j], label=f"{w} µm")
+        ax.set_ylabel("b")
+
+        ax = axes_metric[1,0]
+        ax.scatter(batch_numbers, c[:,j],label=f"{w} µm")
+        ax.set_ylabel("c")
+        ax.set_xlabel("Iteration number")
+
+        ax = axes_metric[1,1]
+        ax.scatter(batch_numbers, d[:,j],label=f"{w} µm")
+        ax.set_ylabel("d")
+        ax.set_xlabel("Iteration number")
+    plt.suptitle(f"Metric results for {simulation_val['num_paras']} parameters \n and hyper parameters of {hyp_param_b} and {hyp_param_c}")
+    fig_metric.legend()
+    fig_metric.tight_layout()
+    fig_metric.show()
+    fig_metric.savefig(f"Bayesian Opt Results\{simulation_val['num_paras']}_params_gridsize_{simulation_val['grid_size']}bayesianmetric_hyperparam{hyp_param_b}_{hyp_param_c}.png")
+
+    # make 3d scatter plot and individual parameter plots
+    fig = plt.figure(figsize=(14, 8))
+    gs = gridspec.GridSpec(3, 2, width_ratios=[1, 2])  # 3 rows, 2 columns
+    plt.suptitle(f"Bayesian Optimiser Results for {simulation_val['num_paras']} parameter sets \n with hyperparams {hyp_param_b} and {hyp_param_c}.png")
+    # Core neff vs Core diameter
+    ax1 = fig.add_subplot(gs[0, 0])
+    comp1 = ax1.scatter(core_diam, core_neff, c=throughput, cmap='viridis_r', s=80, edgecolor='k')
+    ax1.set_xlabel(param_label_1)
+    ax1.set_ylabel(param_label_2)
+
+    # Taper ratio vs Core diameter
+    ax2 = fig.add_subplot(gs[1, 0])
+    comp2 = ax2.scatter(core_diam, taper_length, c=throughput, cmap='viridis_r', s=80, edgecolor='k')
+    ax2.set_xlabel(param_label_1)
+    ax2.set_ylabel(param_label_3)
+
+    # Taper ratio vs Core neff
+    ax3 = fig.add_subplot(gs[2, 0])
+    comp3 = ax3.scatter(core_neff, taper_length, c=throughput, cmap='viridis_r', s=80, edgecolor='k')
+    ax3.set_xlabel(param_label_2)
+    ax3.set_ylabel(param_label_3)
+
+    ax4 = fig.add_subplot(gs[:, 1], projection='3d')
+    comp3d = ax4.scatter(core_diam, core_neff, taper_length, c=throughput, cmap='viridis_r', s=50, edgecolor='k')
+    ax4.set_xlabel(param_label_1)
+    ax4.set_ylabel(param_label_2)
+    ax4.set_zlabel(param_label_3)
+    cbar4 = plt.colorbar(comp3d, ax=ax4, shrink=0.6)
+    cbar4.set_label("Loss Function")
+
+    plt.tight_layout()
+    plt.show()
+    fig.savefig(f"Bayesian Opt Results\{simulation_val['num_paras']}_params_gridsize_{simulation_val['grid_size']}bayesianresult_hyperparam{hyp_param_b}_{hyp_param_c}.png")
+
+    np.save(f"Bayesian Opt Results\{simulation_val['num_paras']}_params_gridsize_{simulation_val['grid_size']}list_of_results_hyperparam{hyp_param_b}_{hyp_param_c}.npy", tf_list, allow_pickle = True)
+
+###################################################################################################################################################################################################################################################
+def find_nearest(arr, val):
+    """
+    Function to find the index of the nearest value nearest of some number in an array.
+
+    Inputs:
+        arr: array to search
+        val: float to find the nearest number of
+    Returns:
+        array[idx]: array value that is closest to the required number
+        idx: index of the required number
+    """
+    array = np.asarray(arr)
+    idx = (np.abs(array - val)).argmin()
+    return array[idx], idx
+
+###################################################################################################################################################################################################################################################
+
+def find_field_base_filenames(folder, wave, field=("ex", "ey", "hx", "hy")):
+    """
+    Copies LP01 FEM field files (*_ex/_ey/_hx/_hy.m00) for a given wavelength
+    into the working directory.
+
+    Returns:
+        list of unique base filenames (ending in .m00)
+    """
+    folder = Path(folder)
+    wave = str(wave)
+    cwd = Path.cwd()
+
+    suffixes = tuple(f"_{f}.m00" for f in field)
+    base_files = set()
+
+    for f in folder.iterdir():
+        if not f.is_file():
+            continue
+
+        name = f.name.lower()
+
+        if f"_{wave}_lp01_" not in name:
+            continue
+
+        if not name.endswith(suffixes):
+            continue
+
+        # identify which field suffix
+        for fi in field:
+            suf = f"_{fi}.m00"
+            if name.endswith(suf):
+                base_name = f.name[:-len(suf)] + ".m00"
+                shutil.copy2(f, cwd / f.name)
+                base_files.add(base_name)
+                break
+
+    return sorted(base_files)

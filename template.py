@@ -4,16 +4,16 @@ import random, numpy as np
 NOTE: Using values from 19CorePL_July2021_noOuter_MMtoSM_extraMM.ind
 '''
 fixed_params = {
-    "core_sep": 35, #35, # 120
+    "core_sep": 35, # 120, 60
     "MCFCladd": 125, # 380 #125
     # "core_claddings": None, 
     "core_cladding_diam": None, # None #80,
-    "cladding_neff": 1.44,#0.0055, #0.0095,
+    "cladding_neff": 1.44, # pure silica
     "core_cladding_neff": None,
     "cen_core_cladding_neff": None,#0.00949,
     # "Taper_L": 50000, #45000
     # "core_neff": 0.0122895, #0.015,
-    "taper": 6.25, #7.33207692,
+    "taper": 6.25, #7.33207692, 5.3
     # "core_diam": 8.2,
     "alpha": 0,
     "length_hyperparam": 0.01
@@ -34,7 +34,7 @@ RSoft_params = {
     "field_output_format": "OUTPUT_AMP_PHASE",
     "slice_output_format": "OUTPUT_AMP_PHASE",
     "slice_output_individual": "None", # OUTPUT_AMP_PHASE_3D
-    "background_index": 1.4345,
+    "background_index": 1.4345, 
     "sim_tool": Sim_tool.BP,
     "launch_align_file": 1,
     "launch_normalization": 1,
@@ -100,17 +100,17 @@ else:
     RSoft_params["free_space_wavelength"] = Simulation_params["free_space_wavelength"]
 RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
 
-bestvals = {                      
-    # "core_diam": 7.697149,
-    # "core_neff": 1.446386,
-    # "Taper_L": 43864.607645
+bestvals = {         		            
+    # "core_diam": 7.137965, #9.625706,#7.697149, 		
+    # "core_neff": 1.449995, #1.448226,#1.446386,
+    # "Taper_L": 49862.309974 #47182.42891#43864.607645
 }
 
 variable_params= {
-    "core_diam": 6.5, # np.array([30.0])
-    "core_neff": 1.4467895,#0.0122895, #0.0157,#
+    "core_diam": 6.5, # using 3D mode val: 8.104383, 4.36,#
+    "core_neff": 1.4467895, #1.45, # using 3D mode val: 1.449049,
     # "taper": 6.55789308, #22, #8.53
-    "Taper_L": 50000,
+    "Taper_L":  50000, # using 3D mode val: 48587.538152
 }       
 
 # Assign core_neffs here 
@@ -142,8 +142,8 @@ for i in range(1, Simulation_params["core_num"] + 1):
 
     elif "core_diam" in variable_params and "core_neff" in variable_params:
         core_params[f"core_{i}"] = {
-        "core_diam": 6.5, #6.5,#variable_params["core_diam"],
-        "neff": 1.4467895-RSoft_params["background_index"], #variable_params["core_neff"] 
+        "core_diam": 6.5,#variable_params["core_diam"],
+        # "neff": 1.4467895-RSoft_params["background_index"], #variable_params["core_neff"], 1.442906 2 mol% Ge, 1.4467895
         "taper": variable_params.get("taper", fixed_params.get("taper"))
         }
     elif "core_neff" in fixed_params:
