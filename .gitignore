@@ -1,0 +1,14 @@
+# FemSIM files
+*m00
+
+# Data files
+*.npy
+*.json
+
+# OS
+.DS_Store
+
+# ignore folders
+Vids/
+"Bayesian Opt Results/"
+"Unused Files/"

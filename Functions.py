@@ -1079,7 +1079,7 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
     tf_list_params_results = list(zip(params, results))
     core_num = simulation_val["core_num"]
     # search for each Guided Mode csv file created and pick only the most recent one to read, since they are all the same.
-    guided_mode_pattern = os.path.join(folder, "Guided Modes_*.csv")
+    guided_mode_pattern = os.path.join(folder, "*_Guided Modes_*.csv")
     matches = glob.glob(guided_mode_pattern)
     if not matches:
         raise FileNotFoundError(f"No Guided Modes_*.csv files found in {folder}")
@@ -1193,7 +1193,7 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
         loss_arr.append(loss_func)
         collected_arr.append(array_of_results)
         len_modes_arr.append(num_modes)
-        return loss_func, array_of_results, waves, len_modes_arr
+        return loss_func, array_of_results, waves, np.array(len_modes_arr)
         # return np.asarray(loss_func, dtype=float), np.asarray(collected_arr, dtype=float)
 
 def read_port_mon_file(filepath = ""):
@@ -1464,7 +1464,7 @@ def plot_pl_results(
     extract_portmon_amp_phase=None,
     plot_tf_matrix=None,
     plot_combined_tf_matrix=None,
-    print_max_amp_or_phase_value=None,
+    # print_max_amp_or_phase_value=None,
     use_seaborn_grid_plot=False,
     sns=None,
 ):
@@ -1542,43 +1542,64 @@ def plot_pl_results(
     # ------------------------------------------------------------
     if df_wave_log is None or len(df_wave_log) == 0:
         raise ValueError("For gridding=False you must provide a non-empty df_wave_log.")
-    if plot_tf_matrix is None or plot_combined_tf_matrix is None or print_max_amp_or_phase_value is None:
-        raise ValueError("plot_tf_matrix, plot_combined_tf_matrix, print_max_amp_or_phase_value must be passed in.")
+    if plot_tf_matrix is None or plot_combined_tf_matrix is None:
+        raise ValueError("plot_tf_matrix, plot_combined_tf_matrix must be passed in.")
 
     written = []
     tf_labels = ["Amplitude", "Phase"]
 
-    for _, row in df_wave_log.sort_values("wavelength").iterrows():
-        w = float(row["wavelength"])
-        
-        amp = np.asarray(row["Core Amplitudes"])
-        phase = np.asarray(row["Core Phases"])
-        ex_amp = np.asarray(row["Extra Amplitudes"])
-        ex_phase = np.asarray(row["Extra Phases"])
+    core_amp_cols = sorted(
+        [c for c in df_wave_log.columns if c.startswith("Core_") and c.endswith("_Amp")],
+        key=lambda s: int(s.split("_")[1])
+    )
+    core_phase_cols = sorted(
+        [c for c in df_wave_log.columns if c.startswith("Core_") and c.endswith("_Phase")],
+        key=lambda s: int(s.split("_")[1])
+    )
 
-        mode_order = ["LP01", "LP11a", "LP11b", "LP21a", "LP21b", "LP02"]
+    extra_amp_cols = sorted(
+        [c for c in df_wave_log.columns if c.startswith("Extra_") and c.endswith("_Amp")],
+        key=lambda s: int(s.split("_")[1])
+    )
+    extra_phase_cols = sorted(
+        [c for c in df_wave_log.columns if c.startswith("Extra_") and c.endswith("_Phase")],
+        key=lambda s: int(s.split("_")[1])
+    )
 
-        labels = row["Mode Labels"]
-        labels = [canonical_label(x) for x in labels]
+    # Group rows by wavelength
+    for w, group in df_wave_log.sort_values("Wavelength").groupby("Wavelength"):
 
-        # build indices to reorder rows into mode_order
+        # reconstruct matrices
+        amp = group[core_amp_cols].to_numpy(dtype=float)
+        phase = group[core_phase_cols].to_numpy(dtype=float)
+
+        if extra_amp_cols:
+            ex_amp = group[extra_amp_cols].to_numpy(dtype=float)
+            ex_phase = group[extra_phase_cols].to_numpy(dtype=float)
+        else:
+            ex_amp = np.empty((amp.shape[0], 0))
+            ex_phase = np.empty((amp.shape[0], 0))
+
+        # injected modes in this wavelength
+        labels = group["Injected Mode"].tolist()
+
+        # reorder rows to match desired canonical order
+        mode_order = ["_LP01", "_LP11a", "_LP11b", "_LP21a", "_LP21b", "_LP02"]
+
         idx = []
         for m in mode_order:
-            if m not in labels:
-                raise ValueError(f"Missing mode {m} in labels={labels}")
-            idx.append(labels.index(m))
+            for i, l in enumerate(labels):
+                if l.endswith(m):
+                    idx.append(i)
 
-        amp   = np.asarray(row["Core Amplitudes"])[idx, :]
-        phase = np.asarray(row["Core Phases"])[idx, :]
-
-        ex_amp   = np.asarray(row["Extra Amplitudes"])
-        ex_phase = np.asarray(row["Extra Phases"])
+        amp = amp[idx, :]
+        phase = phase[idx, :]
         if ex_amp.size:
             ex_amp = ex_amp[idx, :]
         if ex_phase.size:
             ex_phase = ex_phase[idx, :]
 
-        max_value = print_max_amp_or_phase_value(amp)
+        # max_value = print_max_amp_or_phase_value(amp)
 
         tf_figure = plt.figure(figsize=(20, 12))
         param_str = ", ".join(f"{p:.3f}" for p in params)
@@ -1651,11 +1672,16 @@ def plot_pl_results(
 
         for i, (lab, tf_type, ex_type) in enumerate(zip(tf_labels, tf_to_plot, tf_to_plot_ex)):
             plot_phase = (lab == "Phase")
-            plot_tf_matrix(
-                tf_type, simulation_val, ex_type,
-                matrix_type=f"{lab}", ax=axes[i],
-                cbar=True, reorder=reorder, phase=plot_phase
-            )
+
+            tf_vectors = list(zip(group["Injected Mode"], tf_type))
+            extra_tf_vectors = list(zip(group["Injected Mode"], tf_to_plot_ex))
+            plot_tf_matrix(tf_vectors, simulation_val, extra_tf_vectors, matrix_type=f"{lab}", ax=axes[i],
+                cbar=True, reorder=reorder, phase=plot_phase)
+            # plot_tf_matrix(
+            #     tf_type, simulation_val, ex_type,
+            #     matrix_type=f"{lab}", ax=axes[i],
+            #     cbar=True, reorder=reorder, phase=plot_phase
+            # )
             ax2.set_ylabel(None)
 
         # combined matrix plot
@@ -1663,9 +1689,13 @@ def plot_pl_results(
             f"TF_Combined_{simulation_val['core_num']}c{simulation_val['grid_type']}PL_"
             f"iter{iteration_num:04d}_lam{w:.4g}.png"
         )
+
         plot_combined_tf_matrix(
-            simulation_val, amp, phase, ex_amp, ex_phase, core_number,
-            amp_max=max_value,
+            simulation_val,
+            amp, phase,
+            ex_amp, ex_phase,
+            core_number,
+            labels=group["Injected Mode"].tolist(),
             dir=combined_dir,
             name=combined_name
         )
@@ -1680,45 +1710,63 @@ def plot_pl_results(
 
     return {"wavelength_plots": written}
 
-def extract_portmon_amp_phase(tf_list, core_num, grid_size_range=None):
+# def extract_portmon_amp_phase(tf_list, core_num, grid_size_range=None):
 
-    og_amp_list = []
-    og_phase_list = []
-    ex_amp_list = []
-    ex_phase_list = []
-    tf_result = []
+#     og_amp_list = []
+#     og_phase_list = []
+#     ex_amp_list = []
+#     ex_phase_list = []
+#     tf_result = []
 
-    for tf in tf_list:
-        arrs = np.array(tf).flatten()
-        tf_result.append(arrs)
+#     for tf in tf_list:
+#         arrs = np.array(tf).flatten()
+#         tf_result.append(arrs)
 
-        amps = arrs[1::2]
-        phases = np.deg2rad(arrs[2::2])
+#         amps = arrs[1::2]
+#         phases = np.deg2rad(arrs[2::2])
 
-        # Correct separation:
-        og_amp = amps[:core_num]
-        og_phase = phases[:core_num]
-        og_amp_list.append(og_amp)
-        og_phase_list.append(og_phase)
+#         # Correct separation:
+#         og_amp = amps[:core_num]
+#         og_phase = phases[:core_num]
+#         og_amp_list.append(og_amp)
+#         og_phase_list.append(og_phase)
 
-        if grid_size_range is None:
-            ex_amp = amps[core_num:]
-            ex_phase = phases[core_num:]
-            ex_amp_list.append(ex_amp)
-            ex_phase_list.append(ex_phase)
+#         if grid_size_range is None:
+#             ex_amp = amps[core_num:]
+#             ex_phase = phases[core_num:]
+#             ex_amp_list.append(ex_amp)
+#             ex_phase_list.append(ex_phase)
 
-    # Convert to 2D arrays (modes × cores)
-    og_amp_arr = np.array(og_amp_list)
-    og_phase_arr = np.array(og_phase_list)
+#     # Convert to 2D arrays (modes × cores)
+#     og_amp_arr = np.array(og_amp_list)
+#     og_phase_arr = np.array(og_phase_list)
+#     if grid_size_range is None:
+#         ex_amp_arr = np.array(ex_amp_list)
+#         ex_phase_arr = np.array(ex_phase_list)
+
+#     # Optional grid-size return
+#     if grid_size_range is not None:
+#         return og_amp_arr, og_phase_arr, list(grid_size_range), tf_result
+
+#     return og_amp_arr, og_phase_arr, ex_amp_arr, ex_phase_arr, tf_result
+
+def extract_portmon_amp_phase(tf_list, core_num, grid_size_range = None):
+    tf_result = [np.asarray(tf, dtype=float).ravel() for tf in tf_list]
+
+    tf_mat = np.vstack(tf_result)
+
+    amps = tf_mat[:, 1::2]
+    phases = np.deg2rad(tf_mat[:, 2::2])
+
+    og_amp_arr = amps[:, :core_num]
+    og_phase_arr = phases[:, :core_num]
+
     if grid_size_range is None:
-        ex_amp_arr = np.array(ex_amp_list)
-        ex_phase_arr = np.array(ex_phase_list)
-
-    # Optional grid-size return
-    if grid_size_range is not None:
-        return og_amp_arr, og_phase_arr, list(grid_size_range), tf_result
-
-    return og_amp_arr, og_phase_arr, ex_amp_arr, ex_phase_arr, tf_result
+        ex_amp_arr = amps[:, core_num:]
+        ex_phase_arr = phases[:, core_num:]
+        return og_amp_arr, og_phase_arr, ex_amp_arr, ex_phase_arr, tf_mat
+    
+    return og_amp_arr, og_phase_arr, np.asarray(list(grid_size_range)), tf_mat
 
 def reorder_tf_vectors(tf_vector, simulation_val):
     """
@@ -1811,144 +1859,162 @@ def plot_tf_matrix(tf_vectors, simulation_val, extra_modes,
     core_num = simulation_val["core_num"]
     core_to_monitor = simulation_val["core_to_monitor"]
 
-    # reordering value index and assigning labels 
-    tf_vectors = assign_17modes_to_tflist(tf_vectors, simulation_val)
+    # ------------------------------
+    # Unpack main TF
+    # ------------------------------
+    labels, vectors = zip(*tf_vectors)
+    tf_matrix = np.array(vectors, dtype=float).T  # (cores × modes)
 
-    if reorder:
-        label, tf_matrix = reorder_tf_vectors(tf_vectors, simulation_val)
+    # ------------------------------
+    # Unpack extra TF
+    # ------------------------------
+    if extra_modes:
+        _, extra_vectors = zip(*extra_modes)
+        extra_matrix = np.array(extra_vectors, dtype=float).T
     else:
-        label, tf_matrix = [(lab, vec) for lab, vec in tf_vectors]
+        extra_matrix = np.empty((0, tf_matrix.shape[1]))
 
-    
-    tf_matrix = np.array(tf_matrix).T          # shape (cores × modes)
-    extra_matrix = np.array(extra_modes).T     # shape (extra × modes)
+    # ------------------------------
+    # Safe vmin/vmax
+    # ------------------------------
+    vmin = tf_matrix.min()
+    vmax = tf_matrix.max()
 
-    vmin = min(tf_matrix.min(), extra_matrix.min())
-    vmax = max(tf_matrix.max(), extra_matrix.max())
+    if extra_matrix.size:
+        vmin = min(vmin, extra_matrix.min())
+        vmax = max(vmax, extra_matrix.max())
 
     cmap = "twilight_shifted" if phase else "viridis"
 
-    fig = None
-
+    # ------------------------------
+    # Ax handling
+    # ------------------------------
     if isinstance(ax, plt.Axes):
-
         fig = ax.get_figure()
-
-        # hide original axis
         ax.set_visible(False)
-
-        # create inset sub-axes
         gs = ax.get_subplotspec().subgridspec(
             2, 1, height_ratios=[1, 0.5], hspace=0.05
         )
-
         ax1 = fig.add_subplot(gs[0])
         ax2 = fig.add_subplot(gs[1])
-
     else:
-        # assume ax is iterable of length 2
         ax1, ax2 = ax
         fig = ax1.get_figure()
 
-    # ----------------------------------------------------
-    # Plot main transfer matrix
-    # ----------------------------------------------------
+    # ------------------------------
+    # Main matrix
+    # ------------------------------
     im_main = ax1.imshow(tf_matrix, cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
     ax1.set_xticks([])
     ax1.set_yticks(range(core_num))
     ax1.set_yticklabels([f"{i+1}" for i in range(core_num)], fontsize=10)
     ax1.set_ylabel("Output Core", fontsize=12)
 
-    # ----------------------------------------------------
-    # Plot extra-modes matrix
-    # ----------------------------------------------------
-    im_extra = ax2.imshow(extra_matrix, cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
+    # ------------------------------
+    # Extra matrix
+    # ------------------------------
+    if extra_matrix.size:
+        im_extra = ax2.imshow(extra_matrix, cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
 
-    ax2.set_xticks(range(len(label)))
-    ax2.set_xticklabels(label, rotation=90, fontsize=10)
+        ax2.set_xticks(range(len(labels)))
+        ax2.set_xticklabels([l.split("_")[-1] for l in labels], rotation=90, fontsize=10)
 
-    # dynamic labels (auto trims if fewer extra rows)
-    lp_names = ["LP11a", "LP11b", "LP21a", "LP21b", "LP02"]
-    ax2.set_yticks(range(extra_matrix.shape[0]))
-    ax2.set_yticklabels([fr"${core_to_monitor}_{{{m}}}$" for m in lp_names[:extra_matrix.shape[0]]], fontsize=10)
+        lp_names = ["LP11a", "LP11b", "LP21a", "LP21b", "LP02"]
+        ax2.set_yticks(range(extra_matrix.shape[0]))
+        ax2.set_yticklabels(
+            [fr"${core_to_monitor}_{{{m}}}$" for m in lp_names[:extra_matrix.shape[0]]],
+            fontsize=10
+        )
+    else:
+        im_extra = None
+        ax2.text(0.5, 0.5, "No extra modes", ha="center", va="center", transform=ax2.transAxes)
+        ax2.set_xticks([])
+        ax2.set_yticks([])
 
     ax2.set_xlabel("Input Mode", fontsize=12)
 
-    # make shared colourbar
     if cbar:
-        cbar_obj = fig.colorbar(im_main, ax=[ax1, ax2])
-        cbar_obj.set_label(matrix_type, fontsize=14)
+        fig.colorbar(im_main, ax=[ax1, ax2]).set_label(matrix_type, fontsize=14)
 
     return im_main, im_extra
 
-def plot_combined_tf_matrix(simulation_val, amp, phase, ex_amp, ex_phase, core_num, phase_max = 2*np.pi, amp_max = 1.0, dir = "", name = ""):
+def plot_combined_tf_matrix(
+    simulation_val,
+    amp,
+    phase,
+    ex_amp,
+    ex_phase,
+    core_num,
+    labels,
+    phase_max=2*np.pi,
+    amp_max=1.0,
+    dir="",
+    name=""
+):
     """
-    Function used to combine both amplitude and phase transfer matrices into one joined matrix.
+    Combine amplitude and phase into complex transfer matrix image.
+    Assumes amp, phase already ordered correctly by mode.
+    """
 
-    Arguments:
-        - amp: numpy array containing amplitude values
-        - phase: numpy array containing phase values
-        - core_num: number of cores specified in either simulation_val or Simulation_Params
-        - dir: string pointing to the save directory
-        - name: name of the image to save
-    
-    Return:
-        - Transfer matrix containing the phase and amplitude for each core and mode
-    """
     resolution = 500
     phase_min = 0
-    phase_max = phase_max
     amp_min = 0
-    amp_max = amp_max
 
-    amp_matrix = np.vstack(amp)
-    phase_matrix = np.vstack(phase)
-    ex_amp_matrix = np.vstack(ex_amp)
-    ex_phase_matrix = np.vstack(ex_phase)
+    # amp and phase are already (n_modes, n_cores)
+    comp_matrix = amp * np.exp(1j * phase)
+    ex_comp_matrix = ex_amp * np.exp(1j * ex_phase) if ex_amp.size else np.empty((0, amp.shape[1]))
 
-    comp_matrix = amp_matrix * np.exp(1j * phase_matrix)
-    ex_comp_matrix = ex_amp_matrix * np.exp(1j * ex_phase_matrix)
+    # convert to image format (core × mode × RGB)
+    amp_phase_img = np.transpose(
+        apply_complex_map(comp_matrix, cmocean.cm.phase),
+        (1, 0, 2)
+    )
 
-    comp_tf_vector = assign_17modes_to_tflist(comp_matrix, simulation_val)
+    if ex_comp_matrix.size:
+        ex_amp_phase_img = np.transpose(
+            apply_complex_map(ex_comp_matrix, cmocean.cm.phase),
+            (1, 0, 2)
+        )
+    else:
+        ex_amp_phase_img = np.zeros((1, amp_phase_img.shape[1], 3))
 
-    label, tf_matrix = reorder_tf_vectors(comp_tf_vector, simulation_val)
+    amp_phase_colorbar = generate_complex_colorbar(resolution=resolution)
 
-    amp_phase_img = np.transpose(apply_complex_map(tf_matrix, cmocean.cm.phase), (1, 0, 2))
-    ex_amp_phase_img = np.transpose(apply_complex_map(ex_comp_matrix, cmocean.cm.phase), (1, 0, 2))
-    amp_phase_colorbar = generate_complex_colorbar(resolution = resolution)
-    norm = Normalize(vmin = 0, vmax = 1.0)
-
-    fig, ax = plt.subplots(2, 1, figsize=(14,8))
+    fig, ax = plt.subplots(2, 1, figsize=(14, 8))
     ax1, ax2 = ax
-    im1 = ax1.imshow(amp_phase_img, aspect='auto', origin='lower')
+
+    # ----------------------------
+    # Main transfer matrix
+    # ----------------------------
+    ax1.imshow(amp_phase_img, aspect='auto', origin='lower')
     ax1.set_xticks([])
     ax1.set_yticks(range(core_num))
     ax1.set_yticklabels([f"{i+1}" for i in range(core_num)], fontsize=10)
     ax1.set_ylabel("Output Core", fontsize=12)
-    ax1.set_title("Complex Transfer Matrix (Amplitude+Phase)", fontsize = 18)
+    ax1.set_title("Complex Transfer Matrix (Amplitude+Phase)", fontsize=18)
 
-    im2 = ax2.imshow(ex_amp_phase_img, aspect='auto', origin='lower')
-    ax2.set_xticks(range(len(label)))
-    ax2.set_xticklabels(label, rotation=90, fontsize=10)
+    # ----------------------------
+    # Extra matrix
+    # ----------------------------
+    ax2.imshow(ex_amp_phase_img, aspect='auto', origin='lower')
+    ax2.set_xticks(range(len(labels)))
+    ax2.set_xticklabels([l.split("_")[-1] for l in labels], rotation=90, fontsize=10)
 
-    # dynamic labels (auto trims if fewer extra rows)
-    lp_names = ["LP11a", "LP11b", "LP21a", "LP21b", "LP02"]
     ax2.set_yticks(range(ex_amp_phase_img.shape[0]))
-    ax2.set_yticklabels([f"${simulation_val['core_to_monitor']}_{{{m}}}$" for m in lp_names[:ex_amp_phase_img.shape[0]]], fontsize=10)
-
+    ax2.set_ylabel("Extra Modes")
     ax2.set_xlabel("Input Mode", fontsize=12)
-    plt.gca().invert_yaxis()
 
-    cb_ax = fig.add_axes([1, 0.15, 0.03, 0.8])  
-    cb_ax.imshow(amp_phase_colorbar, aspect='auto', origin='lower') #, norm = norm
+    # ----------------------------
+    # Custom complex colourbar
+    # ----------------------------
+    cb_ax = fig.add_axes([1, 0.15, 0.03, 0.8])
+    cb_ax.imshow(amp_phase_colorbar, aspect='auto', origin='lower')
 
     phase_tick_vals = [0, np.pi/2, np.pi, 3*np.pi/2, 2*np.pi]
     phase_tick_labels = [r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2\pi$"]
+
     amp_tick_vals = [0, amp_max]
-    if amp_max < 0.5:
-        amp_tick_labels = ["0", "0.5"]
-    elif amp_max >= 0.5:
-        amp_tick_labels = ["0", "1"]
+    amp_tick_labels = ["0", "1"]
 
     yticks = [phase_to_pixel(val, phase_min, phase_max, resolution) for val in phase_tick_vals]
     xticks = [phase_to_pixel(val, amp_min, amp_max, resolution) for val in amp_tick_vals]
@@ -1962,25 +2028,24 @@ def plot_combined_tf_matrix(simulation_val, amp, phase, ex_amp, ex_phase, core_n
     cb_ax.tick_params(axis='y', right=True, labelright=True, left=False, labelleft=False)
     cb_ax.yaxis.set_label_position("right")
 
-    # plt.tight_layout()
-    save_dir = dir + "\\" + name
-    plt.savefig(save_dir, bbox_inches="tight", dpi = 300)
+    save_path = os.path.join(dir, name)
+    plt.savefig(save_path, bbox_inches="tight", dpi=300)
     plt.close()
 
-def print_max_amp_or_phase_value(array):
-        """
-        Function that loops through each element in the array and prints out the maximum value
+# def print_max_amp_or_phase_value(array):
+#         """
+#         Function that loops through each element in the array and prints out the maximum value
 
-        Arguments:
-            - array: 1D array of values
-        Returns:
-            - maximum value in the array
-        """
-        max_val = []
-        for i in array:
-            max_val.append(max(i))
-        max_value = max(max_val)
-        return max_value
+#         Arguments:
+#             - array: 1D array of values
+#         Returns:
+#             - maximum value in the array
+#         """
+#         max_val = []
+#         for i in array:
+#             max_val.append(max(i))
+#         max_value = max(max_val)
+#         return max_value
 #######################################################################################################################################################
 def assign_core_properties(simulation_val):
     '''
@@ -2664,3 +2729,25 @@ def find_field_base_filenames(folder, wave, field=("ex", "ey", "hx", "hy")):
                 break
 
     return sorted(base_files)
+
+
+def fem_fields_present(base_name, fields=("ex", "ey", "hx", "hy")):
+    """
+    Check whether FEM field files for a given base name
+    already exist in the current working directory.
+
+    base_name: e.g.
+      FemSim_File_DET_1.5_LP01_core_diam_..._Taper_L_....m00
+    """
+    cwd = Path.cwd()
+    stem = base_name[:-7]  # strip "_ex_.m00"
+    discovered_files = []
+    for f in fields:
+        path_to_check = cwd / f"{stem}_{f}.m00"
+        if not (path_to_check).exists():
+            return False
+        else:
+            discovered_files.append(path_to_check)
+    discovered_files = np.array(discovered_files)
+    print(f"Found {len(discovered_files)} existing FemSIM files. Using these.")
+    return True

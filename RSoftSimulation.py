@@ -146,7 +146,7 @@ class RSoftSim:
                 json.dump(self.core_positions, g)
     
 
-    def RunRSoftSim(self, name_tag, femsim_name_tag, fixed, vars, fixed_length, param_range, simulation_val, csv_path, json_config, prior_space_pid, fem=False):
+    def RunRSoftSim(self, name_tag, femsim_name_tag, fixed, vars, fixed_length, param_range, simulation_val, csv_path, json_config, prior_space_pid, wave,fem=False):
         filename = f"{name_tag}.ind"
         filename_FS = f"{femsim_name_tag}.ind"
         sim_tool = simulation_val.get("sim_tool", RSoft_params["sim_tool"])
@@ -213,8 +213,8 @@ class RSoftSim:
         onedrive_filename = name_tag + ".ind"
         onedrive_filename_results = name_tag + "_mon.dat"
         onedrive_femsim_filename_results = femsim_name_tag + ".ind"
-        onedrive_neff_csv_path = Path(onedrive_results_folder) / f"Guided Modes_{pid_csv}.csv"
-        neff_csv_path = Path(results_folder) / f"Guided Modes_{pid_csv}.csv"
+        onedrive_neff_csv_path = Path(onedrive_results_folder) / f"{wave}_Guided Modes_{pid_csv}.csv"
+        neff_csv_path = Path(results_folder) / f"{wave}_Guided Modes_{pid_csv}.csv"
 
         file_extensions_to_copy = [
            onedrive_filename, onedrive_filename_results, onedrive_femsim_filename_results,onedrive_neff_csv_path
@@ -269,14 +269,17 @@ class RSoftSim:
         uf_neff.read(str(nef_path))
         x_neff, y_neff = uf_neff.get_arrays()
 
+        stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
+        _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), wave)
+        fixed_params["cladding_neff"] = stored_data["SiO2"].to_numpy()[idx]
         guided_mask = y_neff > fixed_params["cladding_neff"]
         guided_neff = np.array(y_neff[guided_mask])
 
         with open(neff_csv_path, mode="w", newline="") as f_neff:
             writer = csv.writer(f_neff)
-            writer.writerow(["Mode_Index", "n_eff"])
+            writer.writerow(["Mode_Index", "n_eff", "Wavelength (um)"])
             for idx, nval in enumerate(guided_neff, start=1):
-                writer.writerow([idx, nval])
+                writer.writerow([idx, nval, wave])
 
         with open(onedrive_neff_csv_path, mode="w", newline="") as f_neff_od:
             writer = csv.writer(f_neff_od)
@@ -561,13 +564,13 @@ class RSoftSim:
             average_throughput, res_folder = self.RunRSoftSim(name_tag, femsim_name_tag, fixed, 
                                                   vars, fixed_length, param_range, 
                                                   simulation_val, csv_path, json_config, 
-                                                  prior_space_pid)
+                                                  prior_space_pid, wave)
             return average_throughput, res_folder
         else: 
             transfer_vector, average_throughput, res_folder = self.RunRSoftSim(name_tag, femsim_name_tag, fixed, 
                                                                    vars, fixed_length, param_range, 
                                                                    simulation_val, csv_path, json_config, 
-                                                                   prior_space_pid, fem = fem)
+                                                                   prior_space_pid, wave, fem = fem)
             return transfer_vector, average_throughput, res_folder
 
     def MultProc(self, build_tf, json_config, csv_path, simulation_val, prior_space_pid): #csv_path
@@ -893,7 +896,8 @@ def multiple_mode_tf(arg_list):
     # Identify and extract TF columns
     tf_columns = [col for col in data.columns if col.startswith("TF_")]
     if tf_columns:
-        tf_vectors = data[tf_columns].values.tolist()  
+        tf_vectors = data.loc[:, tf_columns].to_numpy(dtype=float)
+        # tf_vectors = data[tf_columns].values.tolist()  
     else:
         tf_vectors = None
 
@@ -976,7 +980,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
     waves = np.asarray([w for (_, _, w) in tf_list], dtype=float)
     unique_waves = np.unique(waves)
     wave_rows = []
-
+    row = []
     for w in unique_waves:
         tf_list_w = [(lab, arr, wave) for (lab, arr, wave) in tf_list if float(wave) == float(w)]
         tf_list_w_arr = [arr for (lab, arr, wave) in tf_list_w]
@@ -992,36 +996,59 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         )
 
         og_amp, og_phase, ex_amp, ex_phase, _ = extract_portmon_amp_phase(tf_list_w_arr, core_num=simulation_val["core_num"])
+        n_modes, n_cores = og_amp.shape
+        stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
+        _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
+        Other_core_ref_ind = stored_data["GeO2_2_mol%"].to_numpy()[idx]
+        Cladding_ref_ind = stored_data["SiO2"].to_numpy()[idx]
+        Capillary_ref_ind = stored_data["F_2_mol%"].to_numpy()[idx]
+        for m in range(n_modes):
+            mode_label = (
+                mode_labels_raw[m] if (mode_labels_raw is not None and m < len(mode_labels_raw))
+                else f"Mode{m+1}"
+            )
+            row={
+                "Iteration": int(iteration_num),
+                "Wavelength": float(w),
+                "Loss Value": float(loss),
+                "Loss_a": arr_results[0],
+                "Loss_b": arr_results[1],
+                "Loss_c": arr_results[2],
+                "Loss_d": arr_results[3],
+                "x": float(params[0]),
+                "y": float(params[1]),
+                "z": float(params[2]),
+                "Non-MS Core Refractive Index": Other_core_ref_ind,
+                "Cladding Refractive Index": Cladding_ref_ind,
+                "Capillary Refractive Index": Capillary_ref_ind,
+                "Guided Modes":int(len_modes_arr[0]),
+                "Injected Mode": str(mode_label),
+                "Mode Index": int(m)
+            }
+            
+            for c in range(n_cores):
+                row[f"Core_{c+1}_Amp"] = og_amp[m, c]
+                row[f"Core_{c+1}_Phase"] = og_phase[m, c]
+            
+            _, n_ex = ex_amp.shape
 
-        wave_rows.append({
-            "iteration": int(iteration_num),
-            "wavelength": float(w),
-            "loss": float(loss),
-            "loss_a": arr_results[0],
-            "loss_b": arr_results[1],
-            "loss_c": arr_results[2],
-            "loss_d": arr_results[3],
-            "x": float(params[0]),
-            "y": float(params[1]),
-            "z": float(params[2]),
-            "Guided Modes":len_modes_arr,
-            "Mode Labels": mode_labels_raw,
-            "Core Amplitudes": og_amp,
-            "Core Phases": og_phase,
-            "Extra Amplitudes": ex_amp,
-            "Extra Phases": ex_phase
-        })
+            if m==0 or mode_label.endswith("_LP01"):
+                for c in range(n_ex):
+                    row[f"Extra{c+1}_Amp"]   = float(ex_amp[m, c])
+                    row[f"Extra{c+1}_Phase"] = float(ex_phase[m, c])
+
+            wave_rows.append(row)
 
     df_wave_log = pd.DataFrame(wave_rows)
     outdir = r"C:\Users\RSoft Things\Desktop\Results\Wavelength_results"
     os.makedirs(outdir, exist_ok=True)
     pid = os.getpid()
-    out_csv = os.path.join(outdir, f"wavelength_loss_iter_{iteration_num}_{pid}.csv")
+    out_csv = os.path.join(outdir, f"wavelength_loss_iter_{iteration_num}_{simulation_val['core_num']}{simulation_val['grid_type']}_{simulation_val['mon_type']}_NumModes_{len(simulation_val['mode_vals'])}_{pid}.csv")
     df_wave_log.to_csv(out_csv, index=False)
     if len(unique_waves) == 1:
-        final_loss = float(df_wave_log["loss"].iloc[0])
+        final_loss = float(df_wave_log["Loss Value"].iloc[0])
     else:
-        L = df_wave_log["loss"].to_numpy(dtype=float)
+        L = df_wave_log["Loss Value"].to_numpy(dtype=float)
         final_loss = float(np.sqrt(np.mean((L - np.mean(L))**2))+np.mean(L))
 
     # return what your caller expects
@@ -1114,23 +1141,53 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                     df_wave_log=df_wave_log,
                     plot_tf_matrix=plot_tf_matrix,
                     plot_combined_tf_matrix=plot_combined_tf_matrix,
-                    print_max_amp_or_phase_value=print_max_amp_or_phase_value,
                 )
+                
                 # tell optimiser the performance of the chosen parameters
                 # opt.tell(param_batch, result_batch)
                 # log iteration of parameters, store for later use, rows are the wavelength used
                 # wave_logs.append(df_wave_log)
                 print(f"Iteration {batch_idx + 1}: {result_batch:.6f}")
-                for w, a, b, c, d in zip(df_wave_log["wavelength"], df_wave_log["loss_a"], df_wave_log["loss_b"], 
-                                        df_wave_log["loss_c"], df_wave_log["loss_d"]):
-                                    print(f"  λ={w:.3f} µm | (a, b, c, d)=({a:.6g}, {b:.6g}, {c:.6g}, {d:.6g})")
+                for w, group in df_wave_log.groupby("Wavelength"):
+                    row = group.iloc[0]  # safe: all rows for this λ share same loss terms
+
+                    print(
+                        f"  λ={w:.3f} µm | "
+                        f"(a, b, c, d)=("
+                        f"{row['Loss_a']:.6g}, "
+                        f"{row['Loss_b']:.6g}, "
+                        f"{row['Loss_c']:.6g}, "
+                        f"{row['Loss_d']:.6g})"
+                    )
 
                 # convert df_wave_log to numpy array
-                loss_terms = df_wave_log[["wavelength","loss_a","loss_b","loss_c","loss_d"]].to_numpy()
-                amp = df_wave_log["Core Amplitudes"].to_numpy()
-                phase = df_wave_log["Core Phases"].to_numpy()
-                ex_amp = df_wave_log["Extra Amplitudes"].to_numpy()
-                ex_phase = df_wave_log["Extra Phases"].to_numpy()
+                loss_terms = df_wave_log[["Wavelength","Loss_a","Loss_b","Loss_c","Loss_d"]].to_numpy()
+                
+                core_amp_cols = sorted(
+                    [c for c in df_wave_log.columns if c.startswith("Core_") and c.endswith("_Amp")],
+                    key=lambda s: int(s.split("_")[1])
+                )
+
+                core_phase_cols = sorted(
+                    [c for c in df_wave_log.columns if c.startswith("Core_") and c.endswith("_Phase")],
+                    key=lambda s: int(s.split("_")[1])
+                )
+                amp = df_wave_log[core_amp_cols].to_numpy(dtype=float)
+                phase = df_wave_log[core_phase_cols].to_numpy(dtype=float)
+
+                extra_amp_cols = sorted(
+                    [c for c in df_wave_log.columns if c.startswith("Extra_") and c.endswith("_Amp")],
+                    key=lambda s: int(s.split("_")[1])
+                )
+
+                extra_phase_cols = sorted(
+                    [c for c in df_wave_log.columns if c.startswith("Extra_") and c.endswith("_Phase")],
+                    key=lambda s: int(s.split("_")[1])
+                )
+
+                ex_amp = df_wave_log[extra_amp_cols].to_numpy(dtype=float)
+                ex_phase = df_wave_log[extra_phase_cols].to_numpy(dtype=float)
+
                 number_of_guided_modes = df_wave_log["Guided Modes"].to_numpy()
                 all_results.append({'params': param_batch, 'result': result_batch, 
                                     'Iteration': batch_idx + 1, "Loss Metric": loss_terms, "Number of Guided Modes": number_of_guided_modes,
@@ -1138,10 +1195,15 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                                     "Extra Core Amplitudes": ex_amp, "Extra Core Phases": ex_phase})
             return all_results
         
-        # dynamically generate femsim files as a function of wavlength ONCE. Use the template file to do this.
-        param_names = ["core_diam", "core_neff"]
-        params = [variable_params[k] for k in param_names]
-        run_tf_multproc(params, 1,simulation_val, custom_priors, mode_vals, radial_mode_vals,taper_min, taper_max, fem = True, gridding=gridding)
+        # checking if femsim files exist. If they do, continue. If not, generate the,
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.447962_Taper_L_50000.000000_ex.m00"
+        if not fem_fields_present(femSIM_file_example):
+            print("No suitable FemSIM field profiles detected. Generating...")
+            param_names = ["core_diam", "core_neff"]
+            params = [variable_params[k] for k in param_names]
+            run_tf_multproc(params, 1,simulation_val, custom_priors, mode_vals, 
+                            radial_mode_vals,taper_min, taper_max, fem = True, gridding=gridding)
+
         for batch_idx in range(total_calls):
             # ask for 1 set of parameter vectors only to prevent daemonic process having children 
             param_batch = opt.ask() 
@@ -1155,31 +1217,70 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             result_batch, df_wave_log = run_all_modes_for_params(param_batch, batch_idx + 1, 
                                                                       simulation_val, custom_priors, taper_min, 
                                                                       taper_max, gridding = gridding)
-            plot_pl_results(
-                simulation_val=simulation_val,
-                iteration_num=batch_idx + 1,
-                params=param_batch,
-                gridding=False,
-                df_wave_log=df_wave_log,
-                plot_tf_matrix=plot_tf_matrix,
-                plot_combined_tf_matrix=plot_combined_tf_matrix,
-                print_max_amp_or_phase_value=print_max_amp_or_phase_value,
-            )
+            # plot_pl_results(
+            #     simulation_val=simulation_val,
+            #     iteration_num=batch_idx + 1,
+            #     params=param_batch,
+            #     gridding=False,
+            #     df_wave_log=df_wave_log,
+            #     plot_tf_matrix=plot_tf_matrix,
+            #     plot_combined_tf_matrix=plot_combined_tf_matrix,
+            # )
+
             # tell optimiser the performance of the chosen parameters
             opt.tell(param_batch, result_batch)
             # log iteration of parameters, store for later use, rows are the wavelength used
             # wave_logs.append(df_wave_log)
             print(f"Iteration {batch_idx + 1}: {result_batch:.6f}")
-            for w, a, b, c, d in zip(df_wave_log["wavelength"], df_wave_log["loss_a"], df_wave_log["loss_b"], 
-                                     df_wave_log["loss_c"], df_wave_log["loss_d"]):
-                                print(f"  λ={w:.3f} µm | (a, b, c, d)=({a:.6g}, {b:.6g}, {c:.6g}, {d:.6g})")
+
+            # # convert df_wave_log to numpy array
+            # loss_terms = df_wave_log[["wavelength","loss_a","loss_b","loss_c","loss_d"]].to_numpy()
+            # amp = df_wave_log["Core Amplitudes"].to_numpy()
+            # phase = df_wave_log["Core Phases"].to_numpy()
+            # ex_amp = df_wave_log["Extra Amplitudes"].to_numpy()
+            # ex_phase = df_wave_log["Extra Phases"].to_numpy()
+            for w, group in df_wave_log.groupby("Wavelength"):
+                row = group.iloc[0]  # safe: all rows for this λ share same loss terms
+
+                print(
+                    f"  λ={w:.3f} µm | "
+                    f"(a, b, c, d)=("
+                    f"{row['Loss_a']:.6g}, "
+                    f"{row['Loss_b']:.6g}, "
+                    f"{row['Loss_c']:.6g}, "
+                    f"{row['Loss_d']:.6g})"
+                )
 
             # convert df_wave_log to numpy array
-            loss_terms = df_wave_log[["wavelength","loss_a","loss_b","loss_c","loss_d"]].to_numpy()
-            amp = df_wave_log["Core Amplitudes"].to_numpy()
-            phase = df_wave_log["Core Phases"].to_numpy()
-            ex_amp = df_wave_log["Extra Amplitudes"].to_numpy()
-            ex_phase = df_wave_log["Extra Phases"].to_numpy()
+            loss_terms = df_wave_log[["Wavelength","Loss_a","Loss_b","Loss_c","Loss_d"]].to_numpy()
+            
+            core_amp_cols = sorted(
+                [c for c in df_wave_log.columns if c.startswith("Core_") and c.endswith("_Amp")],
+                key=lambda s: int(s.split("_")[1])
+            )
+
+            core_phase_cols = sorted(
+                [c for c in df_wave_log.columns if c.startswith("Core_") and c.endswith("_Phase")],
+                key=lambda s: int(s.split("_")[1])
+            )
+            # amp = df_wave_log["Core Amplitudes"].to_numpy()
+            # phase = df_wave_log["Core Phases"].to_numpy()
+            amp = df_wave_log[core_amp_cols].to_numpy(dtype=float)
+            phase = df_wave_log[core_phase_cols].to_numpy(dtype=float)
+
+            extra_amp_cols = sorted(
+                    [c for c in df_wave_log.columns if c.startswith("Extra_") and c.endswith("_Amp")],
+                    key=lambda s: int(s.split("_")[1])
+                )
+
+            extra_phase_cols = sorted(
+                    [c for c in df_wave_log.columns if c.startswith("Extra_") and c.endswith("_Phase")],
+                    key=lambda s: int(s.split("_")[1])
+                )
+
+            ex_amp = df_wave_log[extra_amp_cols].to_numpy(dtype=float)
+            ex_phase = df_wave_log[extra_phase_cols].to_numpy(dtype=float)
+
             number_of_guided_modes = df_wave_log["Guided Modes"].to_numpy()
             all_results.append({'params': param_batch, 'result': result_batch, 
                                 'Iteration': batch_idx + 1, "Loss Metric": loss_terms, "Number of Guided Modes": number_of_guided_modes,
