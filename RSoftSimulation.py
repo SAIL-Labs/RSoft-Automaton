@@ -7,7 +7,7 @@ from skopt.utils import dump
 import multiprocessing as mp
 import matplotlib.gridspec as gridspec
 import seaborn as sns
-
+import datetime
 
 from Circuit_Properties import *
 from Functions import *
@@ -944,7 +944,6 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_v
         return tf_list, res_folder
 
 def run_all_modes_for_params(params, iteration_num, simulation_val, custom_priors, taper_min, taper_max, gridding=False):
-    # from RSoftSimulation import RSoftSim
     """
     For a single param vector, run all modes and aggregate result.
     params: list of optimized parameter values (from skopt)
@@ -952,6 +951,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
     mode_list: list of (m, rm) tuples
     gridding: bool, determines whether to run gridding determination or not
     """
+
     mode_vals = simulation_val["mode_vals"]
     radial_mode_vals = simulation_val["radial_mode_vals"]
     if gridding:
@@ -998,16 +998,27 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         og_amp, og_phase, ex_amp, ex_phase, _ = extract_portmon_amp_phase(tf_list_w_arr, core_num=simulation_val["core_num"])
         n_modes, n_cores = og_amp.shape
         stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
-        _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
-        Other_core_ref_ind = stored_data["GeO2_2_mol%"].to_numpy()[idx]
-        Cladding_ref_ind = stored_data["SiO2"].to_numpy()[idx]
-        Capillary_ref_ind = stored_data["F_2_mol%"].to_numpy()[idx]
+        
+        # find the refractive index for each segment according to the wavelength simulated
+        _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w) # find nearest index to the simulated wavelength
+        Other_core_ref_ind = stored_data["GeO2_2_mol%"].to_numpy()[idx] # find value for non-ms core refractive index
+        Cladding_ref_ind = stored_data["SiO2"].to_numpy()[idx] # find value for cladding refractive index
+        Capillary_ref_ind = stored_data["F_2_mol%"].to_numpy()[idx] # find value for capillary refractive index
+
+        # extract variable parameter keys
+        k_arr = []
+        for k in variable_params.keys():
+            k_arr.append(k)
+        k_arr = np.array(k_arr)
+
         for m in range(n_modes):
             mode_label = (
                 mode_labels_raw[m] if (mode_labels_raw is not None and m < len(mode_labels_raw))
                 else f"Mode{m+1}"
             )
+
             row={
+                "Simulation Date": datetime.datetime.now(),
                 "Iteration": int(iteration_num),
                 "Wavelength": float(w),
                 "Loss Value": float(loss),
@@ -1015,9 +1026,9 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
                 "Loss_b": arr_results[1],
                 "Loss_c": arr_results[2],
                 "Loss_d": arr_results[3],
-                "x": float(params[0]),
-                "y": float(params[1]),
-                "z": float(params[2]),
+                f"{k_arr[0]}": float(params[0]),
+                f"{k_arr[1]}": float(params[1]),
+                f"{k_arr[2]}": float(params[2]),
                 "Non-MS Core Refractive Index": Other_core_ref_ind,
                 "Cladding Refractive Index": Cladding_ref_ind,
                 "Capillary Refractive Index": Capillary_ref_ind,
@@ -1034,10 +1045,39 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
 
             if m==0 or mode_label.endswith("_LP01"):
                 for c in range(n_ex):
-                    row[f"Extra{c+1}_Amp"]   = float(ex_amp[m, c])
-                    row[f"Extra{c+1}_Phase"] = float(ex_phase[m, c])
+                    row[f"{LP_mode_dict_rot[c+1]}_Amp"] = float(ex_amp[m, c])
+                    row[f"{LP_mode_dict_rot[c+1]}_Phase"] = float(ex_phase[m, c])
 
             wave_rows.append(row)
+    
+
+    ## Globally fixed parameters
+    core_pos = core_pos_geo(simulation_val)
+    glob_fix_param = {
+        "Time CSV Created": datetime.datetime.now(),
+        "Non-MS Core Diameter ($\mu m$)": core_params[f"core_{(simulation_val['core_to_monitor'] + 1)%simulation_val['core_num']}"]["core_diam"],
+        "Cladding Diameter ($\mu m$)": fixed_params["MCFCladd"],
+        "Core Separation ($\mu m$)": fixed_params["core_sep"],
+        "MS Core Position": core_pos[simulation_val['core_to_monitor']-1],
+        "MS Mode": LP_mode_dict_rot[0], # Need to somehow make this dynamic, only selects LP01 atm
+        "Core Configuration": simulation_val['grid_type'],
+        "Number of Cores": simulation_val["core_num"]
+    }
+
+    if "taper" not in k_arr:
+        glob_fix_param["Taper"] = fixed_params["taper"]
+
+    # append_kv_rows(wave_rows, "GLOBAL", glob_fix_param, base_cols)
+
+    ## Legend
+    leg = {
+        "Loss_a": ("Intensity of MS mode in the MS core with the sum of intensities of higher order modes in ms core" if simulation_val["all_modes"] else "Intensity of MS mode in the MS core"),
+        "Loss_b": "Mean intensity of non MS modes in non MS cores",
+        "Loss_c": "Mean intensity of non MS modes exciting LP01 in MS core",
+        "Loss_d": "Mean intensity of MS mode in non MS cores",
+        "Loss": "-Loss_a - Loss_b + (Loss_c + Loss_d) + 2"
+    }
+    # append_kv_rows(wave_rows, "LEGEND", leg, base_cols)
 
     df_wave_log = pd.DataFrame(wave_rows)
     outdir = r"C:\Users\RSoft Things\Desktop\Results\Wavelength_results"
@@ -1045,6 +1085,19 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
     pid = os.getpid()
     out_csv = os.path.join(outdir, f"wavelength_loss_iter_{iteration_num}_{simulation_val['core_num']}{simulation_val['grid_type']}_{simulation_val['mon_type']}_NumModes_{len(simulation_val['mode_vals'])}_{pid}.csv")
     df_wave_log.to_csv(out_csv, index=False)
+
+    # now append the global and legend
+    with open(out_csv, "a", newline="") as f:
+        f.write("\n")  # blank line
+
+        f.write("Globally Fixed Parameters\n")
+        for k, v in glob_fix_param.items():
+            f.write(f"{k}: {v}\n")
+
+        f.write("\nLegend\n")
+        for k, v in leg.items():
+            f.write(f"{k}: {v}\n")
+
     if len(unique_waves) == 1:
         final_loss = float(df_wave_log["Loss Value"].iloc[0])
     else:
@@ -1063,9 +1116,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
     #     return rms_loss, arr_results, amp, phase, ex_amp, ex_phase
 
 def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding, total_calls, simulate_tf_metric = True):
-    
-    array_of_results = []
-    
+
     # create image folder in results location
     images_dir = Path(os.path.expanduser("~/Desktop/Results/Images"))
     images_dir.mkdir(parents=True, exist_ok=True)

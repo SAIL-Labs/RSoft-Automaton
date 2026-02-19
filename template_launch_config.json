@@ -18,7 +18,7 @@
   "launch_type": "LAUNCH_WGMODE",
   "free_space_wavelength": [
     1.5,
-    1.6
+    1.9
   ],
   "mon_type": "port_mon",
   "port_mon_file": "7MCF.m00",

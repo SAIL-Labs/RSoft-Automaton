@@ -1,11 +1,9 @@
 from Circuit_Properties import *
 import random, numpy as np
-'''
-NOTE: Using values from 19CorePL_July2021_noOuter_MMtoSM_extraMM.ind
-'''
+
 fixed_params = {
-    "core_sep": 35, # 120, 60
-    "MCFCladd": 125, # 380 #125
+    "core_sep": 60, # 120, 35
+    "MCFCladd": 250, # 380 #125
     # "core_claddings": None, 
     "core_cladding_diam": None, # None #80,
     "cladding_neff": 1.44, # pure silica

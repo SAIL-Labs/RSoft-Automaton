@@ -1,6 +1,9 @@
 # FemSIM files
 *m00
 
+# Bayesian Results Folder
+"Bayesian Opt Results/*.png"
+
 # Data files
 *.npy
 *.json

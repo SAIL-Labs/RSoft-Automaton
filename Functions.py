@@ -650,10 +650,10 @@ end launch_field
                 # Insert boundary_* after boundary_gap_z = 0
                 if stripped == "boundary_gap_z = 0":
                     output_lines.extend([
-                        "boundary_max = 20\n", #10+38.5
-                        "boundary_max_y = 20\n", #15
-                        "boundary_min = -20\n", #-10+38.5
-                        "boundary_min_y = -20\n" #-15
+                        "boundary_max = 30\n", #10+38.5
+                        "boundary_max_y = 30\n", #15
+                        "boundary_min = -30\n", #-10+38.5
+                        "boundary_min_y = -30\n" #-15
                     ])
                 # Insert domain_min after dimension = 3
                 if stripped == "dimension = 3":
@@ -1169,7 +1169,8 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
         # Prepare other modes
         other_mode_labels = [lab for idx, lab in enumerate(mode_list) if idx != mode_idx] 
         other_mode_vals = [mode_result[f"{lab}_result"] for lab in other_mode_labels] 
-        # 3. Mean of MS core in non-MS modes:
+        
+        # 3. Mean of non-MS modes exciting LP01 in MS core
         ms_core_other_mode_vals = [np.abs(vals[ms_core])**2 for vals in other_mode_vals] 
 
         ms_core_other_mode = np.mean(ms_core_other_mode_vals) 
@@ -1187,8 +1188,8 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
         loss_func = -ms_core_mode -hyp_param_b*nonms_core_other_mode + hyp_param_c*(nonms_core_ms_mode + ms_core_other_mode) + 2
         array_of_results = np.array([ms_core_mode, #a
                             nonms_core_other_mode, #b
-                            nonms_core_ms_mode, #c
-                            ms_core_other_mode #d
+                            ms_core_other_mode, #c
+                            nonms_core_ms_mode #d
                             ])
         loss_arr.append(loss_func)
         collected_arr.append(array_of_results)
@@ -1405,6 +1406,61 @@ LP_mode_dict = {
     "LP04": 1,
     "LP71": 2
 }
+##############################################################################################################################################################################################################################################################################
+## Stuff used for saving results
+LP_mode_dict_rot = np.array([
+    "LP01",
+    "LP11a",
+    "LP11b",
+    "LP21a",
+    "LP21b",
+    "LP02",
+])
+
+def append_kv_rows(wave_rows, kind: str, mapping: dict, base_cols: set):
+    """
+    Append key/value metadata rows to wave_rows, using a consistent schema.
+    base_cols = set of columns used by your DATA rows (so every row is a dict with same keys).
+    """
+    for k, v in mapping.items():
+        row = {col: np.nan for col in base_cols}
+        row["RowType"] = kind
+        row["MetaKey"] = str(k)
+        row["MetaValue"] = str(v)
+        wave_rows.append(row)
+
+def core_pos_geo(simulation_val):
+    if simulation_val["grid_type"] == "Hex":
+        if simulation_val["core_num"] == 7:
+            core_pos = {
+                0: "Centre",
+                1: "Right",
+                2: "Upper Right",
+                3: "Upper Left",
+                4: "Left",
+                5: "Lower Left",
+                6: "Lower Right"
+            }
+        elif simulation_val["core_num"] > 7:
+            raise RuntimeError(f"No core position built-in yet for {simulation_val['core_num']} cores in Hex config.")
+    elif simulation_val["grid_type"] == "Pent":
+        if simulation_val["core_num"] == 6:
+            core_pos = {
+                0: "Centre",
+                1: "Upper Right",
+                2: "Top",
+                3: "Upper Left",
+                4: "Lower Left",
+                5: "Lower Right"
+            }
+        elif simulation_val["core_num"] > 6:
+            raise RuntimeError(f"No core position built-in yet for {simulation_val['core_num']} cores in Pent config.")
+        
+    else:
+        raise RuntimeError(f"No core position applicable for the current grid type: {simulation_val['grid_type']}.")
+    
+    return core_pos
+##############################################################################################################################################################################################################################################################################
 
 def mode_wanted_considering_mode_orientations(LP_mode_dict, mode_desired):
     '''
