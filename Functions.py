@@ -1063,31 +1063,31 @@ def transfer_matrix_component(csv_path, row, port_mon = False):
         return row, throughput
 
             
-def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, core_to_monitor, modes_to_monitor, simulation_val):
+def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_b, hyp_param_c, core_to_monitor, modes_to_monitor, simulation_val):
     """
     Function that will sort through tf_list, extract the mode selective core values in ms/non-ms modes and return the loss function needed by scikit
     Arguments:
         - tf_list: transfer matrix resulting from RSoft multiprocessing
-        - sim_obj: RSoftSim() class used to access file directories
+        - wave: wavelength being simulated/accessed by the worker
         - core_to_monitor: special core to have ms capabilities. Must be a single integer
         - modes_to_monitor: modes to couple into the ms core. Must be an array of values (e.g. ["LP01", "LP11a",...])
     Returns:
         - loss function that will maximise the ms core in the ms mode(s), overall power in non-ms cores in non-ms modes, 
         while minimising ms core in non-ms modes and non-ms cores in ms-mode(s)
     """
-    params, results, waves = zip(*tf_list)
+    params, results, waves, _ = zip(*tf_list)
     tf_list_params_results = list(zip(params, results))
     core_num = simulation_val["core_num"]
     # search for each Guided Mode csv file created and pick only the most recent one to read, since they are all the same.
-    guided_mode_pattern = os.path.join(folder, "*_Guided Modes_*.csv")
+    guided_mode_pattern = os.path.join(folder, f"{wave}_Guided Modes_{csv_pid[0]}.csv")
     matches = glob.glob(guided_mode_pattern)
     if not matches:
-        raise FileNotFoundError(f"No Guided Modes_*.csv files found in {folder}")
+        raise FileNotFoundError(f"No {wave}_Guided Modes_{csv_pid}.csv files found in {folder}")
     guided_path = max(matches, key=os.path.getmtime)
     df = pd.read_csv(guided_path)
-    num_modes = len(df[2::2]["Mode_Index"].values) # this only takes the first polarisation of each mode (excluding LP01)
-                              # into account as that is what the port monitors are setup to measure
-
+    num_modes = len(df["Mode_Index"].values) # this takes all polarisations of each mode (including LP01), for plotting only
+    num_mode_arr = df["Mode_Index"].iloc[2::2].values # this takes the first polarisation of each higher order mode (excluding LP01) 
+                                                        # into account as that is what the port monitors are setup to measure
     label_replacements = {
         'LP01': 'LP01',
         'LP11': 'LP11a',
@@ -1107,13 +1107,13 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
         'LP51': 'LP51a',
         'LP-51': 'LP51b'
     }
-
     # tf_list = tf_list[0]
     # tf_list = np.array(tf_list) #.reshape(simulation_val["free_space_wavelength"].size,simulation_val["mode_vals"].size)
 
     loss_arr = []
     collected_arr = []
     len_modes_arr = []
+    loss_a_num_extra_modes = []
 # for tf in tf_list:
     # relabel
     new_tf_list = [
@@ -1122,6 +1122,10 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
     ]
 
     mode_list = [label for label, _ in new_tf_list]
+    # # code for extra modes in central core
+    # extra_mode_order = ["LP11a", "LP11b", "LP21a", "LP21b", "LP02"]
+    # guided_modes_set = set(mode_list) 
+    # guided_mask = np.array([m in guided_modes_set for m in extra_mode_order], dtype=bool)
     # extract the amplitudes only and leave the phase information
     mode_result = {}
     extra_result = {}
@@ -1157,8 +1161,8 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
         ex_ms_mode_vals = extra_result[f"{mode_label}_extra"] # extracts the higher order mode amplitudes for the MS core
         
         # 1. MS core in MS mode:
-        if Simulation_params["all_modes"]:
-            ms_core_mode = np.abs(ms_mode_vals[ms_core])**2 + np.sum(np.abs(ex_ms_mode_vals[:num_modes])**2)
+        if simulation_val["all_modes"]:
+            ms_core_mode = np.abs(ms_mode_vals[ms_core])**2 + np.sum(np.abs(ex_ms_mode_vals[:len(num_mode_arr)])**2)
         else:
             ms_core_mode = np.abs(ms_mode_vals[ms_core])**2 #- np.sum(np.abs(ex_ms_mode_vals[:num_modes])**2)
 
@@ -1194,7 +1198,8 @@ def mode_selective_tf_matrix_metric(tf_list, folder, hyp_param_b, hyp_param_c, c
         loss_arr.append(loss_func)
         collected_arr.append(array_of_results)
         len_modes_arr.append(num_modes)
-        return loss_func, array_of_results, waves, np.array(len_modes_arr)
+        loss_a_num_extra_modes.append(num_mode_arr)
+        return loss_func, array_of_results, waves, np.array(len_modes_arr), np.array(loss_a_num_extra_modes)
         # return np.asarray(loss_func, dtype=float), np.asarray(collected_arr, dtype=float)
 
 def read_port_mon_file(filepath = ""):

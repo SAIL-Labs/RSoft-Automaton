@@ -2,13 +2,13 @@ from Circuit_Properties import *
 import random, numpy as np
 
 fixed_params = {
-    "core_sep": 60, # 120, 35
-    "MCFCladd": 250, # 380 #125
+    "core_sep": 35, # 120, 60
+    "MCFCladd": 125, # 380 #250
     # "core_claddings": None, 
-    "core_cladding_diam": None, # None #80,
+    "core_cladding_diam": 15, # None #80,
     "cladding_neff": 1.44, # pure silica
     "core_cladding_neff": None,
-    "cen_core_cladding_neff": None,#0.00949,
+    "cen_core_cladding_neff": None,#1.44,#0.00949,
     # "Taper_L": 50000, #45000
     # "core_neff": 0.0122895, #0.015,
     "taper": 6.25, #7.33207692, 5.3

@@ -32,7 +32,7 @@
   "launch_normalization": 1,
   "core_to_monitor": 1,
   "metric": "TF",
-  "num_paras": 1,
+  "num_paras": 100,
   "skip_core": null,
   "add_cladding_to_cores": null,
   "fixed_fem_file": false,
