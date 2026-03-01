@@ -366,7 +366,7 @@ class RSoftSim:
                 transfer_vector, throughput = transfer_matrix_component(csv_pathway, row)
                 return transfer_vector, -throughput, results_folder, pid_csv
 
-    def build_circuit(self, params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave, fem=False): # maybe put this into its own function. Make it universal.
+    def build_circuit(self, params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave, delta_index_at_reference_wavelength, fem=False): # maybe put this into its own function. Make it universal.
         """
         Create the design file using template.py and 
         write to separate .ind file. Also contains function to run BeamProp
@@ -480,9 +480,11 @@ class RSoftSim:
         if sim_param["mode_selective"] == 1:
             for j, core_key in enumerate(core_name, start=1):
                 if j == Simulation_params["core_to_monitor"]:
+                    # need to modify the core_neff according to the wavelength
+                    # params[core_neff_idx] = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength
                     # core to be optimized by skopt
                     core_diam = variable_params.get("core_diam")
-                    core_neff = variable_params.get("core_neff", fixed_params.get("core_neff"))
+                    core_neff = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength#variable_params.get("core_neff", fixed_params.get("core_neff"))
                     core_taper = param_dict.get("taper", fixed_params.get("taper"))
                 else:
                     # pass
@@ -705,7 +707,7 @@ class RSoftSim:
                                   csv_path = csv_path, 
                                   name_tag = self.sym["Name"])
 
-    def RunRSoft(self, simulation_val, prior_space_pid, wave, csv_path, json_config, pid, fem=False, simulate=False, build_tf = True): #csv_path, 
+    def RunRSoft(self, simulation_val, prior_space_pid, wave, delta_index_at_reference_wavelength, csv_path, json_config, pid, fem=False, simulate=False, build_tf = True): #csv_path, 
         '''
         Multiprocessing must to be run outside of a Jupyter cell or it will silently 
         fail/infinitely loop on the first batch
@@ -759,10 +761,10 @@ class RSoftSim:
 
         # -- If not multi-mode: do just the single template simulation
         if Simulation_params['metric'] != 'TF':
-            seed_result, res_folder, pid_csv = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave)
+            seed_result, res_folder, pid_csv = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave, delta_index_at_reference_wavelength)
             tf_vector = None
         else:
-            tf_vector, seed_result, res_folder, pid_csv = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave, fem = fem)
+            tf_vector, seed_result, res_folder, pid_csv = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave, delta_index_at_reference_wavelength, fem = fem)
 
         results_folder = log_optimizer_results(
             x_iters=[seed_params],
@@ -789,7 +791,7 @@ def run_rsoft_sim(args):
     overwrite_template_val(json_config)
     sim = RSoftSim()
     sim.generate_core_positions()
-    return sim.build_circuit(params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave)
+    return sim.build_circuit(params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave, delta_index_at_reference_wavelength)
 
 #############################################################################################################################################################################
 """
@@ -807,10 +809,14 @@ def multiple_mode_tf(arg_list):
     '''
     TO DO: fix up the gridding part of this code.
     '''
-    if len(arg_list) == 11:
-        sim_val, custom_priors, wave, m, rm, params, fem, taper_min, taper_max, gridding, iteration_num = arg_list
-    if len(arg_list) == 8:
+    if len(arg_list) == 13:
+        sim_val, custom_priors, wave, m, rm, params, fem, taper_min, taper_max, gridding, delta_index_at_reference_wavelength, core_neff_idx, iteration_num = arg_list
+    # elif len(arg_list) == 11:
+    #     sim_val, custom_priors, wave, m, rm, params, fem, taper_min, taper_max, gridding, iteration_num = arg_list
+    elif len(arg_list) == 8:
         sim_val, custom_priors, gr, params, taper_min, taper_max, gridding, iteration_num = arg_list
+    else:
+        raise RuntimeError(f"There are some values unaccounted for while building the multprocessor. The total number of arguments should be {len(arg_list)}")
     if gridding:
         sim_val, custom_priors, gr, params, taper_min, taper_max, gridding, iteration_num = arg_list
         sim_val = copy.deepcopy(sim_val)
@@ -833,7 +839,7 @@ def multiple_mode_tf(arg_list):
         optimizer_result = f"Grid_{gr}_Optimizer_Result.csv"
         param_num = f"Grid {gr}"
     else:
-        sim_val, custom_priors, wave, m, rm, params, fem, taper_min, taper_max, gridding, iteration_num = arg_list
+        # sim_val, custom_priors, wave, m, rm, params, fem, taper_min, taper_max, gridding, iteration_num = arg_list
         sim_val = copy.deepcopy(sim_val)
         sim_val["launch_mode"] = m
         sim_val["launch_mode_radial"] = rm
@@ -848,6 +854,8 @@ def multiple_mode_tf(arg_list):
         Launch_params["cladding_neff"] = fixed_params["cladding_neff"]
         RSoft_params["background_index"] = stored_data["F_2_mol%"].to_numpy()[idx]
 
+        # n_ms(lambda) = n_SiO2(lambda) + Delta n
+        # params[core_neff_idx] = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength
         # write core diameter properties to simulation_val and set special core properties to None for SKOPT to overwrite
         assign_core_properties(sim_val)
         core_to_monitor = sim_val["core_to_monitor"]
@@ -884,7 +892,7 @@ def multiple_mode_tf(arg_list):
     sim.init_priors(prior_space_pid, build_tf, custom_priors)
 
     # run simulation
-    results_folder, res_folder, pid_csv = sim.RunRSoft(sim_val, prior_space_pid, wave,csv_path = optimizer_result, json_config = code_config, pid = pid, fem = fem, build_tf = build_tf)
+    results_folder, res_folder, pid_csv = sim.RunRSoft(sim_val, prior_space_pid, wave, delta_index_at_reference_wavelength,csv_path = optimizer_result, json_config = code_config, pid = pid, fem = fem, build_tf = build_tf)
 
     # Load results
     best_para_log = os.path.join(results_folder, f"best_params_log_{pid}.csv")    
@@ -908,12 +916,27 @@ def multiple_mode_tf(arg_list):
 def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, fem = False, gridding = False): 
 
     tf_list = []
-    csv_pid_arr = []
+
+    if "core_neff" in variable_params:
+        # get index of core_neff in variable_params
+        for i, key in enumerate(variable_params):
+            if key == "core_neff":
+                core_neff_idx = i
+
+        # define index contrast to scale each sampled refractive index according to some fixed index contrast calculated at a reference wavelength
+        stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
+        _, refractive_index_at_reference_wave = find_nearest(stored_data["Wavelength (um)"].to_numpy(), min(simulation_val["free_space_wavelength"])) # only calculate the contrast from the smallest wavelength simulated
+        Silica_refractive_index_at_reference_wavelength = stored_data["SiO2"].to_numpy()[refractive_index_at_reference_wave]
+        delta_index_at_reference_wavelength = params[core_neff_idx] - Silica_refractive_index_at_reference_wavelength
+    
     if not gridding:
         # initialise global parent argument list. This creates multiple instances of args_list based on the length of
         # mode_vals or radial_mode_vals. i.e. 
         # [(simulation_val, 0, 1, params, False),(simulation_val, 1, 1, params, False),(simulation_val, -1, 1, params, False), .....]
-        args_list = [(simulation_val, custom_priors,wavelengths,m, rm, params, fem, taper_min, taper_max, gridding, iteration_num) for wavelengths in simulation_val["free_space_wavelength"] for m, rm in zip(mode_vals, radial_mode_vals)] 
+        if "core_neff" in variable_params.keys():
+            args_list = [(simulation_val, custom_priors,wavelengths,m, rm, params, fem, taper_min, taper_max, gridding, delta_index_at_reference_wavelength, core_neff_idx, iteration_num) for wavelengths in simulation_val["free_space_wavelength"] for m, rm in zip(mode_vals, radial_mode_vals)] 
+        else:
+            args_list = [(simulation_val, custom_priors,wavelengths,m, rm, params, fem, taper_min, taper_max, gridding, iteration_num) for wavelengths in simulation_val["free_space_wavelength"] for m, rm in zip(mode_vals, radial_mode_vals)] 
     else:
         # run gridding determination
         grid_size_list = np.arange(0.1, 2.1, 0.1)
@@ -925,6 +948,7 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_v
         # initialise global parent argument list
         args_list = [(simulation_val, custom_priors, gr, params, taper_min, taper_max, gridding, iteration_num) for gr in grid_size_range] 
 
+        
     # note 'spawn' means Python will start n separate processes each with their own memory of global variables. 
     # You need to define any changes within their own instance or else NOTHING changes.
     with mp.get_context("spawn").Pool(processes=int(simulation_val["core_num"])*len(simulation_val["free_space_wavelength"]) if not gridding else 20) as pool:
@@ -1047,7 +1071,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
                 "Cladding Refractive Index": Cladding_ref_ind,
                 "Capillary Refractive Index": Capillary_ref_ind,
                 "Guided Modes":int(len_modes_arr[0]),
-                "Extra Mode Intensity in Loss_a": int(len(loss_a_num_extra_modes[0])),
+                "Extra Mode Intensity in Loss_a": int(len(loss_a_num_extra_modes[0])) if simulation_val["all_modes"] else None,
                 "Injected Mode": str(mode_label),
                 "Mode Index": int(m),
                 "PID": pid_w
