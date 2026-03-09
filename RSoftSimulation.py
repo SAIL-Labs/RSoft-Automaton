@@ -481,7 +481,6 @@ class RSoftSim:
             for j, core_key in enumerate(core_name, start=1):
                 if j == Simulation_params["core_to_monitor"]:
                     # need to modify the core_neff according to the wavelength
-                    # params[core_neff_idx] = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength
                     # core to be optimized by skopt
                     core_diam = variable_params.get("core_diam")
                     core_neff = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength#variable_params.get("core_neff", fixed_params.get("core_neff"))
@@ -1067,16 +1066,17 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
                 f"{k_arr[0]}": float(params[0]),
                 f"{k_arr[1]}": float(params[1]),
                 f"{k_arr[2]}": float(params[2]),
+                f"Delta n({simulation_val['free_space_wavelength'][0]} um)": float(params[1] - Cladding_ref_ind),
                 "Non-MS Core Refractive Index": Other_core_ref_ind,
                 "Cladding Refractive Index": Cladding_ref_ind,
                 "Capillary Refractive Index": Capillary_ref_ind,
                 "Guided Modes":int(len_modes_arr[0]),
-                "Extra Mode Intensity in Loss_a": int(len(loss_a_num_extra_modes[0])) if simulation_val["all_modes"] else None,
+                "Extra Mode Intensity in Loss_a": int(len(loss_a_num_extra_modes[0])) if simulation_val["all_modes"] else "None",
                 "Injected Mode": str(mode_label),
                 "Mode Index": int(m),
                 "PID": pid_w
             }
-            
+
             for c in range(n_cores):
                 row[f"Core_{c+1}_Amp"] = og_amp[m, c]
                 row[f"Core_{c+1}_Phase"] = og_phase[m, c]
@@ -1103,7 +1103,8 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         "MS Mode": LP_mode_dict_rot[0], # Need to somehow make this dynamic, only selects LP01 atm
         "Core Configuration": simulation_val['grid_type'],
         "Number of Cores": simulation_val["core_num"],
-        "Example .ind File Used": ind_file
+        "Example .ind File Used": ind_file,
+        "Loss_a config.": "LP01" if not simulation_val["all_modes"] else "LP01 + higher order modes"
     }
 
     if "taper" not in k_arr:
@@ -1117,7 +1118,9 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         "Loss_b": "Mean intensity of non MS modes in non MS cores",
         "Loss_c": "Mean intensity of non MS modes exciting LP01 in MS core",
         "Loss_d": "Mean intensity of MS mode in non MS cores",
-        "Loss": "-Loss_a - Loss_b + (Loss_c + Loss_d) + 2"
+        "Loss": "-Loss_a - Loss_b + (Loss_c + Loss_d) + 2",
+        "Extra Mode Intensity in Loss_a": "Total number of amplitudes corresponding to higher order modes included in Loss_a",
+        f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should give a slightly different value for different wavelengths." 
     }
     # append_kv_rows(wave_rows, "LEGEND", leg, base_cols)
 
