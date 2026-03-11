@@ -1156,10 +1156,14 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_b,
 
     for mode_idx in ms_modes:
 
-        mode_label = mode_list[mode_idx]          # 'LP01', specifies the label for the MS mode 
+        mode_label = mode_list[mode_idx]  # 'LP01', specifies the label for the MS mode 
         ms_mode_vals = mode_result[f"{mode_label}_result"]   # extracts the core amplitudes of the 7 cores for the MS mode 
         ex_ms_mode_vals = extra_result[f"{mode_label}_extra"] # extracts the higher order mode amplitudes for the MS core
-        
+        # Prepare other modes
+        other_mode_labels = [lab for idx, lab in enumerate(mode_list) if idx != mode_idx] 
+        other_mode_vals = [mode_result[f"{lab}_result"] for lab in other_mode_labels] 
+        ex_nonms_mode_vals = [extra_result[f"{lab}_extra"] for lab in other_mode_labels]
+
         # 1. MS core in MS mode:
         if simulation_val["all_modes"]:
             ms_core_mode = np.abs(ms_mode_vals[ms_core])**2 + np.sum(np.abs(ex_ms_mode_vals[:len(num_mode_arr)])**2)
@@ -1170,12 +1174,9 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_b,
         nonms_core_ms_mode = [np.abs(val)**2 for idx, val in enumerate(ms_mode_vals) if idx != ms_core] 
         nonms_core_ms_mode = np.mean(nonms_core_ms_mode)
 
-        # Prepare other modes
-        other_mode_labels = [lab for idx, lab in enumerate(mode_list) if idx != mode_idx] 
-        other_mode_vals = [mode_result[f"{lab}_result"] for lab in other_mode_labels] 
         
-        # 3. Mean of non-MS modes exciting LP01 in MS core
-        ms_core_other_mode_vals = [np.abs(vals[ms_core])**2 for vals in other_mode_vals] 
+        # 3. Mean of non-MS modes exciting LP01 and higher order modes in MS core
+        ms_core_other_mode_vals = ([np.abs(vals[ms_core])**2 for vals in other_mode_vals] + [np.abs(val)**2 for vals in ex_nonms_mode_vals[:len(num_mode_arr)] for val in vals])
 
         ms_core_other_mode = np.mean(ms_core_other_mode_vals) 
 
@@ -1196,7 +1197,7 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_b,
                             nonms_core_ms_mode #d
                             ])
         loss_arr.append(loss_func)
-        collected_arr.append(array_of_results)
+        # collected_arr.append(array_of_results)
         len_modes_arr.append(num_modes)
         loss_a_num_extra_modes.append(num_mode_arr)
         return loss_func, array_of_results, waves, np.array(len_modes_arr), np.array(loss_a_num_extra_modes)

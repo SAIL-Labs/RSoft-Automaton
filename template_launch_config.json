@@ -38,7 +38,7 @@
   "fixed_fem_file": false,
   "mode_selective": 1,
   "core_num": 7,
-  "all_modes": false,
+  "all_modes": true,
   "industry_neff_values": false,
   "industry_neff_file": "C:\\Users\\RSoft Things\\OneDrive - The University of Sydney (Students)\\New Caprica Backup\\industry_neff_values.txt"
 }

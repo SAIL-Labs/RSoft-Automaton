@@ -1083,10 +1083,10 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             
             _, n_ex = ex_amp.shape
 
-            if m==0 or mode_label.endswith("_LP01"):
-                for c in range(n_ex):
-                    row[f"{LP_mode_dict_rot[c+1]}_Amp"] = float(ex_amp[m, c])
-                    row[f"{LP_mode_dict_rot[c+1]}_Phase"] = float(ex_phase[m, c])
+            # if m==0 or mode_label.endswith("_LP01"):
+            for c in range(n_ex):
+                row[f"{LP_mode_dict_rot[c+1]}_Amp"] = float(ex_amp[m, c])
+                row[f"{LP_mode_dict_rot[c+1]}_Phase"] = float(ex_phase[m, c])
 
             wave_rows.append(row)
     
