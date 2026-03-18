@@ -2594,6 +2594,9 @@ class lanternfiber:
         print('LP mode %d, %d' % (self.allmodes_l[mode_to_plot], self.allmodes_m[mode_to_plot]))
 ########################################################################################################################################################################################################################################################################################
 
+"""
+depreciated
+"""
 def coarse_sampler(best_vals, density = 4):
     half_widths = []
     best = np.array([best_vals[x] for x in best_vals])
@@ -2616,6 +2619,44 @@ def coarse_sampler(best_vals, density = 4):
     # All parameter combinations
     param_grid = np.array(list(itertools.product(*grids)))  # shape (N, len(best)), e.g. N = n1*n2*n3
     return param_grid
+
+def monte_carlo_rej(mean_vals, mean_limits, scales, sigmas, n_accept):
+    """
+    Function that samples values in gaussian distributions centred on some mean value to simulate.  
+    """
+    generated = []
+    accepted = []
+
+    if scales is None:
+        scales = np.ones_like(mean_vals, dtype=float)
+    else:
+        scales = scales
+        if scales.shape != mean_vals.shape: # ensure that the number of scales matches the number of variables
+            raise ValueError(f"scales must have shape {mean_vals.shape}, got {scales.shape}")
+        if np.any(scales <= 0): # ensure that the scales are positive definite
+            raise ValueError("all scales must be > 0")
+
+    rng = np.random.default_rng()
+    for m, mu in enumerate(mean_vals):
+        counter = 0
+        
+        s = scales[m]
+        mu_s = mu / s
+        sigma_s = sigmas[m] / s
+
+        while counter < n_accept:
+            x_s = rng.normal(mu_s, sigma_s)
+            x = x_s * s
+            generated.append(x)
+
+            x_low, x_upp = mean_limits[m]
+            if (x_low <= x <= x_upp):
+                accepted.append(x)
+                counter += 1
+            else:
+                continue
+
+    return np.array(generated), np.array(accepted).reshape(len(mean_vals),n_accept)
 
 def read_neff_values(filepath):
     with open(filepath, "r") as f:

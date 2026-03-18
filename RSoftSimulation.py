@@ -1191,8 +1191,15 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
         # sampling_regions = sample_range(param_range, bestvals, shrink=15.0)
         # for prior_name, (low, high) in sampling_regions.items():
         #     para_space.append(Real(low, high, name=prior_name))
-        para_space = coarse_sampler(bestvals)
-        print("Sampling begin.")
+
+        mean_vals = np.array(list(bestvals.values()), dtype=float)
+        mean_limits = np.array(list(bestval_limits.values()), dtype=float)
+        sigmas = np.array([2.0, 1.0, 3000.0])
+        scales = np.array([1.0, 1.0, 10000.0])
+        _, accepted = monte_carlo_rej(mean_vals, mean_limits, scales, sigmas, simulation_val["num_paras"])
+        # para_space = coarse_sampler(bestvals)
+        para_space = accepted.T # shape(len(simulation_val["num_paras"]), len(bestvals.keys()))
+        print(f"Sampling of {para_space.shape[0]} parameters, begin.")
     else:
         para_space = []
         for prior_name, (low, high) in param_range.items():
@@ -1218,6 +1225,15 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
         wave_logs = []
 
         if bestvals:
+            # checking if femsim files exist. If they do, continue. If not, generate the,
+            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.447962_Taper_L_50000.000000_ex.m00"
+            if not fem_fields_present(femSIM_file_example):
+                print("No suitable FemSIM field profiles detected. Generating...")
+                param_names = ["core_diam", "core_neff"]
+                params = [variable_params[k] for k in param_names]
+                run_tf_multproc(params, 1,simulation_val, custom_priors, mode_vals, 
+                                radial_mode_vals,taper_min, taper_max, fem = True, gridding=gridding)
+            
             for batch_idx, para_set in enumerate(para_space):
                 param_batch = para_set
                 print("Trying " + ", ".join(
@@ -1229,20 +1245,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                 result_batch, df_wave_log = run_all_modes_for_params(param_batch, batch_idx + 1, 
                                                                         simulation_val, custom_priors, taper_min, 
                                                                         taper_max, gridding = gridding)
-                plot_pl_results(
-                    simulation_val=simulation_val,
-                    iteration_num=batch_idx + 1,
-                    params=param_batch,
-                    gridding=False,
-                    df_wave_log=df_wave_log,
-                    plot_tf_matrix=plot_tf_matrix,
-                    plot_combined_tf_matrix=plot_combined_tf_matrix,
-                )
                 
-                # tell optimiser the performance of the chosen parameters
-                # opt.tell(param_batch, result_batch)
-                # log iteration of parameters, store for later use, rows are the wavelength used
-                # wave_logs.append(df_wave_log)
                 print(f"Iteration {batch_idx + 1}: {result_batch:.6f}")
                 for w, group in df_wave_log.groupby("Wavelength"):
                     row = group.iloc[0]  # safe: all rows for this wavelength share same loss terms
