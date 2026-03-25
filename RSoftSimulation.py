@@ -1,9 +1,9 @@
 import numpy as np, os, shutil, csv
 import subprocess, json, time
 from pathlib import Path
-from skopt import Optimizer
+from skopt import Optimizer, dump, load
 from skopt.space import Real, Categorical
-from skopt.utils import dump
+# from skopt.utils import dump
 import multiprocessing as mp
 import matplotlib.gridspec as gridspec
 import seaborn as sns
@@ -1120,9 +1120,9 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         "Loss_d": "Mean intensity of MS mode in non MS cores",
         "Loss": "-Loss_a - Loss_b + (Loss_c + Loss_d) + 2",
         "Extra Mode Intensity in Loss_a": "Total number of amplitudes corresponding to higher order modes included in Loss_a",
-        f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should give a slightly different value for different wavelengths." 
+        f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should give a slightly different value for different wavelengths.",
+        "Guided Modes": "Total number of modes, including rotations AND polarisations, being guided in the fibre."
     }
-    # append_kv_rows(wave_rows, "LEGEND", leg, base_cols)
 
     df_wave_log = pd.DataFrame(wave_rows)
     outdir = r"C:\Users\RSoft Things\Desktop\Results\Wavelength_results"
@@ -1146,25 +1146,30 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
     if len(unique_waves) == 1:
         final_loss = float(df_wave_log["Loss Value"].iloc[0])
     else:
-        L = df_wave_log["Loss Value"].to_numpy(dtype=float)
+        L = (
+            df_wave_log
+            .dropna(subset=["Loss Value"])
+            .groupby("Wavelength")["Loss Value"]
+            .first()
+            .to_numpy(dtype=float)
+        )
         final_loss = float(np.sqrt(np.mean((L - np.mean(L))**2))+np.mean(L))
 
-    # return what your caller expects
     return final_loss, df_wave_log
-    # if len(df_wave_log["wavelength"]) == 1:
-    #     return np.asarray(df_wave_log["loss"].iloc[0],dtype=float), arr_results, waves, amp, phase, ex_amp, ex_phase
-    # else:
-    #     waves = np.asarray(df_wave_log["wavelength"], dtype=float)
-    #     loss_func_vals = np.asarray(df_wave_log["loss"], dtype=float)
-
-    #     rms_loss = np.sqrt(np.sqrt(np.mean((loss_func_vals - loss_func_vals.mean())**2)))
-    #     return rms_loss, arr_results, amp, phase, ex_amp, ex_phase
 
 def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding, total_calls, simulate_tf_metric = True):
 
     # create image folder in results location
-    images_dir = Path(os.path.expanduser("~/Desktop/Results/Images"))
+    results_dir = Path(os.path.expanduser("~/Desktop/Results"))
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    images_dir = results_dir / "Images"
     images_dir.mkdir(parents=True, exist_ok=True)
+
+    results_checkpoint_path = results_dir / "optimizer_results_checkpoint.npy"
+    opt_checkpoint_path = results_dir / "optimizer_state_checkpoint.pkl"
+    # images_dir = Path(os.path.expanduser("~/Desktop/Results/Images"))
+    # images_dir.mkdir(parents=True, exist_ok=True)
 
     # Load prior space
     for attempt in range(10):
@@ -1209,20 +1214,30 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                 para_space.append(Real(low, high, name=prior_name))
         # para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
     
-    # initialise optimiser
-    opt = Optimizer(
-        dimensions=para_space,
-        base_estimator="GP",
-        acq_func="EI", #LCB
-        acq_func_kwargs={"xi": 0.8}, #{"kappa": 2.5}
-        acq_optimizer = "sampling",
-        random_state=None,
-        n_initial_points=50
-    )
+    if simulate_tf_metric and opt_checkpoint_path.exists() and not bestvals:
+        opt = load(opt_checkpoint_path)
+        print(f"Loaded optimiser checkpoint from {opt_checkpoint_path}")
+    else:
+        opt = Optimizer(
+            dimensions=para_space,
+            base_estimator="GP",
+            acq_func="EI",
+            acq_func_kwargs={"xi": 0.8},
+            acq_optimizer="sampling",
+            random_state=None,
+            n_initial_points=50
+        )
+
     # if true, run optimisation testing the loss metric
     if simulate_tf_metric:
-        all_results = []
+        all_results = load_checkpoint_npy(results_checkpoint_path)
         wave_logs = []
+        start_iter = len(all_results)
+
+        if start_iter > 0:
+            print(f"Resuming from iteration {start_iter + 1}")
+        else:
+            print("No existing results checkpoint found. Starting fresh.")
 
         if bestvals:
             # checking if femsim files exist. If they do, continue. If not, generate the,
@@ -1288,10 +1303,20 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                 ex_phase = df_wave_log[extra_phase_cols].to_numpy(dtype=float)
 
                 number_of_guided_modes = df_wave_log["Guided Modes"].to_numpy()
-                all_results.append({'params': param_batch, 'result': result_batch, 
-                                    'Iteration': batch_idx + 1, "Loss Metric": loss_terms, "Number of Guided Modes": number_of_guided_modes,
-                                    "Core Amplitudes": amp, "Core Phases": phase,
-                                    "Extra Core Amplitudes": ex_amp, "Extra Core Phases": ex_phase})
+                iter_result = {
+                    'params': param_batch,
+                    'result': result_batch,
+                    'Iteration': batch_idx + 1,
+                    "Loss Metric": loss_terms,
+                    "Number of Guided Modes": number_of_guided_modes,
+                    "Core Amplitudes": amp,
+                    "Core Phases": phase,
+                    "Extra Core Amplitudes": ex_amp,
+                    "Extra Core Phases": ex_phase
+                }
+
+                all_results.append(iter_result)
+                atomic_save_npy(all_results, results_checkpoint_path)
             return all_results
         
         # checking if femsim files exist. If they do, continue. If not, generate the,
@@ -1303,7 +1328,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             run_tf_multproc(params, 1,simulation_val, custom_priors, mode_vals, 
                             radial_mode_vals,taper_min, taper_max, fem = True, gridding=gridding)
 
-        for batch_idx in range(total_calls):
+        for batch_idx in range(start_iter, total_calls):
             # ask for 1 set of parameter vectors only to prevent daemonic process having children 
             param_batch = opt.ask() 
 
@@ -1316,28 +1341,13 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             result_batch, df_wave_log = run_all_modes_for_params(param_batch, batch_idx + 1, 
                                                                       simulation_val, custom_priors, taper_min, 
                                                                       taper_max, gridding = gridding)
-            # plot_pl_results(
-            #     simulation_val=simulation_val,
-            #     iteration_num=batch_idx + 1,
-            #     params=param_batch,
-            #     gridding=False,
-            #     df_wave_log=df_wave_log,
-            #     plot_tf_matrix=plot_tf_matrix,
-            #     plot_combined_tf_matrix=plot_combined_tf_matrix,
-            # )
 
             # tell optimiser the performance of the chosen parameters
             opt.tell(param_batch, result_batch)
+
             # log iteration of parameters, store for later use, rows are the wavelength used
-            # wave_logs.append(df_wave_log)
             print(f"Iteration {batch_idx + 1}: {result_batch:.6f}")
 
-            # # convert df_wave_log to numpy array
-            # loss_terms = df_wave_log[["wavelength","loss_a","loss_b","loss_c","loss_d"]].to_numpy()
-            # amp = df_wave_log["Core Amplitudes"].to_numpy()
-            # phase = df_wave_log["Core Phases"].to_numpy()
-            # ex_amp = df_wave_log["Extra Amplitudes"].to_numpy()
-            # ex_phase = df_wave_log["Extra Phases"].to_numpy()
             for w, group in df_wave_log.groupby("Wavelength"):
                 row = group.iloc[0]  # safe: all rows for this wavelength share same loss terms
 
@@ -1362,8 +1372,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                 [c for c in df_wave_log.columns if c.startswith("Core_") and c.endswith("_Phase")],
                 key=lambda s: int(s.split("_")[1])
             )
-            # amp = df_wave_log["Core Amplitudes"].to_numpy()
-            # phase = df_wave_log["Core Phases"].to_numpy()
+
             amp = df_wave_log[core_amp_cols].to_numpy(dtype=float)
             phase = df_wave_log[core_phase_cols].to_numpy(dtype=float)
 
@@ -1381,11 +1390,23 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             ex_phase = df_wave_log[extra_phase_cols].to_numpy(dtype=float)
 
             number_of_guided_modes = df_wave_log["Guided Modes"].to_numpy()
-            all_results.append({'params': param_batch, 'result': result_batch, 
-                                'Iteration': batch_idx + 1, "Loss Metric": loss_terms, "Number of Guided Modes": number_of_guided_modes,
-                                "Core Amplitudes": amp, "Core Phases": phase,
-                                "Extra Core Amplitudes": ex_amp, "Extra Core Phases": ex_phase})
+
+            iter_result = {'params': param_batch, 
+                           'result': result_batch, 
+                            'Iteration': batch_idx + 1, 
+                            "Loss Metric": loss_terms, 
+                            "Number of Guided Modes": number_of_guided_modes,
+                            "Core Amplitudes": amp, 
+                            "Core Phases": phase,
+                            "Extra Core Amplitudes": ex_amp, 
+                            "Extra Core Phases": ex_phase
+                            }
+            all_results.append(iter_result)
+            # save simulation and optimisation results instantaneously
+            atomic_save_npy(all_results, results_checkpoint_path)
+            dump(opt, opt_checkpoint_path, store_objective=False)
         return all_results
+    
     # if false, run tf code for the template parameters
     else:
         param_names = ["core_diam", "core_neff"]

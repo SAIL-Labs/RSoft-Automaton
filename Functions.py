@@ -15,7 +15,7 @@ import ehtplot.color
 import cmocean
 import itertools
 from HexProperties import *
-import shutil
+import shutil, tempfile
 #######################################################################################################################################################
 # Function to extract parameters from the .ind file
 def Extract_params(param=""):
@@ -2657,6 +2657,55 @@ def monte_carlo_rej(mean_vals, mean_limits, scales, sigmas, n_accept):
                 continue
 
     return np.array(generated), np.array(accepted).reshape(len(mean_vals),n_accept)
+
+def atomic_save_npy(obj, filepath):
+    """
+    Core to prevent loss of data in the event of computer crashes.
+    Write the new checkpoint to a temporary file first. 
+    Only once that write succeeds, swap it into place as the real checkpoint. 
+    Then clean up any leftover temp file.
+
+    Arguments: 
+        - obj: Python object to save
+        - filepath: location of the final .npy file
+    """
+    # convert directory into Path object
+    filepath = Path(filepath)
+    # ensure the parent directory exists. If not, create it.
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    # create temporary file, fd == low-level file descriptor, tmp_name == string containing the full path to the temporary file
+    fd, tmp_name = tempfile.mkstemp(dir=filepath.parent, suffix=".npy")
+    # close fd since we aren't writing to it
+    os.close(fd)
+    tmp_path = Path(tmp_name)
+
+    # try to save and replace the file
+    try:
+        # at this point the temporary file contains the new checkpoint data and hasn't affected the final file.
+        np.save(tmp_path, np.array(obj, dtype=object), allow_pickle=True)
+        # replace the final file with the temp. file
+        os.replace(tmp_path, filepath)
+
+    # regardless if the try block suceeds or fails, delete temp file 
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+
+def load_checkpoint_npy(filepath):
+    """
+    Load optimiser checkpoint if it exists
+
+    Arguments:
+        - filepath: location of the final .npy file
+    Returns:
+        - empty array or list of previous optimiser results
+    """
+
+    filepath = Path(filepath)
+    if not filepath.exists():
+        return []
+    return np.load(filepath, allow_pickle=True).tolist()
 
 def read_neff_values(filepath):
     with open(filepath, "r") as f:
