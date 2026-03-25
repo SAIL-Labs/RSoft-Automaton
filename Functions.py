@@ -719,13 +719,12 @@ def filter_parameter_space_by_v_number(para_space, background_index, wavelength,
 ############################################################################################################################################
 def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_names,
                           iteration_start, batch_size,
-                          penalty_batch=None, transfer_vector_batch=None,
+                          penalty_batch=None, transfer_vector_batch=None, results_folder="",
                           csv_path="", name_tag=None):
     """
     Save a batch of scikit-optimize parameter evaluations to CSV, and plot the results.
     Moves both csv_path and best_params_log_{pid}.csv to the folder named by name_tag if provided.
     """
-    import shutil, os
 
     include_penalty = penalty_batch is not None
     include_tf = transfer_vector_batch is not None and transfer_vector_batch[0] is not None
@@ -773,8 +772,8 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
     # Move both CSV files to the results folder, if name_tag is specified
     if name_tag is not None:
         # Build the results folder path (adapt to your exact convention)
-        results_folder = os.path.join(os.path.expanduser("~/Desktop/Results"), f"BP_{name_tag}")
-        os.makedirs(results_folder, exist_ok=True)
+        # results_folder = os.path.join(os.path.expanduser("~/Desktop/Results"), f"BP_{name_tag}")
+        # os.makedirs(results_folder, exist_ok=True)
         # Move the best_params_log_{pid}.csv file
         try:
             shutil.move(para_tag, os.path.join(results_folder, para_tag))

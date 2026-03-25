@@ -99,15 +99,15 @@ else:
 RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
 
 bestvals = {         		            
-    "core_diam": 8.601, 		
-    "core_neff": 1.4579, 
-    "Taper_L": 45000 
+    # "core_diam": 8.601, 		
+    # "core_neff": 1.4579, 
+    # "Taper_L": 45000 
 }
 
 bestval_limits = {         		            
-    "core_diam": (5.5, 20), 	
-    "core_neff": (1.4461, 1.465), 
-    "Taper_L": (30000,50000) 
+    # "core_diam": (5.5, 20), 	
+    # "core_neff": (1.4461, 1.465), 
+    # "Taper_L": (30000,50000) 
 }
 
 variable_params= {

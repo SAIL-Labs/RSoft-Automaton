@@ -574,137 +574,137 @@ class RSoftSim:
                                                                    prior_space_pid, wave, fem = fem)
             return transfer_vector, average_throughput, res_folder, pid_csv
 
-    def MultProc(self, build_tf, json_config, csv_path, simulation_val, prior_space_pid): #csv_path
-        images_dir = Path(os.path.expanduser("~/Desktop/Results/Images"))
-        images_dir.mkdir(parents=True, exist_ok=True)
+    # def MultProc(self, build_tf, json_config, csv_path, simulation_val, prior_space_pid): #csv_path
+    #     images_dir = Path(os.path.expanduser("~/Desktop/Results/Images"))
+    #     images_dir.mkdir(parents=True, exist_ok=True)
 
-        # load prior space
-        if build_tf:
-            for attempt in range(10):
-                try:
-                    with open(prior_space_pid, "r") as read:
-                        param_range = json.load(read)
-                    break
-                except json.decoder.JSONDecodeError:
-                    time.sleep(0.2)
-            else:
-                raise RuntimeError(f"Failed to load {prior_space_pid} after retries.")
-        else:
-            for attempt in range(10):
-                try:
-                    with open("prior_space.json", "r") as read:
-                        param_range = json.load(read)
-                    break
-                except json.decoder.JSONDecodeError:
-                    time.sleep(0.2)
-            else:
-                raise RuntimeError("Failed to load prior_space.json after retries.")
+    #     # load prior space
+    #     if build_tf:
+    #         for attempt in range(10):
+    #             try:
+    #                 with open(prior_space_pid, "r") as read:
+    #                     param_range = json.load(read)
+    #                 break
+    #             except json.decoder.JSONDecodeError:
+    #                 time.sleep(0.2)
+    #         else:
+    #             raise RuntimeError(f"Failed to load {prior_space_pid} after retries.")
+    #     else:
+    #         for attempt in range(10):
+    #             try:
+    #                 with open("prior_space.json", "r") as read:
+    #                     param_range = json.load(read)
+    #                 break
+    #             except json.decoder.JSONDecodeError:
+    #                 time.sleep(0.2)
+    #         else:
+    #             raise RuntimeError("Failed to load prior_space.json after retries.")
             
-        para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
+    #     para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
         
-        # backend of skopt.gp_minimize that can handle multiprocessing
-        opt = Optimizer(
-            dimensions = para_space,
-            base_estimator = "GP",
-            acq_func = "EI",
-            random_state=42
-        )
+    #     # backend of skopt.gp_minimize that can handle multiprocessing
+    #     opt = Optimizer(
+    #         dimensions = para_space,
+    #         base_estimator = "GP",
+    #         acq_func = "EI",
+    #         random_state=42
+    #     )
 
-        sim_param = Simulation_params
-        # how many values in each parameter space to run simulation with
-        total_calls = sim_param["num_paras"]
+    #     sim_param = Simulation_params
+    #     # how many values in each parameter space to run simulation with
+    #     total_calls = sim_param["num_paras"]
 
-        # this is the number of points to sample simultaneously. 
-        # Increase to cycle through prior space quicker at the cost of CPU computation
-        batch_size = sim_param["batch_num"]
-        all_results = []
-        # initialise the optimizer with template solutions
-        param_names = [dim.name for dim in para_space]
-        seed_params = [variable_params[k] for k in param_names]
+    #     # this is the number of points to sample simultaneously. 
+    #     # Increase to cycle through prior space quicker at the cost of CPU computation
+    #     batch_size = sim_param["batch_num"]
+    #     all_results = []
+    #     # initialise the optimizer with template solutions
+    #     param_names = [dim.name for dim in para_space]
+    #     seed_params = [variable_params[k] for k in param_names]
 
-        # self.sym["Name"] = "MCF_Test"
-        if Simulation_params['metric'] != 'TF':
-            throughput, seed_result, pid_csv = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
-            opt.tell(seed_params, seed_result)
-            tf_vector = None
-        else:
-            tf_vector, seed_result, pid_csv = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
-            # seed_result = mode_selective_tf_matrix_metric(tf_vector, simulation_val["core_to_monitor"], simulation_val["modes_to_monitor"])
-            opt.tell(seed_params, seed_result)
+    #     # self.sym["Name"] = "MCF_Test"
+    #     if Simulation_params['metric'] != 'TF':
+    #         throughput, seed_result, pid_csv = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
+    #         opt.tell(seed_params, seed_result)
+    #         tf_vector = None
+    #     else:
+    #         tf_vector, seed_result, pid_csv = self.build_circuit(seed_params, build_tf, json_config, csv_path, simulation_val, prior_space_pid)
+    #         # seed_result = mode_selective_tf_matrix_metric(tf_vector, simulation_val["core_to_monitor"], simulation_val["modes_to_monitor"])
+    #         opt.tell(seed_params, seed_result)
 
-        all_results.append({
-            "params": seed_params,
-            "result": seed_result,
-            "transfer_vector": tf_vector
-        })
+    #     all_results.append({
+    #         "params": seed_params,
+    #         "result": seed_result,
+    #         "transfer_vector": tf_vector
+    #     })
 
-        log_optimizer_results(
-            x_iters=[seed_params],
-            y_vals=[-seed_result],  
-            param_batch=[seed_params],
-            result_batch=[seed_result],
-            param_names=param_names,
-            iteration_start=0,
-            batch_size=1,
-            penalty_batch=None,
-            transfer_vector_batch=[tf_vector],
-            csv_path = csv_path,
-            name_tag = self.sym["Name"]
-        )
-        # run optimizer as normal
-        for i in range(0, total_calls, batch_size):
+    #     log_optimizer_results(
+    #         x_iters=[seed_params],
+    #         y_vals=[-seed_result],  
+    #         param_batch=[seed_params],
+    #         result_batch=[seed_result],
+    #         param_names=param_names,
+    #         iteration_start=0,
+    #         batch_size=1,
+    #         penalty_batch=None,
+    #         transfer_vector_batch=[tf_vector],
+    #         csv_path = csv_path,
+    #         name_tag = self.sym["Name"]
+    #     )
+    #     # run optimizer as normal
+    #     for i in range(0, total_calls, batch_size):
             
-            # Suggest next batch of points
-            param_batch = opt.ask(batch_size)
+    #         # Suggest next batch of points
+    #         param_batch = opt.ask(batch_size)
 
-            # Evaluate in parallel
-            ctx = mp.get_context("spawn")
-            args_list = [(params, build_tf, json_config, csv_path, simulation_val, prior_space_pid) for params in param_batch]
-            with ctx.Pool(batch_size) as pool:
-                result_batch = pool.map(run_rsoft_sim, args_list) 
+    #         # Evaluate in parallel
+    #         ctx = mp.get_context("spawn")
+    #         args_list = [(params, build_tf, json_config, csv_path, simulation_val, prior_space_pid) for params in param_batch]
+    #         with ctx.Pool(batch_size) as pool:
+    #             result_batch = pool.map(run_rsoft_sim, args_list) 
 
-            # Feed results back to optimizer
-            # opt.tell(param_batch, result_batch)
-            if Simulation_params['metric'] == 'TF':
-                scores_only = [score for _, score in result_batch]
-                opt.tell(param_batch, scores_only)
-            else:
-                opt.tell(param_batch, result_batch)
+    #         # Feed results back to optimizer
+    #         # opt.tell(param_batch, result_batch)
+    #         if Simulation_params['metric'] == 'TF':
+    #             scores_only = [score for _, score in result_batch]
+    #             opt.tell(param_batch, scores_only)
+    #         else:
+    #             opt.tell(param_batch, result_batch)
             
-            for p, r in zip(param_batch, result_batch):
-                if Simulation_params['metric'] == 'TF':
-                    tf_vector, score = r
-                else:
-                    tf_vector = None
-                    score = r
-                all_results.append({
-                    "params": p,
-                    "result": score,
-                    "transfer_vector": tf_vector
-                })
+    #         for p, r in zip(param_batch, result_batch):
+    #             if Simulation_params['metric'] == 'TF':
+    #                 tf_vector, score = r
+    #             else:
+    #                 tf_vector = None
+    #                 score = r
+    #             all_results.append({
+    #                 "params": p,
+    #                 "result": score,
+    #                 "transfer_vector": tf_vector
+    #             })
                 
-            # all_results.extend(zip(param_batch, result_batch))
+    #         # all_results.extend(zip(param_batch, result_batch))
 
-            '''
-            save results for plotting/analysis
-            '''
+    #         '''
+    #         save results for plotting/analysis
+    #         '''
             
-            # Unpack results
-            x_iters = [r["params"] for r in all_results]  # parameter sets
-            y_vals = [-r["result"] for r in all_results]  # throughput values
-            tf_vector_val = [r["transfer_vector"] for r in all_results]
+    #         # Unpack results
+    #         x_iters = [r["params"] for r in all_results]  # parameter sets
+    #         y_vals = [-r["result"] for r in all_results]  # throughput values
+    #         tf_vector_val = [r["transfer_vector"] for r in all_results]
 
-            param_names = [dim.name for dim in opt.space.dimensions]
-            # log chosen values and penalties
-            log_optimizer_results(x_iters, y_vals,
-                                  param_batch, 
-                                  [r["result"] for r in all_results[-batch_size:]],
-                                  param_names, iteration_start=i,
-                                  batch_size = batch_size,
-                                  penalty_batch= None,
-                                  transfer_vector_batch=tf_vector_val, 
-                                  csv_path = csv_path, 
-                                  name_tag = self.sym["Name"])
+    #         param_names = [dim.name for dim in opt.space.dimensions]
+    #         # log chosen values and penalties
+    #         log_optimizer_results(x_iters, y_vals,
+    #                               param_batch, 
+    #                               [r["result"] for r in all_results[-batch_size:]],
+    #                               param_names, iteration_start=i,
+    #                               batch_size = batch_size,
+    #                               penalty_batch= None,
+    #                               transfer_vector_batch=tf_vector_val, 
+    #                               csv_path = csv_path, 
+    #                               name_tag = self.sym["Name"])
 
     def RunRSoft(self, simulation_val, prior_space_pid, wave, delta_index_at_reference_wavelength, csv_path, json_config, pid, fem=False, simulate=False, build_tf = True): #csv_path, 
         '''
@@ -775,6 +775,7 @@ class RSoftSim:
             batch_size=1,
             penalty_batch=None,
             transfer_vector_batch=[tf_vector],
+            results_folder = res_folder,
             csv_path = csv_path,
             name_tag = self.sym["Name"]
         )
