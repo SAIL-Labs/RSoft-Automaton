@@ -809,12 +809,12 @@ def multiple_mode_tf(arg_list):
     '''
     TO DO: fix up the gridding part of this code.
     '''
-    if len(arg_list) == 13:
-        sim_val, custom_priors, wave, m, rm, params, fem, taper_min, taper_max, gridding, delta_index_at_reference_wavelength, core_neff_idx, iteration_num = arg_list
+    if len(arg_list) == 14:
+        sim_val, custom_priors, wave, m, rm, cand_idx, param, fem, taper_min, taper_max, gridding, delta_index_at_reference_wavelength, core_neff_idx, iteration_num = arg_list
     # elif len(arg_list) == 11:
     #     sim_val, custom_priors, wave, m, rm, params, fem, taper_min, taper_max, gridding, iteration_num = arg_list
-    elif len(arg_list) == 8:
-        sim_val, custom_priors, gr, params, taper_min, taper_max, gridding, iteration_num = arg_list
+    elif len(arg_list) == 9:
+        sim_val, custom_priors, gr, cand_idx, param, taper_min, taper_max, gridding, iteration_num = arg_list
     else:
         raise RuntimeError(f"There are some values unaccounted for while building the multprocessor. The total number of arguments should be {len(arg_list)}")
     if gridding:
@@ -845,6 +845,7 @@ def multiple_mode_tf(arg_list):
         sim_val["launch_mode_radial"] = rm
         sim_val["iter_num"] = iteration_num
         sim_val["free_space_wavelength"] = wave
+        sim_val["cand_idx"] = cand_idx
 
         # Open file containing the refractive indices determined from the Selmeier equation
         stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
@@ -864,7 +865,7 @@ def multiple_mode_tf(arg_list):
         param_names = list(variable_params.keys())
 
         # Assign the new params directly to the special core
-        for pname, pval in zip(param_names, params):
+        for pname, pval in zip(param_names, param):
             sim_val[f"core_{core_to_monitor}"][pname] = pval
             variable_params[pname] = pval
         
@@ -892,7 +893,7 @@ def multiple_mode_tf(arg_list):
     sim.init_priors(prior_space_pid, build_tf, custom_priors)
 
     # run simulation
-    results_folder, res_folder, pid_csv = sim.RunRSoft(sim_val, prior_space_pid, wave, delta_index_at_reference_wavelength,csv_path = optimizer_result, json_config = code_config, pid = pid, fem = fem, build_tf = build_tf)
+    results_folder, res_folder, pid_csv = sim.RunRSoft(sim_val, prior_space_pid, wave, delta_index_at_reference_wavelength[cand_idx],csv_path = optimizer_result, json_config = code_config, pid = pid, fem = fem, build_tf = build_tf)
 
     # Load results
     best_para_log = os.path.join(results_folder, f"best_params_log_{pid}.csv")    
@@ -916,6 +917,7 @@ def multiple_mode_tf(arg_list):
 def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, fem = False, gridding = False): 
 
     tf_list = []
+    params = np.asarray(params, dtype=float)
 
     if "core_neff" in variable_params:
         # get index of core_neff in variable_params
@@ -927,7 +929,7 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_v
         stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
         _, refractive_index_at_reference_wave = find_nearest(stored_data["Wavelength (um)"].to_numpy(), min(simulation_val["free_space_wavelength"])) # only calculate the contrast from the smallest wavelength simulated
         Silica_refractive_index_at_reference_wavelength = stored_data["SiO2"].to_numpy()[refractive_index_at_reference_wave]
-        delta_index_at_reference_wavelength = params[core_neff_idx] - Silica_refractive_index_at_reference_wavelength
+        delta_index_at_reference_wavelength = params[:, core_neff_idx] - Silica_refractive_index_at_reference_wavelength
     
     if not gridding:
         # initialise global parent argument list. This creates multiple instances of args_list based on the length of
@@ -935,16 +937,16 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_v
         # [(simulation_val, 0, 1, params, False),(simulation_val, 1, 1, params, False),(simulation_val, -1, 1, params, False), .....]
         if "core_neff" in variable_params.keys():
             args_list = [
-                        (simulation_val, custom_priors, wavelengths, m, rm, param, fem, taper_min, taper_max, gridding, 
+                        (simulation_val, custom_priors, wavelengths, m, rm, cand_idx, param, fem, taper_min, taper_max, gridding, 
                         delta_index_at_reference_wavelength, core_neff_idx, iteration_num) 
-                        for param in params
+                        for cand_idx, param in enumerate(params)
                         for wavelengths in simulation_val["free_space_wavelength"] 
                         for m, rm in zip(mode_vals, radial_mode_vals)
                         ] 
         else:
             args_list = [
-                        (simulation_val, custom_priors,wavelengths,m, rm, param, fem, taper_min, taper_max, gridding, iteration_num) 
-                        for param in params
+                        (simulation_val, custom_priors,wavelengths,m, rm, cand_idx, param, fem, taper_min, taper_max, gridding, iteration_num) 
+                        for cand_idx, param in enumerate(params)
                         for wavelengths in simulation_val["free_space_wavelength"] 
                         for m, rm in zip(mode_vals, radial_mode_vals)
                         ] 
