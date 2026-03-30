@@ -1220,13 +1220,14 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
         print(f"Loaded optimiser checkpoint from {opt_checkpoint_path}")
     else:
         opt = Optimizer(
-            dimensions=para_space,
-            base_estimator="GP",
-            acq_func="EI",
-            acq_func_kwargs={"xi": 0.8},
-            acq_optimizer="sampling",
-            random_state=None,
-            n_initial_points=50
+            dimensions=para_space, # Parameter search space (bounds + types)
+            base_estimator="GP", # Surrogate model (Gaussian Process)
+            acq_func="EI", # Acquisition function (chooses next point)
+            acq_func_kwargs={"xi": 0.8}, # EI exploration strength (higher = more exploration)
+            acq_optimizer="sampling", # How acquisition is maximised (random sampling)
+            # acq_optimizer_kwargs = {"n_points": 10000}, # Number of samples used to find best next point
+            random_state=None, # Random seed (None = non-reproducible)
+            n_initial_points=50 # Number of random iterations before BO starts
         )
 
     # if true, run optimisation testing the loss metric
