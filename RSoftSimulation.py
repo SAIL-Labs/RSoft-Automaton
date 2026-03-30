@@ -934,9 +934,20 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_v
         # mode_vals or radial_mode_vals. i.e. 
         # [(simulation_val, 0, 1, params, False),(simulation_val, 1, 1, params, False),(simulation_val, -1, 1, params, False), .....]
         if "core_neff" in variable_params.keys():
-            args_list = [(simulation_val, custom_priors,wavelengths,m, rm, params, fem, taper_min, taper_max, gridding, delta_index_at_reference_wavelength, core_neff_idx, iteration_num) for wavelengths in simulation_val["free_space_wavelength"] for m, rm in zip(mode_vals, radial_mode_vals)] 
+            args_list = [
+                        (simulation_val, custom_priors, wavelengths, m, rm, param, fem, taper_min, taper_max, gridding, 
+                        delta_index_at_reference_wavelength, core_neff_idx, iteration_num) 
+                        for param in params
+                        for wavelengths in simulation_val["free_space_wavelength"] 
+                        for m, rm in zip(mode_vals, radial_mode_vals)
+                        ] 
         else:
-            args_list = [(simulation_val, custom_priors,wavelengths,m, rm, params, fem, taper_min, taper_max, gridding, iteration_num) for wavelengths in simulation_val["free_space_wavelength"] for m, rm in zip(mode_vals, radial_mode_vals)] 
+            args_list = [
+                        (simulation_val, custom_priors,wavelengths,m, rm, param, fem, taper_min, taper_max, gridding, iteration_num) 
+                        for param in params
+                        for wavelengths in simulation_val["free_space_wavelength"] 
+                        for m, rm in zip(mode_vals, radial_mode_vals)
+                        ] 
     else:
         # run gridding determination
         grid_size_list = np.arange(0.1, 2.1, 0.1)
@@ -951,7 +962,7 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_v
         
     # note 'spawn' means Python will start n separate processes each with their own memory of global variables. 
     # You need to define any changes within their own instance or else NOTHING changes.
-    with mp.get_context("spawn").Pool(processes=int(simulation_val["core_num"])*len(simulation_val["free_space_wavelength"]) if not gridding else 20) as pool:
+    with mp.get_context("spawn").Pool(processes=len(simulation_val["mode_vals"])*len(simulation_val["free_space_wavelength"]) if not gridding else 20) as pool:
         # supply multiple_mode_tf with the arguments required to run. 
         # Since the number of processes match the length of the mode_vals/radial_mode_vals
         # then each worker gets an instance of arg_list. i.e. arg_list[i]
@@ -989,10 +1000,6 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         tf_list, res_folder = run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_vals, radial_mode_vals, taper_min, taper_max, gridding)
     
     # Aggregate result (compute scalar loss/metric for this parameter vector)
-    """
-    put code to build the tf matrix here!!!!!
-    use only 1 fixed name since the multiprocessing is in run_tf_multproc, not here; oNLY 1 MATRIX IS MADE PER ITERATION
-    """
     core_to_monitor = simulation_val["core_to_monitor"] - 1
     core_number = simulation_val["core_num"]
     modes_to_monitor = ["LP01"]  
@@ -1330,15 +1337,18 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             run_tf_multproc(params, 1,simulation_val, custom_priors, mode_vals, 
                             radial_mode_vals,taper_min, taper_max, fem = True, gridding=gridding)
 
-        for batch_idx in range(start_iter, total_calls):
+        # start at whatever the last iteration was (or 0), but scale the total number of iterations based
+        # on the number of selected parameter vectors.
+        for batch_idx in range(start_iter, total_calls, simulation_val["n_points"]):
             # ask for 1 set of parameter vectors only to prevent daemonic process having children 
-            param_batch = opt.ask() 
+            param_batch = opt.ask(n_points=simulation_val["n_points"]) 
 
-            print("Trying " + ", ".join(
-                f"Core neff: {param_batch[l]:.3f}" if text == "core_neff"
-                else f"{text}: {param_batch[l]:.3f}"
-                for l, text in enumerate(variable_params.keys())
-            ))         
+            for para in param_batch:
+                print("Trying " + ", ".join(
+                    f"Core Refractive Index: {para[l]:.3f}" if text == "core_neff"
+                    else f"{text}: {para[l]:.3f}"
+                    for l, text in enumerate(variable_params.keys())
+                ))         
             
             result_batch, df_wave_log = run_all_modes_for_params(param_batch, batch_idx + 1, 
                                                                       simulation_val, custom_priors, taper_min, 
@@ -1347,20 +1357,20 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             # tell optimiser the performance of the chosen parameters
             opt.tell(param_batch, result_batch)
 
-            # log iteration of parameters, store for later use, rows are the wavelength used
-            print(f"Iteration {batch_idx + 1}: {result_batch:.6f}")
+            # # log iteration of parameters, store for later use, rows are the wavelength used
+            # print(f"Iteration {batch_idx + 1}: {result_batch:.6f}")
 
-            for w, group in df_wave_log.groupby("Wavelength"):
-                row = group.iloc[0]  # safe: all rows for this wavelength share same loss terms
+            # for w, group in df_wave_log.groupby("Wavelength"):
+            #     row = group.iloc[0]  # safe: all rows for this wavelength share same loss terms
 
-                print(
-                    f"  wavelength ={w:.3f} µm | "
-                    f"(a, b, c, d)=("
-                    f"{row['Loss_a']:.6g}, "
-                    f"{row['Loss_b']:.6g}, "
-                    f"{row['Loss_c']:.6g}, "
-                    f"{row['Loss_d']:.6g})"
-                )
+            #     print(
+            #         f"  wavelength ={w:.3f} µm | "
+            #         f"(a, b, c, d)=("
+            #         f"{row['Loss_a']:.6g}, "
+            #         f"{row['Loss_b']:.6g}, "
+            #         f"{row['Loss_c']:.6g}, "
+            #         f"{row['Loss_d']:.6g})"
+            #     )
 
             # convert df_wave_log to numpy array
             loss_terms = df_wave_log[["Wavelength","Loss_a","Loss_b","Loss_c","Loss_d"]].to_numpy()
