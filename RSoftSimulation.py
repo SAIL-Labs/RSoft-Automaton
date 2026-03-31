@@ -1051,14 +1051,20 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         results_path = Path(rf'C:\Users\RSoft Things\Desktop\Results\BP_SimulationNum_{iteration_num}')
         wavelength_results_folder = r'C:\Users\RSoft Things\Desktop\Results\Wavelength_results'
         
-        ind_files = list(results_path.glob("1.9_LP01_*.ind")) # returns a list
+        ind_files = list(results_path.glob("1.5_LP01_*.ind")) # returns a list
+        if ind_files is None:
+            for wave_num in simulation_val["wavelengths"]:
+                ind_files = list(results_path.glob(f"{wave_num}_LP01_*.ind"))
+                if ind_files:
+                    continue
+
         if not ind_files:
             raise FileNotFoundError(f"No .ind file found in: {results_path}")
 
         ind_file = ind_files[0]
         shutil.copy2(ind_file, wavelength_results_folder)
 
-        for m in range(n_modes):
+        for m, n in zip(range(n_modes), params):
             mode_label = (
                 mode_labels_raw[m] if (mode_labels_raw is not None and m < len(mode_labels_raw))
                 else f"Mode{m+1}"
@@ -1073,10 +1079,10 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
                 "Loss_b": arr_results[1],
                 "Loss_c": arr_results[2],
                 "Loss_d": arr_results[3],
-                f"{k_arr[0]}": float(params[0]),
-                f"{k_arr[1]}": float(params[1]),
-                f"{k_arr[2]}": float(params[2]),
-                f"Delta n({simulation_val['free_space_wavelength'][0]} um)": float(params[1] - Cladding_ref_ind),
+                f"{k_arr[0]}": float(n[0]),
+                f"{k_arr[1]}": float(n[1]),
+                f"{k_arr[2]}": float(n[2]),
+                f"Delta n({simulation_val['free_space_wavelength'][0]} um)": float(n[1] - Cladding_ref_ind),
                 "Non-MS Core Refractive Index": Other_core_ref_ind,
                 "Cladding Refractive Index": Cladding_ref_ind,
                 "Capillary Refractive Index": Capillary_ref_ind,
@@ -1345,6 +1351,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             # ask for 1 set of parameter vectors only to prevent daemonic process having children 
             param_batch = opt.ask(n_points=simulation_val["n_points"]) 
 
+            print(f"Iteration {batch_idx + 1}:")
             for para in param_batch:
                 print("Trying " + ", ".join(
                     f"Core Refractive Index: {para[l]:.3f}" if text == "core_neff"
@@ -1359,20 +1366,20 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             # tell optimiser the performance of the chosen parameters
             opt.tell(param_batch, result_batch)
 
-            # # log iteration of parameters, store for later use, rows are the wavelength used
-            # print(f"Iteration {batch_idx + 1}: {result_batch:.6f}")
+            # log iteration of parameters, store for later use, rows are the wavelength used
+            print(f"Iteration {batch_idx + 1} result(s): {result_batch:.6f}")
 
-            # for w, group in df_wave_log.groupby("Wavelength"):
-            #     row = group.iloc[0]  # safe: all rows for this wavelength share same loss terms
+            for w, group in df_wave_log.groupby("Wavelength"):
+                row = group.iloc[0]  # safe: all rows for this wavelength share same loss terms
 
-            #     print(
-            #         f"  wavelength ={w:.3f} µm | "
-            #         f"(a, b, c, d)=("
-            #         f"{row['Loss_a']:.6g}, "
-            #         f"{row['Loss_b']:.6g}, "
-            #         f"{row['Loss_c']:.6g}, "
-            #         f"{row['Loss_d']:.6g})"
-            #     )
+                print(
+                    f"  wavelength ={w:.3f} µm | "
+                    f"(a, b, c, d)=("
+                    f"{row['Loss_a']:.6g}, "
+                    f"{row['Loss_b']:.6g}, "
+                    f"{row['Loss_c']:.6g}, "
+                    f"{row['Loss_d']:.6g})"
+                )
 
             # convert df_wave_log to numpy array
             loss_terms = df_wave_log[["Wavelength","Loss_a","Loss_b","Loss_c","Loss_d"]].to_numpy()
