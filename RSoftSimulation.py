@@ -217,8 +217,8 @@ class RSoftSim:
         onedrive_filename = name_tag + ".ind"
         onedrive_filename_results = name_tag + "_mon.dat"
         onedrive_femsim_filename_results = femsim_name_tag + ".ind"
-        onedrive_neff_csv_path = Path(onedrive_results_folder) / f"{wave}_Guided Modes_{pid_csv}_{run_tag}.csv"
-        neff_csv_path = Path(results_folder) / f"{wave}_Guided Modes_{pid_csv}_{run_tag}.csv"
+        onedrive_neff_csv_path = Path(onedrive_results_folder) / f"{wave}_Guided Modes_{run_tag}.csv"
+        neff_csv_path = Path(results_folder) / f"{wave}_Guided Modes_{run_tag}.csv"
 
         file_extensions_to_copy = [
            onedrive_filename, onedrive_filename_results, onedrive_femsim_filename_results,onedrive_neff_csv_path
@@ -825,6 +825,8 @@ def multiple_mode_tf(arg_list):
         sim_val, custom_priors, wave, m, rm, cand_idx, param, fem, taper_min, taper_max, gridding, delta_index_at_reference_wavelength, core_neff_idx, iteration_num = arg_list
     # elif len(arg_list) == 11:
     #     sim_val, custom_priors, wave, m, rm, params, fem, taper_min, taper_max, gridding, iteration_num = arg_list
+    elif len(arg_list) == 13:
+        sim_val, custom_priors, wave, m, rm, cand_idx, param, fem, taper_min, taper_max, gridding, iteration_num = arg_list
     elif len(arg_list) == 9:
         sim_val, custom_priors, gr, cand_idx, param, taper_min, taper_max, gridding, iteration_num = arg_list
     else:
@@ -938,6 +940,8 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_v
 
     tf_list = []
     params = np.asarray(params, dtype=float)
+    if params.ndim == 1:
+        params = params[np.newaxis, :]
 
     if "core_neff" in variable_params:
         # get index of core_neff in variable_params
@@ -1017,7 +1021,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         # run gridding determination
         grid_size_range, tf_list, res_folder = run_tf_multproc(params, iteration_num, simulation_val, 
                                                                custom_priors, mode_vals, radial_mode_vals, 
-                                                               params, taper_min, taper_max, gridding)
+                                                               taper_min, taper_max, gridding=gridding)
         return grid_size_range, tf_list
     
     # multiprocessing in here, we only want multiprocessing in this function and not in main_optimizer!!!!
@@ -1042,6 +1046,27 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
     for cand_idx in sorted(by_candidate.keys()):
         candidate_tf_list = by_candidate[cand_idx]
         candidate_params = params[cand_idx]
+        run_tag = candidate_tf_list[0][4]
+
+        results_path = Path(res_folder)
+        wavelength_results_folder = Path(outdir)
+        
+        param_names = list(variable_params.keys())
+        chosen_wavelength = simulation_val["free_space_wavelength"][0]
+        param_tag = "_".join(
+            f"{pname}_{float(candidate_params[i]):.6f}"
+            for i, pname in enumerate(param_names)
+        )
+
+        ind_pattern = f"{chosen_wavelength}_LP01_{param_tag}.ind"
+        ind_files = list(results_path.glob(ind_pattern))
+
+        if not ind_files:
+            print(f"[WARN] No .ind file found for candidate {cand_idx} with pattern: {ind_pattern}")
+            ind_file = None
+        else:
+            ind_file = ind_files[0]
+            shutil.copy2(ind_file, wavelength_results_folder)
 
         final_loss, df_wave_log = build_df_wave_log_for_candidate(
             candidate_tf_list=candidate_tf_list,
@@ -1057,6 +1082,76 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             f"wavelength_loss_iter_{iteration_num}_cand_{cand_idx}_{simulation_val['core_num']}{simulation_val['grid_type']}_{simulation_val['mon_type']}_NumModes_{len(simulation_val['mode_vals'])}.csv"
         )
         df_wave_log.to_csv(out_csv, index=False)
+
+        # Globally fixed parameters
+        core_pos = core_pos_geo(simulation_val)
+
+        glob_fix_param = {
+            "Time CSV Created": datetime.datetime.now(),
+            "Non-MS Core Diameter ($\mu m$)": core_params[f"core_{(simulation_val['core_to_monitor'] + 1)%simulation_val['core_num']}"]["core_diam"],
+            "Cladding Diameter ($\mu m$)": fixed_params["MCFCladd"],
+            "Core Separation ($\mu m$)": fixed_params["core_sep"],
+            "MS Core Position": core_pos[simulation_val['core_to_monitor']-1],
+            "MS Mode": LP_mode_dict_rot[0], # Need to somehow make this dynamic, only selects LP01 atm
+            "Core Configuration": simulation_val['grid_type'],
+            "Number of Cores": simulation_val["core_num"],
+            "Example .ind File Used": str(ind_file),
+            "Loss_a config.": "LP01" if not simulation_val["all_modes"] else "LP01 + higher order modes"
+        }
+
+        # extract variable parameter keys
+        # k_arr = []
+        # for k in param_names:
+        #     k_arr.append(k)
+        # k_arr = np.array(k_arr)
+
+        if "taper" not in param_names:
+            glob_fix_param["Taper"] = fixed_params["taper"]
+
+        # append_kv_rows(wave_rows, "GLOBAL", glob_fix_param, base_cols)
+
+        ## Legend
+        leg = {
+            "Loss_a": ("Intensity of MS mode in the MS core with the sum of intensities of higher order modes in ms core" if simulation_val["all_modes"] else "Intensity of MS mode in the MS core"),
+            "Loss_b": "Mean intensity of non MS modes in non MS cores",
+            "Loss_c": "Mean intensity of non MS modes exciting LP01 in MS core",
+            "Loss_d": "Mean intensity of MS mode in non MS cores",
+            "Loss": "-Loss_a - Loss_b + (Loss_c + Loss_d) + 2",
+            "Extra Mode Intensity in Loss_a": "Total number of amplitudes corresponding to higher order modes included in Loss_a",
+            f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should give a slightly different value for different wavelengths.",
+            "Guided Modes": "Total number of modes, including rotations AND polarisations, being guided in the fibre."
+        }
+
+        # now append the global and legend
+        with open(out_csv, "a", newline="") as f:
+            f.write("\n")  # blank line
+
+            f.write("Globally Fixed Parameters\n")
+            for k, v in glob_fix_param.items():
+                f.write(f"{k}: {v}\n")
+
+            f.write("\nLegend\n")
+            for k, v in leg.items():
+                f.write(f"{k}: {v}\n")
+
+        # results_path = Path(res_folder)
+        # wavelength_results_folder = Path(outdir)
+
+        # # unique_waves = df_wave_log["Wavelength"].unique()
+
+        # # for w in unique_waves:
+        # #     # Build pattern using run_tag
+        # #     ind_pattern = f"{w}_LP01_*.ind"
+
+        # #     ind_files = list(results_path.glob(ind_pattern))
+
+        # #     if not ind_files:
+        # #         print(f"[WARN] No .ind file found named {ind_pattern}")
+        # #         continue
+
+        # #     # Copy all matching (safer than assuming 1)
+        # #     for ind_file in ind_files:
+        # #         shutil.copy2(ind_file, wavelength_results_folder)
 
         final_losses.append(final_loss)
         df_wave_logs.append(df_wave_log)
@@ -1314,38 +1409,61 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
     if simulate_tf_metric:
         all_results = load_checkpoint_npy(results_checkpoint_path)
         wave_logs = []
-        start_iter = len(all_results)
+        completed_candidates = len(all_results)
+        completed_batches = completed_candidates // simulation_val["n_points"]
 
-        if start_iter > 0:
-            print(f"Resuming from iteration {start_iter + 1}")
+        if completed_candidates > 0:
+            print(f"Resuming from iteration {completed_batches + 1}")
         else:
             print("No existing results checkpoint found. Starting fresh.")
 
         if bestvals:
-            # checking if femsim files exist. If they do, continue. If not, generate the,
+            # checking if femsim files exist. If they do, continue. If not, generate them
             femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.447962_Taper_L_50000.000000_ex.m00"
             if not fem_fields_present(femSIM_file_example):
                 print("No suitable FemSIM field profiles detected. Generating...")
                 param_names = ["core_diam", "core_neff"]
                 params = [variable_params[k] for k in param_names]
-                run_tf_multproc(params, 1,simulation_val, custom_priors, mode_vals, 
-                                radial_mode_vals,taper_min, taper_max, fem = True, gridding=gridding)
-            
-            for batch_idx, para_set in enumerate(para_space):
-                param_batch = para_set
-                print("Trying " + ", ".join(
-                f"Core neff: {param_batch[l]:.3f}" if text == "core_neff"
-                else f"{text}: {param_batch[l]:.3f}"
-                for l, text in enumerate(variable_params.keys())
-                ))         
+                run_tf_multproc(
+                    params, 1, simulation_val, custom_priors, mode_vals,
+                    radial_mode_vals, taper_min, taper_max, fem=True, gridding=gridding
+                )
 
-                result_batch, df_wave_log = run_all_modes_for_params(param_batch, batch_idx + 1, 
-                                                                        simulation_val, custom_priors, taper_min, 
-                                                                        taper_max, gridding = gridding)
-                
-                print(f"Iteration {batch_idx + 1}: {result_batch:.6f}")
-                for cand_idx, df_wave_log in enumerate(df_wave_log):
-                    print(f"\nCandidate {cand_idx}:")
+            para_space = np.asarray(para_space, dtype=float)
+            if para_space.ndim == 1:
+                para_space = para_space[np.newaxis, :]
+
+            batch_size = simulation_val["n_points"]
+
+            for batch_idx, start_idx in enumerate(range(completed_candidates, len(para_space), batch_size)):
+                param_batch = para_space[start_idx:start_idx + batch_size]
+
+                print(f"Iteration {batch_idx + 1}:")
+                for cand_idx, para in enumerate(param_batch):
+                    print(
+                        f"  Candidate {cand_idx}: "
+                        + ", ".join(
+                            f"Core neff: {para[l]:.3f}" if text == "core_neff"
+                            else f"{text}: {para[l]:.3f}"
+                            for l, text in enumerate(variable_params.keys())
+                        )
+                    )
+
+                result_batch, df_wave_logs = run_all_modes_for_params(
+                    param_batch, batch_idx + 1,
+                    simulation_val, custom_priors, taper_min,
+                    taper_max, gridding=gridding
+                )
+
+                # if only one candidate came back, normalise to list form
+                if not isinstance(result_batch, list):
+                    result_batch = [result_batch]
+                    df_wave_logs = [df_wave_logs]
+
+                for cand_idx, (param_vec, df_wave_log, loss_val) in enumerate(
+                    zip(param_batch, df_wave_logs, result_batch)
+                ):
+                    print(f"\nCandidate {cand_idx}: final_loss = {loss_val:.6f}")
 
                     for w, group in df_wave_log.groupby("Wavelength"):
                         row = group.iloc[0]
@@ -1359,9 +1477,8 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                             f"{row['Loss_d']:.6g})"
                         )
 
-                    # convert df_wave_log to numpy array
-                    loss_terms = df_wave_log[["Wavelength","Loss_a","Loss_b","Loss_c","Loss_d"]].to_numpy()
-                    
+                    loss_terms = df_wave_log[["Wavelength", "Loss_a", "Loss_b", "Loss_c", "Loss_d"]].to_numpy()
+
                     core_amp_cols = sorted(
                         [c for c in df_wave_log.columns if c.startswith("Core_") and c.endswith("_Amp")],
                         key=lambda s: int(s.split("_")[1])
@@ -1371,6 +1488,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                         [c for c in df_wave_log.columns if c.startswith("Core_") and c.endswith("_Phase")],
                         key=lambda s: int(s.split("_")[1])
                     )
+
                     amp = df_wave_log[core_amp_cols].to_numpy(dtype=float)
                     phase = df_wave_log[core_phase_cols].to_numpy(dtype=float)
 
@@ -1388,11 +1506,13 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                     ex_phase = df_wave_log[extra_phase_cols].to_numpy(dtype=float)
 
                     number_of_guided_modes = df_wave_log["Guided Modes"].to_numpy()
+
                     iter_result = {
-                        'params': param_batch,
-                        'result': result_batch,
-                        'Iteration': batch_idx + 1,
+                        "params": param_vec,
+                        "result": loss_val,
+                        "Iteration": batch_idx + 1,
                         "Candidate Index": cand_idx,
+                        "Global Candidate Index": start_idx + cand_idx,
                         "Loss Metric": loss_terms,
                         "Number of Guided Modes": number_of_guided_modes,
                         "Core Amplitudes": amp,
@@ -1401,8 +1521,10 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                         "Extra Core Phases": ex_phase
                     }
 
-                all_results.append(iter_result)
+                    all_results.append(iter_result)
+
                 atomic_save_npy(all_results, results_checkpoint_path)
+
             return all_results
         
         # checking if femsim files exist. If they do, continue. If not, generate the,
@@ -1416,7 +1538,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
 
         # start at whatever the last iteration was (or 0), but scale the total number of iterations based
         # on the number of selected parameter vectors.
-        for batch_idx in range(start_iter, total_calls, simulation_val["n_points"]):
+        for batch_idx in range(completed_batches, total_calls//simulation_val["n_points"]):
             # ask for 1 set of parameter vectors only to prevent daemonic process having children 
             param_batch = opt.ask(n_points=simulation_val["n_points"]) 
 
@@ -1435,9 +1557,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             # tell optimiser the performance of the chosen parameters
             opt.tell(param_batch, result_batch)
 
-            # for cand_idx, loss_val in enumerate(result_batch):
-            #     print(f"  Candidate {cand_idx}: final_loss = {loss_val:.6f}")
-            for cand_idx, (df_wave_log, loss_val) in enumerate(zip(df_wave_logs, result_batch)):
+            for cand_idx, (param_vec, df_wave_log, loss_val) in enumerate(zip(param_batch, df_wave_logs, result_batch)):
                 print(f"\nCandidate {cand_idx}: final_loss = {loss_val:.6f}")
                 for w, group in df_wave_log.groupby("Wavelength"):
                     row = group.iloc[0]
@@ -1481,8 +1601,8 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
 
                 number_of_guided_modes = df_wave_log["Guided Modes"].to_numpy()
                 iter_result = {
-                    'params': param_batch,
-                    'result': result_batch,
+                    'params': param_vec,
+                    'result': loss_val,
                     'Iteration': batch_idx + 1,
                     "Candidate Index": cand_idx,
                     "Loss Metric": loss_terms,
@@ -1493,7 +1613,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                     "Extra Core Phases": ex_phase
                 }
 
-            all_results.append(iter_result)
+                all_results.append(iter_result)
             atomic_save_npy(all_results, results_checkpoint_path)
         return all_results
     

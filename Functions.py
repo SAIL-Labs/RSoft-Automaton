@@ -824,7 +824,12 @@ def build_df_wave_log_for_candidate(
             for (lab, arr, wave, pid, rtag) in candidate_tf_list
             if float(wave) == float(w)
         ]
-        run_tag_w = tf_list_w[0][4] # all rows in this wavelength group should belong to the same candidate and share the same run tag
+        # run_tag_w = tf_list_w[0][4] # all rows in this wavelength group should belong to the same candidate and share the same run tag
+        run_tags_w = [rtag for (_, _, _, _, rtag) in tf_list_w]
+        if len(run_tags_w) != 1:
+            run_tag_w = run_tags_w[0]
+            # raise ValueError(f"Expected one run_tag for candidate {candidate_idx}, wavelength {w}, got {run_tags_w}")
+        # run_tag_w = next(iter(run_tags_w))
         tf_list_w_arr = [arr for (_, arr, _, _,_) in tf_list_w]
         mode_labels_raw = [lab for (lab, _, _, _,_) in tf_list_w]
         pid_w = [pid_raw for (_, _, _, pid_raw,_) in tf_list_w]
@@ -905,7 +910,6 @@ def build_df_wave_log_for_candidate(
             wave_rows.append(row)
 
     df_wave_log = pd.DataFrame(wave_rows)
-
     if len(unique_waves) == 1:
         final_loss = float(df_wave_log["Loss Value"].iloc[0])
     else:
@@ -1213,10 +1217,10 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_b,
     tf_list_params_results = list(zip(params, results))
     core_num = simulation_val["core_num"]
     # search for each Guided Mode csv file created and pick only the most recent one to read, since they are all the same.
-    guided_mode_pattern = os.path.join(folder, f"{wave}_Guided Modes_{csv_pid[0]}_{run_tag}.csv")
+    guided_mode_pattern = os.path.join(folder, f"{wave}_Guided Modes_{run_tag}.csv")
     matches = glob.glob(guided_mode_pattern)
     if not matches:
-        raise FileNotFoundError(f"No {wave}_Guided Modes_{csv_pid}.csv files found in {folder}")
+        raise FileNotFoundError(f"No {wave}_Guided Modes_{run_tag}.csv files found in {folder}")
     guided_path = max(matches, key=os.path.getmtime)
     df = pd.read_csv(guided_path)
     num_modes = len(df["Mode_Index"].values) # this takes all polarisations of each mode (including LP01), for plotting only
