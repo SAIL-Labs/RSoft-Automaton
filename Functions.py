@@ -10,6 +10,7 @@ import matplotlib.animation as animation
 from matplotlib.animation import FFMpegWriter
 from matplotlib import colors
 from matplotlib.colors import Normalize
+import datetime
 import glob
 import ehtplot.color
 import cmocean
@@ -720,7 +721,7 @@ def filter_parameter_space_by_v_number(para_space, background_index, wavelength,
 def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_names,
                           iteration_start, batch_size,
                           penalty_batch=None, transfer_vector_batch=None, results_folder="",
-                          csv_path="", name_tag=None):
+                          csv_path="", name_tag=None, run_tag=None):
     """
     Save a batch of scikit-optimize parameter evaluations to CSV, and plot the results.
     Moves both csv_path and best_params_log_{pid}.csv to the folder named by name_tag if provided.
@@ -761,7 +762,10 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
     best_throughput = y_vals[best_idx]
     best_tf = transfer_vector_batch[best_idx] if include_tf else []
     pid = os.getpid()
-    para_tag = f"best_params_log_{pid}.csv"
+    if run_tag is None:
+        para_tag = f"best_params_log_{pid}.csv"
+    else:
+        para_tag = f"best_params_log_{run_tag}.csv"
     with open(para_tag, "w", newline="") as log:
         writer = csv.writer(log)
         writer.writerow(["Iteration"] + param_names + ["Throughput"] +
@@ -785,6 +789,136 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
         except Exception as e:
             print(f"Warning: Could not move {csv_path}: {e}")
     return results_folder
+
+from collections import defaultdict
+
+def build_df_wave_log_for_candidate(
+    candidate_tf_list,
+    candidate_params,
+    candidate_idx,
+    iteration_num,
+    simulation_val,
+    res_folder
+):
+    core_to_monitor = simulation_val["core_to_monitor"] - 1
+    modes_to_monitor = ["LP01"]
+
+    hyp_param_b = simulation_val.get("hyp_param_b", Simulation_params["hyp_param_b"])
+    hyp_param_c = simulation_val.get("hyp_param_c", Simulation_params["hyp_param_c"])
+
+    waves = np.asarray([w for (_, _, w, _, _) in candidate_tf_list], dtype=float)
+    unique_waves = np.unique(waves)
+
+    wave_rows = []
+
+    stored_data = pd.read_csv(
+        r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv"
+    )
+
+    k_arr = np.array(list(variable_params.keys()))
+    candidate_params = np.asarray(candidate_params, dtype=float)
+
+    for w in unique_waves:
+        tf_list_w = [
+            (lab, arr, wave, pid, rtag)
+            for (lab, arr, wave, pid, rtag) in candidate_tf_list
+            if float(wave) == float(w)
+        ]
+        run_tag_w = tf_list_w[0][4] # all rows in this wavelength group should belong to the same candidate and share the same run tag
+        tf_list_w_arr = [arr for (_, arr, _, _,_) in tf_list_w]
+        mode_labels_raw = [lab for (lab, _, _, _,_) in tf_list_w]
+        pid_w = [pid_raw for (_, _, _, pid_raw,_) in tf_list_w]
+        loss, arr_results, _, len_modes_arr, loss_a_num_extra_modes = mode_selective_tf_matrix_metric(
+            tf_list_w,
+            res_folder,
+            w,
+            pid_w,
+            hyp_param_b,
+            hyp_param_c,
+            core_to_monitor=core_to_monitor,
+            modes_to_monitor=modes_to_monitor,
+            simulation_val=simulation_val, 
+            run_tag=run_tag_w
+        )
+
+        og_amp, og_phase, ex_amp, ex_phase, _ = extract_portmon_amp_phase(
+            tf_list_w_arr,
+            core_num=simulation_val["core_num"]
+        )
+
+        n_modes, n_cores = og_amp.shape
+
+        _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
+        Other_core_ref_ind = stored_data["GeO2_2_mol%"].to_numpy()[idx]
+        Cladding_ref_ind = stored_data["SiO2"].to_numpy()[idx]
+        Capillary_ref_ind = stored_data["F_2_mol%"].to_numpy()[idx]
+
+        for m in range(n_modes):
+            mode_label = (
+                mode_labels_raw[m]
+                if (mode_labels_raw is not None and m < len(mode_labels_raw))
+                else f"Mode{m+1}"
+            )
+
+            row = {
+                "Simulation Date": datetime.datetime.now(),
+                "Iteration": int(iteration_num),
+                "Candidate": int(candidate_idx),
+                "Wavelength": float(w),
+                "Loss Value": float(loss),
+                "Loss_a": arr_results[0],
+                "Loss_b": arr_results[1],
+                "Loss_c": arr_results[2],
+                "Loss_d": arr_results[3],
+                "Injected Mode": str(mode_label),
+                "Mode Index": int(m),
+                "PID": pid_w,
+                "Guided Modes": int(len_modes_arr[0]),
+                "Extra Mode Intensity in Loss_a": (
+                    int(len(loss_a_num_extra_modes[0]))
+                    if simulation_val["all_modes"] else "None"
+                ),
+                "Non-MS Core Refractive Index": Other_core_ref_ind,
+                "Cladding Refractive Index": Cladding_ref_ind,
+                "Capillary Refractive Index": Capillary_ref_ind,
+            }
+
+            # write varied parameters once per row
+            for p_idx, pname in enumerate(k_arr):
+                row[pname] = float(candidate_params[p_idx])
+
+            if "core_neff" in k_arr:
+                core_neff_idx = np.where(k_arr == "core_neff")[0][0]
+                row[f"Delta n({simulation_val['free_space_wavelength'][0]} um)"] = float(
+                    candidate_params[core_neff_idx] - Cladding_ref_ind
+                )
+
+            for c in range(n_cores):
+                row[f"Core_{c+1}_Amp"] = og_amp[m, c]
+                row[f"Core_{c+1}_Phase"] = og_phase[m, c]
+
+            _, n_ex = ex_amp.shape
+            for c in range(n_ex):
+                row[f"{LP_mode_dict_rot[c+1]}_Amp"] = float(ex_amp[m, c])
+                row[f"{LP_mode_dict_rot[c+1]}_Phase"] = float(ex_phase[m, c])
+
+            wave_rows.append(row)
+
+    df_wave_log = pd.DataFrame(wave_rows)
+
+    if len(unique_waves) == 1:
+        final_loss = float(df_wave_log["Loss Value"].iloc[0])
+    else:
+        L = (
+            df_wave_log
+            .dropna(subset=["Loss Value"])
+            .groupby("Wavelength")["Loss Value"]
+            .first()
+            .to_numpy(dtype=float)
+        )
+        final_loss = float(np.sqrt(np.mean((L - np.mean(L))**2))+np.mean(L))
+
+    return final_loss, df_wave_log
 
 def plotting_optimizer_results(df, param_names, tf = None, plot = True, csv_path = ""):
     """
@@ -1062,7 +1196,8 @@ def transfer_matrix_component(csv_path, row, port_mon = False):
         return row, throughput
 
             
-def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_b, hyp_param_c, core_to_monitor, modes_to_monitor, simulation_val):
+def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_b, hyp_param_c, 
+                                    core_to_monitor, modes_to_monitor, simulation_val, run_tag):
     """
     Function that will sort through tf_list, extract the mode selective core values in ms/non-ms modes and return the loss function needed by scikit
     Arguments:
@@ -1074,11 +1209,11 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_b,
         - loss function that will maximise the ms core in the ms mode(s), overall power in non-ms cores in non-ms modes, 
         while minimising ms core in non-ms modes and non-ms cores in ms-mode(s)
     """
-    params, results, waves, _ = zip(*tf_list)
+    params, results, waves, _, _ = zip(*tf_list)
     tf_list_params_results = list(zip(params, results))
     core_num = simulation_val["core_num"]
     # search for each Guided Mode csv file created and pick only the most recent one to read, since they are all the same.
-    guided_mode_pattern = os.path.join(folder, f"{wave}_Guided Modes_{csv_pid[0]}.csv")
+    guided_mode_pattern = os.path.join(folder, f"{wave}_Guided Modes_{csv_pid[0]}_{run_tag}.csv")
     matches = glob.glob(guided_mode_pattern)
     if not matches:
         raise FileNotFoundError(f"No {wave}_Guided Modes_{csv_pid}.csv files found in {folder}")
