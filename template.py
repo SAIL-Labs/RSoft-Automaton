@@ -2,13 +2,14 @@ from Circuit_Properties import *
 import random, numpy as np
 
 fixed_params = {
-    "core_sep": 35, # 120, 60
-    "MCFCladd": 125, # 380 #250
+    "core_sep": 120, # 35, 60
+    "MCFCladd": 400, #125  #250
     # "core_claddings": None, 
     "core_cladding_diam": 15, # None #80,
-    "cladding_neff": 1.44, # pure silica
-    "core_cladding_neff": None,
+    "cladding_neff": 1.449445, #1.44, # pure silica
+    "core_cladding_neff": 1.4433510951304291734406199895015, #from using SMF-28 index (). Determined automatically using Sellmeier
     "cen_core_cladding_neff": None,#1.44,#0.00949,
+    "other_core_diam": 8.2, # non-ms core diameter
     # "Taper_L": 50000, #45000
     # "core_neff": 0.0122895, #0.015,
     "taper": 6.25, #7.33207692, 5.3
@@ -79,6 +80,9 @@ Simulation_params = {
     "Structure": "PL", # Fibre, PL, pigtail
     "metric": "TH", # TH = throughput, MS = Mode Selective, TF = Transfer Vector
     "add_cladding_to_cores": None, # This must be zero-indexed!
+    "use_profile": False, # determines whether user profiles are being used
+    "num_profile": 1, # number of user profiles to use
+    "profile": ["testing_1d.dat"], # name of the user profile
     "mode_selective": 0, # 0 == False, 1 == True
     "core_to_monitor": 4,
     "all_modes": False,
@@ -111,8 +115,8 @@ bestval_limits = {
 }
 
 variable_params= {
-    "core_diam": 6.5, # using 3D mode val: 8.104383, 4.36,#
-    "core_neff": 1.4467895, #1.45, # using 3D mode val: 1.449049,
+    "core_diam": 125, # using 3D mode val: 6.5
+    "core_neff": 1.454771, #1.45, # using 3D mode val: 1.449049, 1.4467895
     # "taper": 6.55789308, #22, #8.53
     "Taper_L":  50000, # using 3D mode val: 48587.538152
 }       
@@ -146,13 +150,13 @@ for i in range(1, Simulation_params["core_num"] + 1):
 
     elif "core_diam" in variable_params and "core_neff" in variable_params:
         core_params[f"core_{i}"] = {
-        "core_diam": 6.5,#variable_params["core_diam"],
+        "core_diam": fixed_params["other_core_diam"],#variable_params["core_diam"],
         # "neff": 1.4467895-RSoft_params["background_index"], #variable_params["core_neff"], 1.442906 2 mol% Ge, 1.4467895
         "taper": variable_params.get("taper", fixed_params.get("taper"))
         }
     elif "core_neff" in fixed_params:
         core_params[f"core_{i}"] = {
-        "core_diam": 6.5,#variable_params["core_diam"],
+        "core_diam": fixed_params["other_core_diam"],#variable_params["core_diam"],
         "neff": fixed_params.get("core_neff") - RSoft_params["background_index"], #variable_params["core_neff"]
         "taper": fixed_params.get("taper")
         }

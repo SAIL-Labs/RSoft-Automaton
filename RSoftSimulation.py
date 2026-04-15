@@ -172,13 +172,13 @@ class RSoftSim:
 
             try:
                 subprocess.run(
-                    [r"C:\Synopsys\PhotonicSolutions\2024.09-SP2-3\RSoft\bin\femsim.exe", filename_FS, prefix_FS, "wait=0"],
+                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\femsim.exe", filename_FS, prefix_FS, "wait=0"],
                     check=True,
                     capture_output=True,
                     text=True
                 )
                 subprocess.run(
-                    [r"C:\Synopsys\PhotonicSolutions\2024.09-SP2-3\RSoft\bin\bsimw32.exe", filename, prefix_BP, "wait=0"],
+                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\bsimw32.exe", filename, prefix_BP, "wait=0"],
                     check=True,
                     capture_output=True,
                     text=True
@@ -493,7 +493,7 @@ class RSoftSim:
                 else:
                     # pass
                     # use preconfigured values to specify core parameters
-                    core_diam = 6.5 #core_params[core_key]["core_diam"]
+                    core_diam = fixed_params["other_core_diam"] #core_params[core_key]["core_diam"]
                     core_neff = simulation_val.get("core_neff", fixed_params.get("core_neff"))
                     core_taper = param_dict.get("taper", fixed_params.get("taper"))
 
@@ -519,12 +519,12 @@ class RSoftSim:
         # functions to generate the core layout, either a standard fibre or a complicated photonic lantern setup (either in hex, pent or circular geometry)
         path_num = 0
         if structure == "Fibre":
-            path_num = build_fibre(self.circuit, path_num, self.core_positions, 
+            path_num, core_final_dims_list = build_fibre(self.circuit, path_num, self.core_positions, 
                         core_name, Taper_L, tuple(core * taper for core in core_beg_dims_list), core_end_dims_list,
                         simulation_val)
 
         elif structure == "PL":
-            path_num = build_PL(self.circuit, path_num, self.core_positions,
+            path_num, core_positions, core_final_dims_list = build_PL(self.circuit, path_num, self.core_positions,
                     core_name, taper, Taper_L,
                     cladding_beg_dims, cladding_end_dims,
                     # capillary_beg_dims, capillary_end_dims,
@@ -559,7 +559,7 @@ class RSoftSim:
         """ 
         
         AddHack(name_tag, femsim_name_tag, launch, 
-                path_num - 1, param_dict, simulation_val, wave,fem=fem)
+                path_num - 1, param_dict, simulation_val, wave,core_positions,fem=fem)
         '''
         Manual setup to loop through a list of values. Runs the terminal line that will initiate RSoft and will calculate the 
         metric to test.
@@ -868,7 +868,9 @@ def multiple_mode_tf(arg_list):
         fixed_params["cladding_neff"] = stored_data["SiO2"].to_numpy()[idx]
         Launch_params["cladding_neff"] = fixed_params["cladding_neff"]
         RSoft_params["background_index"] = stored_data["F_2_mol%"].to_numpy()[idx]
-
+        if Simulation_params["add_cladding_to_cores"] is not None:  
+            core_cladding_refractive_index = np.sqrt(sim_val["core_neff"]**2 - 0.14**2) # <-- 0.14 is the NA of SMF28 https://brightspotcdn.byu.edu/c5/a3/eaf794ab47889d39559a4fac1e68/smf28.pdf
+            fixed_params["core_cladding_neff"] = core_cladding_refractive_index
         # n_ms(lambda) = n_SiO2(lambda) + Delta n
         # params[core_neff_idx] = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength
         # write core diameter properties to simulation_val and set special core properties to None for SKOPT to overwrite
@@ -988,7 +990,7 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors, mode_v
         
     # note 'spawn' means Python will start n separate processes each with their own memory of global variables. 
     # You need to define any changes within their own instance or else NOTHING changes.
-    with mp.get_context("spawn").Pool(processes=len(simulation_val["mode_vals"])*len(simulation_val["free_space_wavelength"]) if not gridding else 20) as pool:
+    with mp.get_context("spawn").Pool(processes=simulation_val["n_points"]*len(simulation_val["mode_vals"])*len(simulation_val["free_space_wavelength"]) if not gridding else 20) as pool:
         # supply multiple_mode_tf with the arguments required to run. 
         # Since the number of processes match the length of the mode_vals/radial_mode_vals
         # then each worker gets an instance of arg_list. i.e. arg_list[i]
@@ -1096,7 +1098,8 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Core Configuration": simulation_val['grid_type'],
             "Number of Cores": simulation_val["core_num"],
             "Example .ind File Used": str(ind_file),
-            "Loss_a config.": "LP01" if not simulation_val["all_modes"] else "LP01 + higher order modes"
+            "Loss_a config.": "LP01" if not simulation_val["all_modes"] else "LP01 + higher order modes",
+            "Parameter vectors": simulation_val["n_points"]
         }
 
         # extract variable parameter keys
@@ -1119,7 +1122,8 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Loss": "-Loss_a - Loss_b + (Loss_c + Loss_d) + 2",
             "Extra Mode Intensity in Loss_a": "Total number of amplitudes corresponding to higher order modes included in Loss_a",
             f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should give a slightly different value for different wavelengths.",
-            "Guided Modes": "Total number of modes, including rotations AND polarisations, being guided in the fibre."
+            "Guided Modes": "Total number of modes, including rotations AND polarisations, being guided in the fibre.",
+            "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration"
         }
 
         # now append the global and legend
@@ -1344,8 +1348,6 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
 
     results_checkpoint_path = results_dir / "optimizer_results_checkpoint.npy"
     opt_checkpoint_path = results_dir / "optimizer_state_checkpoint.pkl"
-    # images_dir = Path(os.path.expanduser("~/Desktop/Results/Images"))
-    # images_dir.mkdir(parents=True, exist_ok=True)
 
     # Load prior space
     for attempt in range(10):
@@ -1368,17 +1370,11 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
             else:
                 para_space.append(Real(low, high, name=prior_name))
     elif bestvals:
-        # para_space = []
-        # sampling_regions = sample_range(param_range, bestvals, shrink=15.0)
-        # for prior_name, (low, high) in sampling_regions.items():
-        #     para_space.append(Real(low, high, name=prior_name))
-
         mean_vals = np.array(list(bestvals.values()), dtype=float)
         mean_limits = np.array(list(bestval_limits.values()), dtype=float)
         sigmas = np.array([2.0, 1.0, 3000.0])
         scales = np.array([1.0, 1.0, 10000.0])
         _, accepted = monte_carlo_rej(mean_vals, mean_limits, scales, sigmas, simulation_val["num_paras"])
-        # para_space = coarse_sampler(bestvals)
         para_space = accepted.T # shape(len(simulation_val["num_paras"]), len(bestvals.keys()))
         print(f"Sampling of {para_space.shape[0]} parameters, begin.")
     else:
@@ -1388,7 +1384,6 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                 para_space.append(Real(low, high, name=prior_name))
             else:
                 para_space.append(Real(low, high, name=prior_name))
-        # para_space = [Real(low, high, name=prior_name) for prior_name, (low, high) in param_range.items()]
     
     if simulate_tf_metric and opt_checkpoint_path.exists() and not bestvals:
         opt = load(opt_checkpoint_path)
@@ -1397,12 +1392,12 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
         opt = Optimizer(
             dimensions=para_space, # Parameter search space (bounds + types)
             base_estimator="GP", # Surrogate model (Gaussian Process)
-            acq_func="EI", # Acquisition function (chooses next point)
-            acq_func_kwargs={"xi": 0.8}, # EI exploration strength (higher = more exploration)
-            acq_optimizer="sampling", # How acquisition is maximised (random sampling)
+            acq_func="LCB", # Acquisition function (EI or LCB, chooses next point)
+            acq_func_kwargs={"kappa": 10.00}, # EI exploration strength (higher = more exploration, default=0.01)
+            acq_optimizer="lbfgs", # How the acquisition function is optimised (random sampling, lbfgs)
             # acq_optimizer_kwargs = {"n_points": 10000}, # Number of samples used to find best next point
             random_state=None, # Random seed (None = non-reproducible)
-            n_initial_points=50 # Number of random iterations before BO starts
+            n_initial_points=10 # Number of random iterations before BO starts. Note this is NOT the number of parameters chosen before BO starts - it is the number of REPORTS via tell().
         )
 
     # if true, run optimisation testing the loss metric
@@ -1524,7 +1519,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
                     all_results.append(iter_result)
 
                 atomic_save_npy(all_results, results_checkpoint_path)
-
+                # dump(opt, opt_checkpoint_path, store_objective=False)
             return all_results
         
         # checking if femsim files exist. If they do, continue. If not, generate the,
@@ -1615,15 +1610,16 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors, mode_vals, ra
 
                 all_results.append(iter_result)
             atomic_save_npy(all_results, results_checkpoint_path)
+            dump(opt, opt_checkpoint_path, store_objective=False)
         return all_results
     
     # if false, run tf code for the template parameters
     else:
-        param_names = ["core_diam", "core_neff"]
+        param_names = variable_params.keys() #["core_diam", "core_neff"]
         params = [variable_params[k] for k in param_names]
 
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_*_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.447962_Taper_L_50000.000000_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
             param_names = ["core_diam", "core_neff"]

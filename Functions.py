@@ -191,7 +191,7 @@ def create_folders(folder_name, pos):
         os.makedirs(results_folder_onedrive, exist_ok=True)
         return results_folder_onedrive
 #######################################################################################################################################################
-def AddHack(file_name, FS_file_name, json_file, core_num, param_dict, simulation_val, wave, fem=False):
+def AddHack(file_name, FS_file_name, json_file, core_num, param_dict, simulation_val, wave, core_positions, fem=False):
     '''
     Hacking function to add text that will import segments to RSoft that the Python API does not currently handle.
 
@@ -275,6 +275,26 @@ end launch_field
                 )
             f.write(text)
     elif mon_type == "port_mon":
+        if Simulation_params["use_profile"]:
+            profile_text={
+            "user_profile":'''
+user_profile {u}
+    type = UF_DATAFILE
+    filename = {file} 
+end user_profile
+'''
+            }
+            # Open FS file in append mode
+            with open(f"{FS_file_name}.ind", "a") as fs_prof:
+                for i in range(Simulation_params["num_profile"]):
+                    prof_text = profile_text["user_profile"].format(u=i+1, file=Simulation_params["profile"][i])
+                    fs_prof.write(prof_text)
+            # Open BPM file in append mode
+            with open(f"{file_name}.ind", "a") as bpm_prof:
+                for i in range(Simulation_params["num_profile"]):
+                    prof_text = profile_text["user_profile"].format(u=i+1, file=Simulation_params["profile"][i])
+                    bpm_prof.write(prof_text)
+            
         block_text = { 
         "pathway": '''
 pathway {n}
@@ -346,9 +366,10 @@ end launch_field
         lines = f.readlines()
 
     # Insert delta after core and cladding segment start
-    core_name = [f"core_{n}" for n in range(1, core_num+1)]
+    core_name = np.array([f"core_{n}" for n in range(1, core_num+1)])
 
     for core_key in core_name:
+        # add core properties to each segment
         lines = insert_after_match(lines, "begin.width =", [
             f"\tbegin.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n",
             f"\tend.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n"
@@ -357,6 +378,18 @@ end launch_field
             f"\tbegin.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n",
             f"\tend.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n"
         ], segment_filter=f"{core_key}")
+
+        # code to add the user profile only to the special core
+        if Simulation_params["use_profile"]:
+            if core_key == f"core_{core_to_monitor}":
+                lines = insert_after_match(lines, f"comp_name = core_{core_to_monitor}", [
+                    f"\tprofile_type = PROF_USER_1\n",
+                ], segment_filter=f"{core_key}")
+                lines_fs = insert_after_match(lines_fs,  f"comp_name = core_{core_to_monitor}", [
+                    f"\tprofile_type = PROF_USER_1\n",
+                ], segment_filter=f"{core_key}")
+            else:
+                continue
 
         # if core_key != f"core_{simulation_val['core_to_monitor']}":
         #     # assign material to the cores
@@ -486,9 +519,17 @@ end launch_field
                 #     line = line.replace("type = TIMEMON_EXTENDED", "type = TIMEMON_FIELD")
 
                 # forecfully fix certain port monitor parameters that appear as default otherwise  for port monitors
-                port_mon_text_arr = ["phi = default", "begin.width = default", "begin.height = default"]
-                port_mon_text_replace = ["phi = 0", "begin.width = default", "begin.height = default"]
-                port_mon_text_replace_special = ["phi = 0", f"begin.width = {core_diam_replaced}", f"begin.height = {core_diam_replaced}"]
+                # default text
+                port_mon_text_arr = ["phi = default", 
+                                    "begin.width = default", 
+                                    "begin.height = default"]
+                # replacement text
+                port_mon_text_replace = ["phi = 0", 
+                                        "begin.width = default", 
+                                        "begin.height = default"]
+                port_mon_text_replace_special = ["phi = 0", 
+                                                f"begin.width = {core_diam_replaced}", 
+                                                f"begin.height = {core_diam_replaced}"]
                             
                 # for p, r, s in zip(port_mon_text_arr, port_mon_text_replace, port_mon_text_replace_special):
                 #     if p in line:
@@ -504,7 +545,12 @@ end launch_field
                     in_extra_time_monitor = False
 
                 if in_time_monitor:
+                    # replace the special core's port monitor properties
                     if mon_number == core_to_monitor:
+                        for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
+                            if p in line:
+                                line = line.replace(p, r)
+                    elif mon_number == simulation_val['core_num'] * 2 + 1 + extra_monitors:
                         for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
                             if p in line:
                                 line = line.replace(p, r)
@@ -512,10 +558,10 @@ end launch_field
                         for p, r in zip(port_mon_text_arr, port_mon_text_replace):
                             if p in line:
                                 line = line.replace(p, r)
-                elif in_extra_time_monitor:
-                    for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
-                        if p in line:
-                            line = line.replace(p, r)
+                # elif in_extra_time_monitor:
+                #     for p, r in zip(port_mon_text_arr_special, port_mon_text_replace_special):
+                #         if p in line:
+                #             line = line.replace(p, r)
                     # else:
                     #     for p, r in zip(port_mon_text_arr, port_mon_text_replace):
                     #         if p in line:
@@ -546,7 +592,7 @@ end launch_field
                         final_lines.append(f"\tmonitor_file = {FS_file_name}.m00\n")
                     else:
                         if mon_number < core_num:
-                            if mon_number == (core_to_monitor - 1):
+                            if mon_number == core_to_monitor-1:
                                 final_lines.append(f"\tmonitor_file = {FS_file_name}.m00\n")
                             else:
                                 # enforce other cores to have a field profile as a function of wavelength
@@ -651,10 +697,10 @@ end launch_field
                 # Insert boundary_* after boundary_gap_z = 0
                 if stripped == "boundary_gap_z = 0":
                     output_lines.extend([
-                        "boundary_max = 30\n", #10+38.5
-                        "boundary_max_y = 30\n", #15
-                        "boundary_min = -30\n", #-10+38.5
-                        "boundary_min_y = -30\n" #-15
+                        f"boundary_max = {core_positions[Simulation_params['core_to_monitor']-1][0] + 1.1*(variable_params['core_diam']/2)}\n", #10+38.5
+                        f"boundary_max_y = {core_positions[Simulation_params['core_to_monitor']-1][1] + 1.1*(variable_params['core_diam']/2)}\n", #15
+                        f"boundary_min = {core_positions[Simulation_params['core_to_monitor']-1][0] - 1.1*(variable_params['core_diam']/2)}\n", #-10+38.5
+                        f"boundary_min_y = {core_positions[Simulation_params['core_to_monitor']-1][1] - 1.1*(variable_params['core_diam']/2)}\n" #-15
                     ])
                 # Insert domain_min after dimension = 3
                 if stripped == "dimension = 3":
@@ -1005,7 +1051,8 @@ def build_fibre(circuit, path_num, core_positions, core_names, Taper_length, beg
             dimensions_end=final_dims_list[j]
         )
         core.set_name(core_names[j])
-    return path_num
+    core_segment_propterties = [path_num, core_positions, final_dims_list]
+    return core_segment_propterties
 
 def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
              cladd_beginning_diam, cladd_final_diam,
@@ -1080,11 +1127,12 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
 
         # Add extra port monitors to monitor higher LP modes
         for k in range(len(port_monitors) - 2):
-            port = circuit.add_portmonitor(dimensions = core_final_dims_list[0])
-            circuit.attach(port, core_segments[0], 1, 0, attach_angles = 0, attach_dimensions = 1) 
+            port = circuit.add_portmonitor(dimensions = core_final_dims_list[Simulation_params["core_to_monitor"]-1])
+            circuit.attach(port, core_segments[Simulation_params["core_to_monitor"]-1], 1, 0, attach_angles = 0, attach_dimensions = 1) 
             port_monitors.append(port)
     # if Launch_params["mon_type"] == "port_mon":
-    return path_num
+    core_segment_propterties = [path_num, core_positions, core_final_dims_list]
+    return core_segment_propterties
 
 # def build_pigtail(circuit, path_num, core_positions, core_names, taper, Taper_length,
 #              cladd_beginning_diam, cladd_final_diam,
