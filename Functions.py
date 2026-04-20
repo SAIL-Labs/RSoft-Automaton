@@ -419,8 +419,8 @@ end launch_field
     # ], segment_filter="Super Cladding") 
 
     if Simulation_params["add_cladding_to_cores"] is not None:
-        lines = insert_after_match(lines, "begin.width =", ["profile_type = PROF_INACTIVE"
-        ], segment_filter="Super Cladding") 
+        # lines = insert_after_match(lines, "begin.width =", ["profile_type = PROF_INACTIVE"
+        # ], segment_filter="Super Cladding") 
         for cladd_num in Simulation_params["add_cladding_to_cores"]:
             lines = insert_after_match(lines, "begin.width =", [
             f"\tbegin.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n",
@@ -1515,26 +1515,6 @@ def plot_available_modes(diam, wave, ell_num, NA):
         plt.savefig(f"Available_LP_Modes_for_V_{V:.3f}.png", dpi = 300)
         plot_lp_modes(V)
 
-# def print_paras(radii, wavelengths, mode_count, mode_desired, l_modes_to_consider, NA, upper_bound, lower_bound):
-#     rad_range = []
-#     for i, r in enumerate(radii):
-#         for j, wl in enumerate(wavelengths):
-#             if mode_count[i, j] <= mode_desired:
-#                 rad_range.append((r, wl))
-
-#     df_range = pd.DataFrame(rad_range, columns = ["Core Radius (µm)", "Wavelength (µm)"])
-#     df_filtered = df_range[(df_range["Wavelength (µm)"] >= lower_bound) & (df_range["Wavelength (µm)"] <= upper_bound)]
-#     min_diam = 2 * min(df_filtered["Core Radius (µm)"])
-#     max_diam = 2 * max(df_filtered["Core Radius (µm)"])
-#     diam = [min_diam, max_diam]
-
-#     taper_max = fixed_params["MCFCladd"] / min_diam
-#     taper_min = fixed_params["MCFCladd"] / max_diam
-
-#     wave = df_filtered["Wavelength (µm)"].iloc[np.argmin(df_filtered["Core Radius (µm)"])]                 
-#     plot_available_modes(diam, wave, l_modes_to_consider, NA)
-
-#     return df_filtered, taper_min, taper_max
 def lp_exists(V, ell, m):
     b = ofiber.LP_mode_value(V, ell, m)
     return (b is not None) and (not np.isnan(b))
@@ -1597,6 +1577,39 @@ LP_mode_dict = {
     "LP23": 2,
     "LP04": 1,
     "LP71": 2
+}
+
+LP_mode_rsoft_dict = {
+    "LP01": (0,1),
+    "LP11a": (1, 1),
+    "LP11b": (-1, 1),
+    "LP21a": (2, 1),
+    "LP21b": (-2, 1),
+    "LP02": (0,2),
+    "LP31a": (3,1),
+    "LP31b": (-3,1),
+    "LP12a": (2, 1),
+    "LP12b": (-2, 1),
+    "LP41a": (4, 1),
+    "LP41b": (-4, 1),
+    "LP22a": (2, 2),
+    "LP22b": (-2, 2),
+    "LP03": (0,3),
+    "LP51a": (5, 1),
+    "LP51b": (-5, 1),
+    "LP32a": (3, 2),
+    "LP32b": (-3, 2),
+    "LP13a": (1, 3),
+    "LP13": (-1, 3),
+    "LP61a": (6, 1),
+    "LP61b": (-6, 1),
+    "LP42a": (4, 2),
+    "LP42b": (-4, 2),
+    "LP23a": (2, 3),
+    "LP23b": (-2, 3),
+    "LP04": (0, 4),
+    "LP71a": (7, 1),
+    "LP71b": (-7, 1)
 }
 ##############################################################################################################################################################################################################################################################################
 ## Stuff used for saving results
