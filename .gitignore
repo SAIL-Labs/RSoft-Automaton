@@ -1,3 +1,7 @@
+# Profile/log files
+*dat
+*txt
+
 # FemSIM files
 *m00
 
@@ -5,8 +9,8 @@
 "Bayesian Opt Results/*.png"
 
 # Data files
-*.npy
-*.json
+*npy
+*json
 
 # OS
 .DS_Store

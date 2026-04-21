@@ -898,12 +898,16 @@ def build_df_wave_log_for_candidate(
         )
 
         n_modes, n_cores = og_amp.shape
-
-        _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
-        Other_core_ref_ind = stored_data["GeO2_2_mol%"].to_numpy()[idx]
-        Cladding_ref_ind = stored_data["SiO2"].to_numpy()[idx]
-        Capillary_ref_ind = stored_data["F_2_mol%"].to_numpy()[idx]
-
+        if simulation_val["Fem_present"] and simulation_val["simulate_tf_metric"]:
+            _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
+            Other_core_ref_ind = stored_data["GeO2_2_mol%"].to_numpy()[idx]
+            Cladding_ref_ind = stored_data["SiO2"].to_numpy()[idx]
+            Capillary_ref_ind = stored_data["F_2_mol%"].to_numpy()[idx]
+        else:
+            Other_core_ref_ind = simulation_val["core_neff"]
+            Cladding_ref_ind = fixed_params["cladding_neff"]
+            Capillary_ref_ind = RSoft_params["background_index"]
+            
         for m in range(n_modes):
             mode_label = (
                 mode_labels_raw[m]
