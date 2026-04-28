@@ -12,7 +12,7 @@ fixed_params = {
     "other_core_diam": 8.2, # non-ms core diameter
     # "Taper_L": 50000, #45000
     # "core_neff": 0.0122895, #0.015,
-    "taper": 24.8447204969,#7.7639751553
+    "taper": 28.571428571428571428571428571429, #26.6666666667, #24.8447204969,#7.7639751553
     # "core_diam": 8.2,
     "alpha": 0,
     "length_hyperparam": 0.01
@@ -34,6 +34,7 @@ RSoft_params = {
     "slice_output_format": "OUTPUT_AMP_PHASE",
     "slice_output_individual": "None", # OUTPUT_AMP_PHASE_3D
     "background_index": 1.4345,#1.4357951361369463,#, 
+    "background_index_offset": 0.001295136, # to be used when simulate_tf_metric = False. Default = 0
     "sim_tool": Sim_tool.BP,
     "launch_align_file": 1,
     "launch_normalization": 1,

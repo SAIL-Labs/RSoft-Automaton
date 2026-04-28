@@ -898,7 +898,7 @@ def build_df_wave_log_for_candidate(
         )
 
         n_modes, n_cores = og_amp.shape
-        if simulation_val["Fem_present"] and simulation_val["simulate_tf_metric"]:
+        if simulation_val["Fem_present"] and (simulation_val["simulate_tf_metric"] or simulation_val["sellmeier"]):
             _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
             Other_core_ref_ind = stored_data["GeO2_2_mol%"].to_numpy()[idx]
             Cladding_ref_ind = stored_data["SiO2"].to_numpy()[idx]

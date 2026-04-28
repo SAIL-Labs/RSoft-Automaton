@@ -370,7 +370,7 @@ class RSoftSim:
                 return transfer_vector, -throughput, results_folder, pid_csv
 
     def build_circuit(self, params, build_tf, json_config, csv_path, simulation_val, 
-                      prior_space_pid, wave, delta_index_at_reference_wavelength, run_tag, fem=False): # maybe put this into its own function. Make it universal.
+                      prior_space_pid, wave, delta_index_at_reference_wavelength, run_tag, fem=False): 
         """
         Create the design file using template.py and 
         write to separate .ind file. Also contains function to run BeamProp
@@ -483,18 +483,21 @@ class RSoftSim:
                 if j == Simulation_params["core_to_monitor"]:
                     # need to modify the core_neff according to the wavelength
                     # core to be optimized by skopt
+                    core_diam = variable_params.get("core_diam")
+                    core_taper = param_dict.get("taper", fixed_params.get("taper"))
                     if simulation_val["Fem_present"] and simulation_val["simulate_tf_metric"]:
-                        core_diam = variable_params.get("core_diam")
                         core_neff = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength
-                        core_taper = param_dict.get("taper", fixed_params.get("taper"))
+                        # raise RuntimeError(f"Core neff {core_neff}, delta {delta_index_at_reference_wavelength}")
+                    elif simulation_val["Fem_present"] and not simulation_val["simulate_tf_metric"] and simulation_val["sellmeier"]:
+                        core_neff = simulation_val["Si_RI_ref_wavelength"] + delta_index_at_reference_wavelength # note that his index difference is calculated rel. to silica. In this scenario the cladding index is different from silica.
                     elif simulation_val["Fem_present"] and not simulation_val["simulate_tf_metric"]:
-                        core_diam = variable_params.get("core_diam")
                         core_neff = param_dict.get("core_neff", fixed_params.get("core_neff"))
-                        core_taper = param_dict.get("taper", fixed_params.get("taper"))
+                    # elif simulation_val["Fem_present"] and not simulation_val["simulate_tf_metric"] and simulation_val["sellmeier"]:
+                    #     core_neff = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength
                     else:
-                        core_diam = variable_params.get("core_diam")
+                        #fix the index to that of other cores to determine the FemSIM files.
                         core_neff = simulation_val.get("core_neff", fixed_params.get("core_neff"))
-                        core_taper = param_dict.get("taper", fixed_params.get("taper"))
+                        # raise RuntimeError(f"{core_neff}")
                 else:
                     # use preconfigured values to specify core parameters
                     core_diam = fixed_params["other_core_diam"] #core_params[core_key]["core_diam"]
@@ -604,13 +607,8 @@ class RSoftSim:
         if simulate:
             self.MultProc(build_tf, json_config, csv_path, simulation_val, prior_space_pid) 
             return  
-        # elif simulate_tf:
-        #     tf_MultProc(simulation_val, prior_space_pid)
-        #     return
 
-        # -- BELOW: for "simulate=False" only --
         # Always load template/seed params first
-        
         if build_tf:
             for attempt in range(10):
                 try:
@@ -692,8 +690,8 @@ def multiple_mode_tf(arg_list):
     '''
     TO DO: fix up the gridding part of this code.
     '''
-    if len(arg_list) == 14:
-        sim_val, custom_priors, wave, m, rm, cand_idx, param, fem, taper_min, taper_max, gridding, delta_index_at_reference_wavelength, core_neff_idx, iteration_num = arg_list
+    if len(arg_list) == 15:
+        sim_val, custom_priors, wave, m, rm, cand_idx, param, fem, taper_min, taper_max, gridding, delta_index_at_reference_wavelength, cladding_delta_ri_at_reference_wavelength, core_neff_idx, iteration_num = arg_list
     elif len(arg_list) == 13:
         sim_val, custom_priors, wave, m, rm, cand_idx, param, fem, taper_min, taper_max, gridding, iteration_num = arg_list
     elif len(arg_list) == 9:
@@ -738,11 +736,23 @@ def multiple_mode_tf(arg_list):
             fixed_params["cladding_neff"] = stored_data["SiO2"].to_numpy()[idx]
             Launch_params["cladding_neff"] = fixed_params["cladding_neff"]
             RSoft_params["background_index"] = stored_data["F_2_mol%"].to_numpy()[idx]
-        if Simulation_params["add_cladding_to_cores"] is not None:  
-            core_cladding_refractive_index = np.sqrt(sim_val["core_neff"]**2 - 0.14**2) # <-- 0.14 is the NA of SMF28 https://brightspotcdn.byu.edu/c5/a3/eaf794ab47889d39559a4fac1e68/smf28.pdf
-            fixed_params["core_cladding_neff"] = core_cladding_refractive_index
 
-        # write core diameter properties to simulation_val and set special core properties to None for SKOPT to overwrite
+        elif not sim_val["simulate_tf_metric"] and sim_val["sellmeier"]:
+            # calculate how the refractive index of the specified parameters change with wavelength
+            stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
+            _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), wave)
+            fixed_params["cladding_neff"] = stored_data["SiO2"].to_numpy()[idx] + cladding_delta_ri_at_reference_wavelength
+            Launch_params["cladding_neff"] = fixed_params["cladding_neff"]
+            RSoft_params["background_index"] = stored_data["F_2_mol%"].to_numpy()[idx] - RSoft_params["background_index_offset"]
+            other_core_refractive_index = np.sqrt(0.14**2 + fixed_params["cladding_neff"]**2) # <-- 0.14 is the NA of SMF28 https://brightspotcdn.byu.edu/c5/a3/eaf794ab47889d39559a4fac1e68/smf28.pdf
+            # deterministic non-ms core
+            sim_val["core_neff"] = other_core_refractive_index
+            # raise RuntimeError(f"cladding n: {fixed_params['cladding_neff']}, non-ms core n: {sim_val['core_neff']}")
+
+        # if sim_val["add_cladding_to_cores"] is not None:  
+            # fixed_params["core_cladding_neff"] = core_cladding_refractive_index
+
+        # write core diameter properties to simulation_val and set special core properties to None for SKOPT to overwrite, if applicable
         assign_core_properties(sim_val)
         core_to_monitor = sim_val["core_to_monitor"]
 
@@ -820,7 +830,12 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
         stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
         _, refractive_index_at_reference_wave = find_nearest(stored_data["Wavelength (um)"].to_numpy(), min(simulation_val["free_space_wavelength"])) # only calculate the contrast from the smallest wavelength simulated
         Silica_refractive_index_at_reference_wavelength = stored_data["SiO2"].to_numpy()[refractive_index_at_reference_wave]
+        simulation_val["Si_RI_ref_wavelength"] = Silica_refractive_index_at_reference_wavelength
         delta_index_at_reference_wavelength = params[:, core_neff_idx] - Silica_refractive_index_at_reference_wavelength
+        cladding_delta_ri_at_reference_wavelength = None
+
+        if not simulation_val["simulate_tf_metric"] and simulation_val["sellmeier"]:
+            cladding_delta_ri_at_reference_wavelength = fixed_params["cladding_neff"] - Silica_refractive_index_at_reference_wavelength # want to scale measured cladding index with wavelength
 
     # extract mode labels into numpy array
     mode_labels = []
@@ -831,13 +846,14 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
     mode_vals = np.array([LP_mode_rsoft_dict[m][0] for m in mode_labels])
     radial_mode_vals = np.array([LP_mode_rsoft_dict[m][1] for m in mode_labels])
     res_dict = []
+
     # dynamically generate an array of arrays listing the supported number of modes per free space wavelength
     for w in simulation_val["free_space_wavelength"]:
         b_arr = []
         stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
         _, refractive_index_at_wave = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
         cladding_refractive_index_at_wavelength = stored_data["SiO2"].to_numpy()[refractive_index_at_wave]
-        capillary_refractive_index_at_wavelength = stored_data["F_2_mol%"].to_numpy()[refractive_index_at_wave]
+        capillary_refractive_index_at_wavelength = stored_data["F_2_mol%"].to_numpy()[refractive_index_at_wave] - RSoft_params["background_index_offset"]
 
         numerical_apeture = ofiber.numerical_aperture(cladding_refractive_index_at_wavelength, capillary_refractive_index_at_wavelength)
         v_number = ofiber.V_parameter((fixed_params["MCFCladd"]/fixed_params["taper"])/2, numerical_apeture, w)
@@ -905,7 +921,7 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
                         taper_min, 
                         taper_max, 
                         gridding, 
-                        delta_index_at_reference_wavelength, 
+                        delta_index_at_reference_wavelength, cladding_delta_ri_at_reference_wavelength,
                         core_neff_idx, 
                         iteration_num) 
                         for cand_idx, param in enumerate(params)
@@ -956,10 +972,7 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
     
     res_folder = results[-1][4]
     for cand_idx, param, result, wave, _, csv_pid, run_tag in results:
-        # print(f"Param: {param}, Result: {result}")
-        # tf_list.append(results)
         tf_list.append((cand_idx, param, result, wave, csv_pid, run_tag))
-        # csv_pid_arr.append(csv_pid)
         
     if gridding:
         return grid_size_range, tf_list, res_folder
@@ -975,8 +988,6 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
     gridding: bool, determines whether to run gridding determination or not
     """
 
-    # mode_vals = simulation_val["mode_vals"]
-    # radial_mode_vals = simulation_val["radial_mode_vals"]
     if gridding:
         # run gridding determination
         grid_size_range, tf_list, res_folder = run_tf_multproc(params, iteration_num, simulation_val, 
@@ -1448,7 +1459,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         params = [variable_params[k] for k in param_names]
 
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = f"FemSim_File_DET_1.55_LP01_core_diam_8.200000_core_neff_1.447376_Taper_L_50000.000000_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.200000_core_neff_1.456191_Taper_L_50000.000000_ex.m00"
         # femSIM_file_example = "1.55_GIF_outer_fibre_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
