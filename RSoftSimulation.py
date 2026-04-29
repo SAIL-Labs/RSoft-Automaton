@@ -1070,7 +1070,11 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Number of Cores": simulation_val["core_num"],
             "Example .ind File Used": str(ind_file),
             "Loss_a config.": "LP01" if not simulation_val["all_modes"] else "LP01 + higher order modes",
-            "Parameter vectors": simulation_val["n_points"]
+            "Parameter vectors": simulation_val["n_points"],
+            "Acquisition type": Simulation_params["acq_type"],
+            "Acquisition hyperparameter": Simulation_params["acq_hyperparam"],
+            "Acquistion optimiser": Simulation_params["acq_opt"],
+            "Initial points": Simulation_params["n_init_points"] 
         }
 
         if "taper" not in param_names:
@@ -1086,7 +1090,11 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Extra Mode Intensity in Loss_a": "Total number of amplitudes corresponding to higher order modes included in Loss_a",
             f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should give a slightly different value for different wavelengths.",
             "Guided Modes": "Total number of modes, including rotations AND polarisations, being guided in the fibre.",
-            "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration"
+            "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration",
+            "Acquisition type": "Describe the acquisition function used to select new values to sample. EI = Expected Improvement",
+            "Acquisition hyperparameter": "Set's the hyperparameter for the acquisition function",
+            "Acquisition optimiser": "Algorithm used to optimise the selection of parameters to sample",
+            "Initial points": "Number of randomly drawn points before bayesian optimisation kicks in"
         }
 
         # now append the global and legend
@@ -1161,7 +1169,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 para_space.append(Real(low, high, name=prior_name))
             else:
                 para_space.append(Real(low, high, name=prior_name))
-    
+
     if simulate_tf_metric and opt_checkpoint_path.exists() and not bestvals:
         opt = load(opt_checkpoint_path)
         print(f"Loaded optimiser checkpoint from {opt_checkpoint_path}")
@@ -1169,12 +1177,12 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         opt = Optimizer(
             dimensions=para_space, # Parameter search space (bounds + types)
             base_estimator="GP", # Surrogate model (Gaussian Process)
-            acq_func="EI", # Acquisition function (EI or LCB, chooses next point)
-            acq_func_kwargs={"xi": 0.01}, # EI exploration strength (higher = more exploration, default=0.01)
-            acq_optimizer="lbfgs", # How the acquisition function is optimised (random sampling, lbfgs)
+            acq_func=Simulation_params["acq_type"], # Acquisition function (EI or LCB, chooses next point)
+            acq_func_kwargs={"xi": Simulation_params["acq_hyperparam"]}, # EI exploration strength (higher = more exploration, default=0.01)
+            acq_optimizer=Simulation_params["acq_opt"], # How the acquisition function is optimised (random sampling, lbfgs)
             # acq_optimizer_kwargs = {"n_points": 10000}, # Number of samples used to find best next point
             random_state=None, # Random seed (None = non-reproducible)
-            n_initial_points=10 # Number of random iterations before BO starts. Note this is NOT the number of parameters chosen before BO starts - it is the number of REPORTS via tell().
+            n_initial_points=int(Simulation_params["n_init_points"]) # Number of random iterations before BO starts. Note this is NOT the number of parameters chosen before BO starts - it is the number of REPORTS via tell().
         )
 
     # if true, run optimisation testing the loss metric
@@ -1303,7 +1311,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             return all_results
         
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = f"FemSim_File_DET_1.5_LP01_core_diam_{fixed_params['other_core_diam']}_*.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.447962_Taper_L_50000.000000_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
             param_names = ["core_diam", "core_neff"]
@@ -1330,7 +1338,10 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                                                                 taper_max, gridding = gridding)
 
             # tell optimiser the performance of the chosen parameters
-            opt.tell(param_batch, result_batch)
+            if simulation_val["n_points"] == 1:
+                opt.tell(param_batch[0], result_batch)
+            else:
+                opt.tell(param_batch, result_batch)
 
             if simulation_val["n_points"] != 1:
                 for cand_idx, (param_vec, df_wave_log, loss_val) in enumerate(zip(param_batch, df_wave_logs, result_batch)):
@@ -1436,7 +1447,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
                 number_of_guided_modes = df_wave_logs["Guided Modes"].to_numpy()
                 iter_result = {
-                    'params': param_batch,
+                    'params': param_batch[0],
                     'result': result_batch,
                     'Iteration': batch_idx + 1,
                     "Candidate Index": 0,
@@ -1459,7 +1470,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         params = [variable_params[k] for k in param_names]
 
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.200000_core_neff_1.456191_Taper_L_50000.000000_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.447962_Taper_L_50000.000000_ex.m00"
         # femSIM_file_example = "1.55_GIF_outer_fibre_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
