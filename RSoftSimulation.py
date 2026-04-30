@@ -423,7 +423,12 @@ class RSoftSim:
         # update template file with chosen values from scikit.Optimize()
         variable_params.update(param_dict)
 
-        self.circuit = RSoftCircuit()
+        # need two circuits:
+        #   1) BPM: to run the BPM simulations - special core location is set by siulation_val
+        #   2) FemSIM: to calculate the FemSIM files needed to correctly run BPM - special core location is fixed to the centre
+        bp_circuit = RSoftCircuit()
+        fs_circuit = RSoftCircuit()
+        self.circuit = bp_circuit
 
         """
         Load variable, fixed, and launch parameters from template.py
@@ -443,7 +448,8 @@ class RSoftSim:
             # mode selective properties defined as ('string', ('string', float)) <- will throw C++ error
             if not isinstance(val, (int, float, str)):
                 continue
-            self.circuit.set_symbol(key, val)
+            bp_circuit.set_symbol(key, val)
+            fs_circuit.set_symbol(key, val)
 
         # extract taper ratio, length, core number, 
         # core and cladding diameter
@@ -475,68 +481,45 @@ class RSoftSim:
         cladding_beg_dims = (cladd_diam / taper, cladd_diam / taper) 
         cladding_end_dims = (cladd_diam , cladd_diam)
 
-        core_beg_dims_list = []
-        core_end_dims_list = []
+        bp_core_to_monitor = Simulation_params["core_to_monitor"]
+        fs_core_positions = self.cladd_positions if simulation_val["skip_core"] is not None and self.cladd_positions is not None else self.core_positions
+        fs_core_to_monitor = centre_core_index(fs_core_positions)
+        bp_add_cladding_to_cores = Simulation_params["add_cladding_to_cores"]
+        if bp_add_cladding_to_cores is None:
+            fs_add_cladding_to_cores = None
+        else:
+            fs_add_cladding_to_cores = sorted(
+                ({*bp_add_cladding_to_cores, bp_core_to_monitor - 1} - {fs_core_to_monitor - 1})
+            )
+        bp_core_beg_dims_list, bp_core_end_dims_list, bp_core_params = core_layout_for_special_core(bp_core_to_monitor, sim_param, simulation_val, core_name,param_dict,delta_index_at_reference_wavelength, taper)
+        fs_core_beg_dims_list, fs_core_end_dims_list, fs_core_params = core_layout_for_special_core(fs_core_to_monitor, sim_param, simulation_val, core_name,param_dict,delta_index_at_reference_wavelength, taper)
 
-        if sim_param["mode_selective"] == 1:
-            for j, core_key in enumerate(core_name, start=1):
-                if j == Simulation_params["core_to_monitor"]:
-                    # need to modify the core_neff according to the wavelength
-                    # core to be optimized by skopt
-                    core_diam = variable_params.get("core_diam")
-                    core_taper = param_dict.get("taper", fixed_params.get("taper"))
-                    if simulation_val["Fem_present"] and simulation_val["simulate_tf_metric"]:
-                        core_neff = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength
-                        # raise RuntimeError(f"Core neff {core_neff}, delta {delta_index_at_reference_wavelength}")
-                    elif simulation_val["Fem_present"] and not simulation_val["simulate_tf_metric"] and simulation_val["sellmeier"]:
-                        core_neff = simulation_val["Si_RI_ref_wavelength"] + delta_index_at_reference_wavelength # note that his index difference is calculated rel. to silica. In this scenario the cladding index is different from silica.
-                    elif simulation_val["Fem_present"] and not simulation_val["simulate_tf_metric"]:
-                        core_neff = param_dict.get("core_neff", fixed_params.get("core_neff"))
-                    # elif simulation_val["Fem_present"] and not simulation_val["simulate_tf_metric"] and simulation_val["sellmeier"]:
-                    #     core_neff = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength
-                    else:
-                        #fix the index to that of other cores to determine the FemSIM files.
-                        core_neff = simulation_val.get("core_neff", fixed_params.get("core_neff"))
-                        # raise RuntimeError(f"{core_neff}")
-                else:
-                    # use preconfigured values to specify core parameters
-                    core_diam = fixed_params["other_core_diam"] #core_params[core_key]["core_diam"]
-                    core_neff = simulation_val.get("core_neff", fixed_params.get("core_neff"))
-                    core_taper = param_dict.get("taper", fixed_params.get("taper"))
-
-                # Store dimensions for this core
-                core_beg_dims_list.append((core_diam / taper, core_diam / taper))
-                core_end_dims_list.append((core_diam, core_diam))
-
-                core_params[core_key]["core_diam"] = core_diam
-                core_params[core_key]["neff"] = core_neff
-                core_params[core_key]["taper"] = core_taper
-        else: 
-            for j, core_key in enumerate(core_name, start=1):
-                core_diam = core_params[core_key]["core_diam"]
-                core_neff = core_params[core_key]["neff"]
-
-                # Store dimensions for this core
-                core_beg_dims_list.append((core_diam / taper, core_diam / taper))
-                core_end_dims_list.append((core_diam, core_diam))
-
-                core_params[core_key]["core_diam"] = core_diam
-                core_params[core_key]["neff"] = core_neff
+        core_params.clear()
+        core_params.update(bp_core_params)
 
         # functions to generate the core layout, either a standard fibre or a complicated photonic lantern setup (either in hex, pent or circular geometry)
-        path_num = 0
         if structure == "Fibre":
-            path_num, core_final_dims_list = build_fibre(self.circuit, path_num, self.core_positions, 
-                        core_name, Taper_L, tuple(core * taper for core in core_beg_dims_list), core_end_dims_list,
-                        simulation_val)
+            path_num, core_positions, core_final_dims_list = build_fibre(bp_circuit, 0, self.core_positions,
+                        core_name, Taper_L, bp_core_beg_dims_list, bp_core_end_dims_list)
+            fs_path_num, fs_core_positions, fs_core_final_dims_list = build_fibre(fs_circuit, 0, fs_core_positions,
+                        core_name, Taper_L, fs_core_beg_dims_list, fs_core_end_dims_list)
 
         elif structure == "PL":
-            path_num, core_positions, core_final_dims_list = build_PL(self.circuit, path_num, self.core_positions,
+            path_num, core_positions, core_final_dims_list = build_PL(bp_circuit, 0, self.core_positions,
                     core_name, taper, Taper_L,
                     cladding_beg_dims, cladding_end_dims,
                     # capillary_beg_dims, capillary_end_dims,
-                    core_beg_dims_list, core_end_dims_list,
-                    simulation_val,self.cladd_positions)
+                    bp_core_beg_dims_list, bp_core_end_dims_list,
+                    simulation_val,self.cladd_positions,
+                    add_cladding_to_cores=bp_add_cladding_to_cores,
+                    core_to_monitor=bp_core_to_monitor)
+            fs_path_num, fs_core_positions, fs_core_final_dims_list = build_PL(fs_circuit, 0, fs_core_positions,
+                    core_name, taper, Taper_L,
+                    cladding_beg_dims, cladding_end_dims,
+                    fs_core_beg_dims_list, fs_core_end_dims_list,
+                    simulation_val,fs_core_positions,
+                    add_cladding_to_cores=fs_add_cladding_to_cores,
+                    core_to_monitor=fs_core_to_monitor)
             
         if simulation_val["launch_type"] == LaunchType.SM:
             launch_mode = simulation_val["launch_mode"]
@@ -549,16 +532,16 @@ class RSoftSim:
         
         if fem:
             self.sym["Name"] = name_tag
-            self.circuit.write(f"{name_tag}.ind")
+            bp_circuit.write(f"{name_tag}.ind")
             femsim_name_tag = f"FemSim_File_DET_{name_tag}"
-            self.circuit.write(f"{femsim_name_tag}.ind")
+            fs_circuit.write(f"{femsim_name_tag}.ind")
         else:
             self.sym["Name"] = name_tag
-            self.circuit.write(f"{name_tag}.ind")
+            bp_circuit.write(f"{name_tag}.ind")
 
             # create separate file for FemSIM field determination
             femsim_name_tag = f"FS_{name_tag}"
-            self.circuit.write(f"{femsim_name_tag}.ind")
+            fs_circuit.write(f"{femsim_name_tag}.ind")
 
         """
         Append all pathway, monitor, and launch field blocks based 
@@ -566,7 +549,13 @@ class RSoftSim:
         """ 
         
         AddHack(name_tag, femsim_name_tag, launch, 
-                path_num - 1, param_dict, simulation_val, wave,core_positions,fem=fem)
+                path_num - 1, param_dict, simulation_val, wave,core_positions,fem=fem,
+                core_params_bp=bp_core_params, core_params_fs=fs_core_params,
+                fs_core_to_monitor=fs_core_to_monitor,
+                bp_add_cladding_to_cores=bp_add_cladding_to_cores,
+                fs_add_cladding_to_cores=fs_add_cladding_to_cores,
+                fs_core_num=fs_path_num - 1,
+                fs_core_positions=fs_core_positions)
         '''
         Manual setup to loop through a list of values. Runs the terminal line that will initiate RSoft and will calculate the 
         metric to test.
@@ -1470,7 +1459,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         params = [variable_params[k] for k in param_names]
 
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.447962_Taper_L_50000.000000_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.200000_core_neff_1.456191_Taper_L_50000.000000_ex.m00"
         # femSIM_file_example = "1.55_GIF_outer_fibre_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")

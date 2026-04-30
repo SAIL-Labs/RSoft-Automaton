@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from template import *
+from collections import defaultdict
 import matplotlib.animation as animation
 from matplotlib.animation import FFMpegWriter
 from matplotlib import colors
@@ -191,7 +192,10 @@ def create_folders(folder_name, pos):
         os.makedirs(results_folder_onedrive, exist_ok=True)
         return results_folder_onedrive
 #######################################################################################################################################################
-def AddHack(file_name, FS_file_name, json_file, core_num, param_dict, simulation_val, wave, core_positions, fem=False):
+def AddHack(file_name, FS_file_name, json_file, core_num, param_dict, simulation_val, wave, core_positions, fem=False,
+            core_params_bp=None, core_params_fs=None, fs_core_to_monitor=None,
+            bp_add_cladding_to_cores=None, fs_add_cladding_to_cores=None,
+            fs_core_num=None, fs_core_positions=None):
     '''
     Hacking function to add text that will import segments to RSoft that the Python API does not currently handle.
 
@@ -205,6 +209,13 @@ def AddHack(file_name, FS_file_name, json_file, core_num, param_dict, simulation
         "port_mon" (default) records only the throughput at the end of the fibre, or the position at which the monitor is placed.
     '''
     core_to_monitor = simulation_val["core_to_monitor"]
+    fs_core_to_monitor = fs_core_to_monitor or core_to_monitor
+    fs_core_num = fs_core_num or core_num
+    fs_core_positions = fs_core_positions or core_positions
+    bp_add_cladding_to_cores = Simulation_params["add_cladding_to_cores"] if bp_add_cladding_to_cores is None else bp_add_cladding_to_cores
+    fs_add_cladding_to_cores = bp_add_cladding_to_cores if fs_add_cladding_to_cores is None else fs_add_cladding_to_cores
+    core_params_bp = core_params if core_params_bp is None else core_params_bp
+    core_params_fs = core_params if core_params_fs is None else core_params_fs
     mon_type = simulation_val.get("mon_type", Launch_params["mon_type"])
     launch_array = {k: json_file[k] for k in json_file}
     if mon_type == "pathway_mon":
@@ -317,7 +328,7 @@ end launch_field
         # Open FS file in append mode
         with open(f"{FS_file_name}.ind", "a") as fs:
             # Write all pathways
-            for i in range(1, core_num + 2):  # +1 for cladding
+            for i in range(1, fs_core_num + 2):  # +1 for cladding
                 text = block_text["pathway"].format(n=i)
                 fs.write(text)
 
@@ -367,16 +378,13 @@ end launch_field
 
     # Insert delta after core and cladding segment start
     core_name = np.array([f"core_{n}" for n in range(1, core_num+1)])
+    fs_core_name = np.array([f"core_{n}" for n in range(1, fs_core_num+1)])
 
     for core_key in core_name:
         # add core properties to each segment
         lines = insert_after_match(lines, "begin.width =", [
-            f"\tbegin.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n",
-            f"\tend.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n"
-        ], segment_filter=f"{core_key}")
-        lines_fs = insert_after_match(lines_fs, "begin.width =", [
-            f"\tbegin.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n",
-            f"\tend.delta = {core_params[core_key]['neff'] - RSoft_params['background_index']}\n"
+            f"\tbegin.delta = {core_params_bp[core_key]['neff'] - RSoft_params['background_index']}\n",
+            f"\tend.delta = {core_params_bp[core_key]['neff'] - RSoft_params['background_index']}\n"
         ], segment_filter=f"{core_key}")
 
         # code to add the user profile only to the special core
@@ -385,11 +393,17 @@ end launch_field
                 lines = insert_after_match(lines, f"comp_name = core_{core_to_monitor}", [
                     f"\tprofile_type = PROF_USER_1\n",
                 ], segment_filter=f"{core_key}")
-                lines_fs = insert_after_match(lines_fs,  f"comp_name = core_{core_to_monitor}", [
-                    f"\tprofile_type = PROF_USER_1\n",
-                ], segment_filter=f"{core_key}")
-            else:
-                continue
+
+    for core_key in fs_core_name:
+        lines_fs = insert_after_match(lines_fs, "begin.width =", [
+            f"\tbegin.delta = {core_params_fs[core_key]['neff'] - RSoft_params['background_index']}\n",
+            f"\tend.delta = {core_params_fs[core_key]['neff'] - RSoft_params['background_index']}\n"
+        ], segment_filter=f"{core_key}")
+
+    if Simulation_params["use_profile"]:
+        lines_fs = insert_after_match(lines_fs,  f"comp_name = core_{fs_core_to_monitor}", [
+            f"\tprofile_type = PROF_USER_1\n",
+        ], segment_filter=f"core_{fs_core_to_monitor}")
 
         # if core_key != f"core_{simulation_val['core_to_monitor']}":
         #     # assign material to the cores
@@ -418,24 +432,27 @@ end launch_field
     #     f"\tmat_name = SiO2\n"
     # ], segment_filter="Super Cladding") 
 
-    if Simulation_params["add_cladding_to_cores"] is not None:
+    if bp_add_cladding_to_cores is not None:
         # lines = insert_after_match(lines, "begin.width =", ["profile_type = PROF_INACTIVE"
         # ], segment_filter="Super Cladding") 
-        for cladd_num in Simulation_params["add_cladding_to_cores"]:
+        for cladd_num in bp_add_cladding_to_cores:
             lines = insert_after_match(lines, "begin.width =", [
             f"\tbegin.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n",
             f"\tend.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n"
-            ], segment_filter=f"Core {cladd_num + 1} Cladding") 
-                
-            lines_fs = insert_after_match(lines_fs, "begin.width =", [
-                f"\tbegin.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n",
-                f"\tend.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n"
             ], segment_filter=f"Core {cladd_num + 1} Cladding") 
 
             # assign material to thecore  claddings
             lines = insert_after_match(lines, "end.delta =", [
                 f"\tmat_name = SiO2\n",
+            ], segment_filter=f"Core {cladd_num + 1} Cladding")
+
+    if fs_add_cladding_to_cores is not None:
+        for cladd_num in fs_add_cladding_to_cores:
+            lines_fs = insert_after_match(lines_fs, "begin.width =", [
+                f"\tbegin.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n",
+                f"\tend.delta = {launch_array['cladding_neff']- RSoft_params['background_index']}\n"
             ], segment_filter=f"Core {cladd_num + 1} Cladding") 
+
             lines_fs = insert_after_match(lines_fs, "end.delta =", [
                 f"\tmat_name = SiO2\n"
             ], segment_filter=f"Core {cladd_num + 1} Cladding") 
@@ -456,7 +473,13 @@ end launch_field
     modified_lines = []
     modified_lines_fs = []
 
-    for curr_lines, curr_file_name, arr_name in zip([lines, lines_fs], [file_name, FS_file_name], [modified_lines, modified_lines_fs]):
+    for curr_lines, curr_file_name, arr_name, curr_core_to_monitor, curr_core_num in zip(
+        [lines, lines_fs],
+        [file_name, FS_file_name],
+        [modified_lines, modified_lines_fs],
+        [core_to_monitor, fs_core_to_monitor],
+        [core_num, fs_core_num]
+    ):
         in_segment_header = False
         current_segment_is_super_cladding = False
 
@@ -538,7 +561,7 @@ end launch_field
                     in_time_monitor = True
                     inserted = False  # reset insertion flag for each time_monitor
 
-                if line_strip.startswith(f"time_monitor {simulation_val['core_num'] * 2 + 1 + extra_monitors}"):
+                if line_strip.startswith(f"time_monitor {curr_core_num * 2 + 1 + extra_monitors}"):
                     in_extra_time_monitor = True
                     inserted_extra = False  # reset insertion flag for each time_monitor
                 else:
@@ -546,11 +569,11 @@ end launch_field
 
                 if in_time_monitor:
                     # replace the special core's port monitor properties
-                    if mon_number == core_to_monitor:
+                    if mon_number == curr_core_to_monitor:
                         for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
                             if p in line:
                                 line = line.replace(p, r)
-                    elif mon_number == simulation_val['core_num'] * 2 + 1 + extra_monitors:
+                    elif mon_number == curr_core_num * 2 + 1 + extra_monitors:
                         for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
                             if p in line:
                                 line = line.replace(p, r)
@@ -591,8 +614,8 @@ end launch_field
                     elif fem: # for femsim file determination
                         final_lines.append(f"\tmonitor_file = {FS_file_name}.m00\n")
                     else:
-                        if mon_number < core_num:
-                            if mon_number == core_to_monitor-1:
+                        if mon_number < curr_core_num:
+                            if mon_number == curr_core_to_monitor-1:
                                 final_lines.append(f"\tmonitor_file = {FS_file_name}.m00\n")
                             else:
                                 # enforce other cores to have a field profile as a function of wavelength
@@ -610,9 +633,9 @@ end launch_field
                         # Extra monitors after the first core_num ports:
                         else:
                             # index of this extra monitor among the higher modes
-                            idx_extra = mon_number - core_num  # 0,1,2,3,4,...
+                            idx_extra = mon_number - curr_core_num  # 0,1,2,3,4,...
 
-                            if 0 <= idx_extra < len(higher_mode_indices) and mon_number >= (core_to_monitor - 1):
+                            if 0 <= idx_extra < len(higher_mode_indices) and mon_number >= (curr_core_to_monitor - 1):
                                 mode_idx = higher_mode_indices[idx_extra]
                                 if mode_idx >= 10:
                                     final_lines.append(f"\tmonitor_file = {FS_file_name}.m{mode_idx}\n")
@@ -697,10 +720,10 @@ end launch_field
                 # Insert boundary_* after boundary_gap_z = 0
                 if stripped == "boundary_gap_z = 0":
                     output_lines.extend([
-                        f"boundary_max = {core_positions[Simulation_params['core_to_monitor']-1][0] + 1.1*(variable_params['core_diam']/2)}\n", #10+38.5
-                        f"boundary_max_y = {core_positions[Simulation_params['core_to_monitor']-1][1] + 1.1*(variable_params['core_diam']/2)}\n", #15
-                        f"boundary_min = {core_positions[Simulation_params['core_to_monitor']-1][0] - 1.1*(variable_params['core_diam']/2)}\n", #-10+38.5
-                        f"boundary_min_y = {core_positions[Simulation_params['core_to_monitor']-1][1] - 1.1*(variable_params['core_diam']/2)}\n" #-15
+                        f"boundary_max = {fs_core_positions[fs_core_to_monitor-1][0] + 1.1*(variable_params['core_diam']/2)}\n", #10+38.5
+                        f"boundary_max_y = {fs_core_positions[fs_core_to_monitor-1][1] + 1.1*(variable_params['core_diam']/2)}\n", #15
+                        f"boundary_min = {fs_core_positions[fs_core_to_monitor-1][0] - 1.1*(variable_params['core_diam']/2)}\n", #-10+38.5
+                        f"boundary_min_y = {fs_core_positions[fs_core_to_monitor-1][1] - 1.1*(variable_params['core_diam']/2)}\n" #-15
                     ])
                 # Insert domain_min after dimension = 3
                 if stripped == "dimension = 3":
@@ -728,6 +751,62 @@ end launch_field
             with open(f"{FS_file_name}.ind", "w") as fout:
                 fout.writelines(final_lines)
 
+def centre_core_index(core_positions):
+    if not core_positions:
+        raise ValueError("Core positions must be generated before building the circuit.")
+    return min(
+        range(1, len(core_positions) + 1),
+        key=lambda idx: core_positions[idx - 1][0] ** 2 + core_positions[idx - 1][1] ** 2
+    )
+
+def core_layout_for_special_core(special_core_idx, sim_param, simulation_val, core_name,param_dict,delta_index_at_reference_wavelength, taper):
+    core_beg_dims = []
+    core_end_dims = []
+    circuit_core_params = {}
+
+    if sim_param["mode_selective"] == 1:
+        for j, core_key in enumerate(core_name, start=1):
+            if j == special_core_idx:
+                # need to modify the core_neff according to the wavelength
+                # core to be optimized by skopt
+                core_diam = variable_params.get("core_diam")
+                core_taper = param_dict.get("taper", fixed_params.get("taper"))
+                if simulation_val["Fem_present"] and simulation_val["simulate_tf_metric"]:
+                    core_neff = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength
+                elif simulation_val["Fem_present"] and not simulation_val["simulate_tf_metric"] and simulation_val["sellmeier"]:
+                    core_neff = simulation_val["Si_RI_ref_wavelength"] + delta_index_at_reference_wavelength
+                elif simulation_val["Fem_present"] and not simulation_val["simulate_tf_metric"]:
+                    core_neff = param_dict.get("core_neff", fixed_params.get("core_neff"))
+                else:
+                    # fix the index to that of other cores to determine the FemSIM files.
+                    core_neff = simulation_val.get("core_neff", fixed_params.get("core_neff"))
+            else:
+                # use preconfigured values to specify core parameters
+                core_diam = fixed_params["other_core_diam"]
+                core_neff = simulation_val.get("core_neff", fixed_params.get("core_neff"))
+                core_taper = param_dict.get("taper", fixed_params.get("taper"))
+
+            core_beg_dims.append((core_diam / taper, core_diam / taper))
+            core_end_dims.append((core_diam, core_diam))
+            circuit_core_params[core_key] = {
+                "core_diam": core_diam,
+                "neff": core_neff,
+                "taper": core_taper
+            }
+    else:
+        for core_key in core_name:
+            core_diam = core_params[core_key]["core_diam"]
+            core_neff = core_params[core_key]["neff"]
+
+            core_beg_dims.append((core_diam / taper, core_diam / taper))
+            core_end_dims.append((core_diam, core_diam))
+            circuit_core_params[core_key] = {
+                **core_params[core_key],
+                "core_diam": core_diam,
+                "neff": core_neff
+            }
+
+    return core_beg_dims, core_end_dims, circuit_core_params
         
 #######################################################################################################################################################
 # Calculate the V-number from available parameters
@@ -836,8 +915,6 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
             print(f"Warning: Could not move {csv_path}: {e}")
     return results_folder
 
-from collections import defaultdict
-
 def build_df_wave_log_for_candidate(
     candidate_tf_list,
     candidate_params,
@@ -863,6 +940,48 @@ def build_df_wave_log_for_candidate(
 
     k_arr = np.array(list(variable_params.keys()))
     candidate_params = np.asarray(candidate_params, dtype=float)
+
+    def material_indices_for_wave(w):
+        # function that ensures the correct refractive indices for non-MS cores are logged for each wavelength simulated
+        if simulation_val["simulate_tf_metric"]:
+            _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
+            return {
+                "special_core": None,
+                "other_core": stored_data["GeO2_2_mol%"].to_numpy()[idx],
+                "cladding": stored_data["SiO2"].to_numpy()[idx],
+                "capillary": stored_data["F_2_mol%"].to_numpy()[idx],
+            }
+
+        if simulation_val["sellmeier"]:
+            _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
+            _, ref_idx = find_nearest(
+                stored_data["Wavelength (um)"].to_numpy(),
+                min(simulation_val["free_space_wavelength"])
+            )
+            si_ref = stored_data["SiO2"].to_numpy()[ref_idx]
+            cladding_delta = fixed_params["cladding_neff"] - si_ref
+            cladding_ref_ind = stored_data["SiO2"].to_numpy()[idx] + cladding_delta
+            capillary_ref_ind = stored_data["F_2_mol%"].to_numpy()[idx] - RSoft_params["background_index_offset"]
+            other_core_ref_ind = np.sqrt(0.14**2 + cladding_ref_ind**2)
+
+            special_core_ref_ind = None
+            if "core_neff" in k_arr:
+                core_neff_idx = np.where(k_arr == "core_neff")[0][0]
+                special_core_ref_ind = si_ref + (candidate_params[core_neff_idx] - si_ref)
+
+            return {
+                "special_core": special_core_ref_ind,
+                "other_core": other_core_ref_ind,
+                "cladding": cladding_ref_ind,
+                "capillary": capillary_ref_ind,
+            }
+
+        return {
+            "special_core": None,
+            "other_core": simulation_val.get("core_neff", fixed_params.get("core_neff")),
+            "cladding": fixed_params["cladding_neff"],
+            "capillary": RSoft_params["background_index"],
+        }
 
     for w in unique_waves:
         tf_list_w = [
@@ -898,15 +1017,11 @@ def build_df_wave_log_for_candidate(
         )
 
         n_modes, n_cores = og_amp.shape
-        if simulation_val["Fem_present"] and (simulation_val["simulate_tf_metric"] or simulation_val["sellmeier"]):
-            _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
-            Other_core_ref_ind = stored_data["GeO2_2_mol%"].to_numpy()[idx]
-            Cladding_ref_ind = stored_data["SiO2"].to_numpy()[idx]
-            Capillary_ref_ind = stored_data["F_2_mol%"].to_numpy()[idx]
-        else:
-            Other_core_ref_ind = simulation_val["core_neff"]
-            Cladding_ref_ind = fixed_params["cladding_neff"]
-            Capillary_ref_ind = RSoft_params["background_index"]
+        material_indices = material_indices_for_wave(w)
+        Special_core_ref_ind = material_indices["special_core"]
+        Other_core_ref_ind = material_indices["other_core"]
+        Cladding_ref_ind = material_indices["cladding"]
+        Capillary_ref_ind = material_indices["capillary"]
             
         for m in range(n_modes):
             mode_label = (
@@ -937,6 +1052,8 @@ def build_df_wave_log_for_candidate(
                 "Cladding Refractive Index": Cladding_ref_ind,
                 "Capillary Refractive Index": Capillary_ref_ind,
             }
+            if Special_core_ref_ind is not None:
+                row["MS Core Refractive Index"] = Special_core_ref_ind
 
             # write varied parameters once per row
             for p_idx, pname in enumerate(k_arr):
@@ -1062,9 +1179,14 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
              cladd_beginning_diam, cladd_final_diam,
             #  capillary_beg_dims, capillary_end_dims,
              core_beginning_dims_list, core_final_dims_list, 
-             simulation_val,cladding_positions = None):
+             simulation_val,cladding_positions = None, add_cladding_to_cores = None,
+             core_to_monitor = None):
     if simulation_val["skip_core"] == None:
         cladding_positions = core_positions
+    if add_cladding_to_cores is None:
+        add_cladding_to_cores = Simulation_params["add_cladding_to_cores"]
+    if core_to_monitor is None:
+        core_to_monitor = Simulation_params["core_to_monitor"]
     cladding = circuit.add_segment(
         position=(0, 0, 0),
         offset=(0, 0, Taper_length),
@@ -1096,27 +1218,24 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
         core.set_name(core_names[j])
         # circuit.attach(core, cladding, 0, 0, 0)
         core_segments.append(core)
-    if Simulation_params["add_cladding_to_cores"] is not None:
+    if add_cladding_to_cores is not None:
         for j, (x, y) in enumerate(cladding_positions):
-            if Simulation_params["add_cladding_to_cores"] is not None:
-                for i in Simulation_params["add_cladding_to_cores"]:
-                    if i == j:
-                        if fixed_params["core_cladding_diam"] is not None:
-                            core_cladding_beg_dims = (fixed_params["core_cladding_diam"] / taper,fixed_params["core_cladding_diam"] / taper)
-                            core_cladding_end_dims = (fixed_params["core_cladding_diam"], fixed_params["core_cladding_diam"])
-                            core_cladding = circuit.add_segment(
-                                position=(x / taper, y / taper, 0),
-                                offset=(x, y, Taper_length),
-                                dimensions=core_cladding_beg_dims,
-                                dimensions_end=core_cladding_end_dims
-                            )
-                            core_cladding.color('0')
-                            core_cladding.set_name(f"Core {i+1} Cladding")
+            for i in add_cladding_to_cores:
+                if i == j:
+                    if fixed_params["core_cladding_diam"] is not None:
+                        core_cladding_beg_dims = (fixed_params["core_cladding_diam"] / taper,fixed_params["core_cladding_diam"] / taper)
+                        core_cladding_end_dims = (fixed_params["core_cladding_diam"], fixed_params["core_cladding_diam"])
+                        core_cladding = circuit.add_segment(
+                            position=(x / taper, y / taper, 0),
+                            offset=(x, y, Taper_length),
+                            dimensions=core_cladding_beg_dims,
+                            dimensions_end=core_cladding_end_dims
+                        )
+                        core_cladding.color('0')
+                        core_cladding.set_name(f"Core {i+1} Cladding")
 
-                        else:
-                            raise Exception("core_cladding_diam cannot be None!!!!")
-            else:
-                continue
+                    else:
+                        raise Exception("core_cladding_diam cannot be None!!!!")
     
     if Launch_params["mon_type"] == "port_mon":
         for j, (x, y) in enumerate(core_positions):
@@ -1131,8 +1250,8 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
 
         # Add extra port monitors to monitor higher LP modes
         for k in range(len(port_monitors) - 2):
-            port = circuit.add_portmonitor(dimensions = core_final_dims_list[Simulation_params["core_to_monitor"]-1])
-            circuit.attach(port, core_segments[Simulation_params["core_to_monitor"]-1], 1, 0, attach_angles = 0, attach_dimensions = 1) 
+            port = circuit.add_portmonitor(dimensions = core_final_dims_list[core_to_monitor-1])
+            circuit.attach(port, core_segments[core_to_monitor-1], 1, 0, attach_angles = 0, attach_dimensions = 1)
             port_monitors.append(port)
     # if Launch_params["mon_type"] == "port_mon":
     core_segment_propterties = [path_num, core_positions, core_final_dims_list]
