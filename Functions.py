@@ -780,14 +780,26 @@ def core_layout_for_special_core(special_core_idx, sim_param, simulation_val, co
                 else:
                     # fix the index to that of other cores to determine the FemSIM files.
                     core_neff = simulation_val.get("core_neff", fixed_params.get("core_neff"))
+                
+                # code to cover the pre-tapering of the special core
+                if simulation_val["pre_taper"]:
+                    if not isinstance(simulation_val["pre_taper_val"], float):
+                        raise RuntimeError(f"The value for pre_taper_val must be a float! Current value is {simulation_val["pre_taper_val"]}.")
+                    pre_taper_diam = core_diam / simulation_val["pre_taper_val"]
+                    core_beg_dims.append((pre_taper_diam / taper, pre_taper_diam / taper))
+                    core_end_dims.append((core_diam, core_diam))
+                else:
+                    core_beg_dims.append((core_diam / taper, core_diam / taper))
+                    core_end_dims.append((core_diam, core_diam))
             else:
                 # use preconfigured values to specify core parameters
                 core_diam = fixed_params["other_core_diam"]
                 core_neff = simulation_val.get("core_neff", fixed_params.get("core_neff"))
                 core_taper = param_dict.get("taper", fixed_params.get("taper"))
-
-            core_beg_dims.append((core_diam / taper, core_diam / taper))
-            core_end_dims.append((core_diam, core_diam))
+            
+                core_beg_dims.append((core_diam / taper, core_diam / taper))
+                core_end_dims.append((core_diam, core_diam))
+            
             circuit_core_params[core_key] = {
                 "core_diam": core_diam,
                 "neff": core_neff,
