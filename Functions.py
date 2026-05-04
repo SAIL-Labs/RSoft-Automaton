@@ -720,10 +720,14 @@ end launch_field
                 # Insert boundary_* after boundary_gap_z = 0
                 if stripped == "boundary_gap_z = 0":
                     output_lines.extend([
-                        f"boundary_max = {fs_core_positions[fs_core_to_monitor-1][0] + 1.1*(variable_params['core_diam']/2)}\n", #10+38.5
-                        f"boundary_max_y = {fs_core_positions[fs_core_to_monitor-1][1] + 1.1*(variable_params['core_diam']/2)}\n", #15
-                        f"boundary_min = {fs_core_positions[fs_core_to_monitor-1][0] - 1.1*(variable_params['core_diam']/2)}\n", #-10+38.5
-                        f"boundary_min_y = {fs_core_positions[fs_core_to_monitor-1][1] - 1.1*(variable_params['core_diam']/2)}\n" #-15
+                        f"boundary_max = 30\n", #10+38.5
+                        f"boundary_max_y = 30\n", #15
+                        f"boundary_min = -30\n", #-10+38.5
+                        f"boundary_min_y = -30\n" #-15
+                        # f"boundary_max = {fs_core_positions[fs_core_to_monitor-1][0] + 1.1*(variable_params['core_diam']/2)}\n", #10+38.5
+                        # f"boundary_max_y = {fs_core_positions[fs_core_to_monitor-1][1] + 1.1*(variable_params['core_diam']/2)}\n", #15
+                        # f"boundary_min = {fs_core_positions[fs_core_to_monitor-1][0] - 1.1*(variable_params['core_diam']/2)}\n", #-10+38.5
+                        # f"boundary_min_y = {fs_core_positions[fs_core_to_monitor-1][1] - 1.1*(variable_params['core_diam']/2)}\n" #-15
                     ])
                 # Insert domain_min after dimension = 3
                 if stripped == "dimension = 3":
@@ -784,7 +788,7 @@ def core_layout_for_special_core(special_core_idx, sim_param, simulation_val, co
                 # code to cover the pre-tapering of the special core
                 if simulation_val["pre_taper"]:
                     if not isinstance(simulation_val["pre_taper_val"], float):
-                        raise RuntimeError(f"The value for pre_taper_val must be a float! Current value is {simulation_val["pre_taper_val"]}.")
+                        raise RuntimeError(f"The value for pre_taper_val must be a float! Current value is {simulation_val['pre_taper_val']}.")
                     pre_taper_diam = core_diam / simulation_val["pre_taper_val"]
                     core_beg_dims.append((pre_taper_diam / taper, pre_taper_diam / taper))
                     core_end_dims.append((core_diam, core_diam))
