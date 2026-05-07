@@ -215,12 +215,14 @@ class RSoftSim:
         # files to copy to Onedrive
         onedrive_filename = name_tag + ".ind"
         onedrive_filename_results = name_tag + "_mon.dat"
+        onedrive_field_results = name_tag + ".fld"
         onedrive_femsim_filename_results = femsim_name_tag + ".ind"
         onedrive_neff_csv_path = Path(onedrive_results_folder) / f"{wave}_Guided Modes_{run_tag}.csv"
         neff_csv_path = Path(results_folder) / f"{wave}_Guided Modes_{run_tag}.csv"
 
         file_extensions_to_copy = [
-           onedrive_filename, onedrive_filename_results, onedrive_femsim_filename_results,onedrive_neff_csv_path
+           onedrive_filename, onedrive_filename_results, onedrive_field_results,
+           onedrive_femsim_filename_results,onedrive_neff_csv_path
         ]
 
         files_to_move = [

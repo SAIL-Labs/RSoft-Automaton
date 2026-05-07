@@ -6,7 +6,7 @@ fixed_params = {
     "MCFCladd": 125,  #250 , #400
     # "core_claddings": None, 
     "core_cladding_diam": None, #125  #80,
-    "cladding_neff": 1.449445, #1.44, # pure silica , #1.4449676666871432
+    "cladding_neff": 1.449445, #1.44, # pure silica , #1.4449676666871432 # this value really only sets the minimum value in the prior; it gets replaced through the Sellmeier equation
     "core_cladding_neff": None, #1.4433510951304291734406199895015, #from using SMF-28 index (). Determined automatically using Sellmeier
     "cen_core_cladding_neff": None,#1.44,#0.00949,
     "other_core_diam": 6.5, #8.2, # non-ms core diameter
@@ -100,7 +100,7 @@ Simulation_params = {
 
     # optimiser settings
     "acq_type": "EI",
-    "acq_hyperparam": 0.01,
+    "acq_hyperparam": 0.8,
     "acq_opt": "lbfgs",
     "n_init_points": 10
 }
