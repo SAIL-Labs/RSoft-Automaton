@@ -1,5 +1,5 @@
 import numpy as np, pandas as pd, math
-import json, os, csv, ofiber, random
+import json, os, csv, ofiber, random, time
 from pathlib import Path
 import matplotlib
 import matplotlib.pyplot as plt
@@ -191,6 +191,30 @@ def create_folders(folder_name, pos):
         results_folder_onedrive = os.path.join(results_root_onedrive, folder_name)
         os.makedirs(results_folder_onedrive, exist_ok=True)
         return results_folder_onedrive
+#######################################################################################################################################################
+def copy_when_available(src, dst, timeout=30):
+    os.makedirs(os.path.dirname(os.path.abspath(dst)), exist_ok=True)
+    t_start = time.time()
+    while True:
+        try:
+            shutil.copy(src, dst)
+            return
+        except PermissionError:
+            if time.time() - t_start > timeout:
+                raise
+            time.sleep(0.2)
+
+def move_when_available(src, dst, timeout=30):
+    os.makedirs(os.path.dirname(os.path.abspath(dst)), exist_ok=True)
+    t_start = time.time()
+    while True:
+        try:
+            shutil.move(src, dst)
+            return
+        except PermissionError:
+            if time.time() - t_start > timeout:
+                raise
+            time.sleep(0.2)
 #######################################################################################################################################################
 def AddHack(file_name, FS_file_name, json_file, core_num, param_dict, simulation_val, wave, core_positions, fem=False,
             core_params_bp=None, core_params_fs=None, fs_core_to_monitor=None,
@@ -648,8 +672,7 @@ end launch_field
                                         if p in line:
                                             line = line.replace(p, r)
                             else:
-                                # Fallback (shouldn't normally hit if counts are consistent)
-                                final_lines.append(f"\tmonitor_file = {Simulation_params['port_mon_file']}\n")
+                                final_lines.append(f"\tmonitor_file = {FS_file_name}.m00\n")
 
                     final_lines.append("\tpolarizer = 2\n")
                     inserted = True
@@ -775,18 +798,17 @@ def core_layout_for_special_core(special_core_idx, sim_param, simulation_val, co
                 # core to be optimized by skopt
                 core_diam = variable_params.get("core_diam")
                 core_taper = param_dict.get("taper", fixed_params.get("taper"))
-                if simulation_val["Fem_present"] and simulation_val["simulate_tf_metric"]:
+                if simulation_val["Fem_present"] and (simulation_val["simulate_tf_metric"] or simulation_val["sellmeier"]):
                     core_neff = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength
-                elif simulation_val["Fem_present"] and not simulation_val["simulate_tf_metric"] and simulation_val["sellmeier"]:
-                    core_neff = simulation_val["Si_RI_ref_wavelength"] + delta_index_at_reference_wavelength
                 elif simulation_val["Fem_present"] and not simulation_val["simulate_tf_metric"]:
                     core_neff = param_dict.get("core_neff", fixed_params.get("core_neff"))
                 else:
-                    # fix the index to that of other cores to determine the FemSIM files.
+                    # fix the geometry and index to that of other cores to determine the FemSIM files.
+                    core_diam = fixed_params["other_core_diam"]
                     core_neff = simulation_val.get("core_neff", fixed_params.get("core_neff"))
                 
                 # code to cover the pre-tapering of the special core
-                if simulation_val["pre_taper"]:
+                if simulation_val["Fem_present"] and simulation_val["pre_taper"]:
                     if not isinstance(simulation_val["pre_taper_val"], float):
                         raise RuntimeError(f"The value for pre_taper_val must be a float! Current value is {simulation_val['pre_taper_val']}.")
                     pre_taper_diam = core_diam / simulation_val["pre_taper_val"]
@@ -958,38 +980,21 @@ def build_df_wave_log_for_candidate(
     candidate_params = np.asarray(candidate_params, dtype=float)
 
     def material_indices_for_wave(w):
-        # function that ensures the correct refractive indices for non-MS cores are logged for each wavelength simulated
-        if simulation_val["simulate_tf_metric"]:
-            _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
-            return {
-                "special_core": None,
-                "other_core": stored_data["GeO2_2_mol%"].to_numpy()[idx],
-                "cladding": stored_data["SiO2"].to_numpy()[idx],
-                "capillary": stored_data["F_2_mol%"].to_numpy()[idx],
-            }
-
         if simulation_val["sellmeier"]:
-            _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
-            _, ref_idx = find_nearest(
-                stored_data["Wavelength (um)"].to_numpy(),
-                min(simulation_val["free_space_wavelength"])
-            )
-            si_ref = stored_data["SiO2"].to_numpy()[ref_idx]
-            cladding_delta = fixed_params["cladding_neff"] - si_ref
-            cladding_ref_ind = stored_data["SiO2"].to_numpy()[idx] + cladding_delta
-            capillary_ref_ind = stored_data["F_2_mol%"].to_numpy()[idx] - RSoft_params["background_index_offset"]
-            other_core_ref_ind = np.sqrt(0.14**2 + cladding_ref_ind**2)
+            indices = get_wavelength_dependent_indices(w, simulation_val, fixed_params, stored_data)
 
             special_core_ref_ind = None
             if "core_neff" in k_arr:
                 core_neff_idx = np.where(k_arr == "core_neff")[0][0]
-                special_core_ref_ind = si_ref + (candidate_params[core_neff_idx] - si_ref)
+                _, ref_idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), 1.5)
+                special_core_offset = candidate_params[core_neff_idx] - stored_data["SiO2"].to_numpy()[ref_idx]
+                special_core_ref_ind = indices["cladding_neff"] + special_core_offset
 
             return {
                 "special_core": special_core_ref_ind,
-                "other_core": other_core_ref_ind,
-                "cladding": cladding_ref_ind,
-                "capillary": capillary_ref_ind,
+                "other_core": indices["non_ms_core_neff"],
+                "cladding": indices["cladding_neff"],
+                "capillary": indices["capillary_neff"],
             }
 
         return {
@@ -1727,8 +1732,8 @@ LP_mode_rsoft_dict = {
     "LP02": (0,2),
     "LP31a": (3,1),
     "LP31b": (-3,1),
-    "LP12a": (2, 1),
-    "LP12b": (-2, 1),
+    "LP12a": (1, 2),
+    "LP12b": (-1, 2),
     "LP41a": (4, 1),
     "LP41b": (-4, 1),
     "LP22a": (2, 2),
@@ -1739,7 +1744,7 @@ LP_mode_rsoft_dict = {
     "LP32a": (3, 2),
     "LP32b": (-3, 2),
     "LP13a": (1, 3),
-    "LP13": (-1, 3),
+    "LP13b": (-1, 3),
     "LP61a": (6, 1),
     "LP61b": (-6, 1),
     "LP42a": (4, 2),
@@ -3179,6 +3184,50 @@ def find_nearest(arr, val):
     array = np.asarray(arr)
     idx = (np.abs(array - val)).argmin()
     return array[idx], idx
+
+def get_wavelength_dependent_indices(wave, simulation_val, fixed_params, sellmeier_df):
+    """
+    Return absolute refractive indices for one wavelength using fixed offsets
+    calculated at the 1.5 um Sellmeier reference wavelength.
+    """
+    wavelengths = sellmeier_df["Wavelength (um)"].to_numpy()
+    _, wave_idx = find_nearest(wavelengths, wave)
+    _, ref_idx = find_nearest(wavelengths, 1.5)
+
+    requested_non_ms_core = simulation_val.get("core_neff", fixed_params.get("core_neff"))
+    if requested_non_ms_core is None:
+        raise KeyError("core_neff missing from simulation_val and fixed_params.")
+
+    requested_cladding = fixed_params["cladding_neff"]
+    requested_capillary = fixed_params.get(
+        "Capillary Refractive Index",
+        fixed_params.get(
+            "capillary_neff",
+            fixed_params.get("capillary_refractive_index", RSoft_params["background_index"])
+        )
+    )
+
+    non_ms_core_offset = requested_non_ms_core - sellmeier_df["GeO2_2_mol%"].to_numpy()[ref_idx]
+    cladding_offset = requested_cladding - sellmeier_df["SiO2"].to_numpy()[ref_idx]
+    capillary_offset = requested_capillary - sellmeier_df["F_2_mol%"].to_numpy()[ref_idx]
+
+    non_ms_core_neff = sellmeier_df["GeO2_2_mol%"].to_numpy()[wave_idx] + non_ms_core_offset
+    cladding_neff = sellmeier_df["SiO2"].to_numpy()[wave_idx] + cladding_offset
+    capillary_neff = sellmeier_df["F_2_mol%"].to_numpy()[wave_idx] + capillary_offset
+
+    return {
+        "non_ms_core_neff": non_ms_core_neff,
+        "other_core": non_ms_core_neff,
+        "cladding_neff": cladding_neff,
+        "cladding": cladding_neff,
+        "capillary_neff": capillary_neff,
+        "capillary": capillary_neff,
+        "background_index": capillary_neff,
+        "reference_wavelength": 1.5,
+        "non_ms_core_offset": non_ms_core_offset,
+        "cladding_offset": cladding_offset,
+        "capillary_offset": capillary_offset,
+    }
 
 ###################################################################################################################################################################################################################################################
 

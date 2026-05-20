@@ -2,24 +2,23 @@ from Circuit_Properties import *
 import random, numpy as np
 
 fixed_params = {
-    "core_sep":  35, #60,, #125
-    "MCFCladd": 125,  #250 , #400
+    "core_sep":  60, #125
+    "MCFCladd": 200,  #250 , #400
     # "core_claddings": None, 
     "core_cladding_diam": None, #125  #80,
-    "cladding_neff": 1.449445, #1.44, # pure silica , #1.4449676666871432 # this value really only sets the minimum value in the prior; it gets replaced through the Sellmeier equation
+    "cladding_neff": 1.44,#1.44402, # this value gets replaced through the Sellmeier equation
     "core_cladding_neff": None, #1.4433510951304291734406199895015, #from using SMF-28 index (). Determined automatically using Sellmeier
     "cen_core_cladding_neff": None,#1.44,#0.00949,
-    "other_core_diam": 6.5, #8.2, # non-ms core diameter
+    "other_core_diam": 8.3, #8.2, # non-ms core diameter
     # "Taper_L": 50000, #45000
     # "core_neff": 0.0122895, #0.015,
-    "taper": 7.7639751553, #28.571428571428571428571428571429, #26.6666666667, # 24.8447204969,#
+    "taper": 11.7647058824,#7.7639751553, 15.9
     # "core_diam": 8.2,
     "alpha": 0,
     "length_hyperparam": 0.01
     }
 
 RSoft_params = {
-    # "Name": "MCF_Test",
     "cad_aspectratio_x": -1,
     "cad_aspectratio_y": -1,
     "cad_aspectratio_z": -1,
@@ -33,7 +32,7 @@ RSoft_params = {
     "field_output_format": "OUTPUT_AMP_PHASE",
     "slice_output_format": "OUTPUT_AMP_PHASE",
     "slice_output_individual": "None", # OUTPUT_AMP_PHASE_3D
-    "background_index": 1.4345,#1.4357951361369463,#, 
+    "background_index": 1.4345,#replace through sellmeier
     "background_index_offset": 0, # to be used when simulate_tf_metric = False. Default = 0, 0.001295136
     "sim_tool": Sim_tool.BP,
     "launch_align_file": 1,
@@ -125,8 +124,8 @@ bestval_limits = {
 }
 
 variable_params= {
-    "core_diam": 6.5, # using 3D mode val: 8.104383, 4.36,#
-    "core_neff": 1.447962, #1.45, # using 3D mode val: 1.449049,1.4467895
+    "core_diam": 8.3, # using 3D mode val: 8.104383, 4.36,#
+    "core_neff": 1.4492, #1.45, # using 3D mode val: 1.449049,1.4467895
     # "taper": 6.55789308, #22, #8.53
     "Taper_L":  50000, # using 3D mode val: 48587.538152
 }   

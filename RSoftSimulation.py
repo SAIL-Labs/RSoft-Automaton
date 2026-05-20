@@ -3,12 +3,8 @@ import subprocess, json, time
 from pathlib import Path
 from skopt import Optimizer, dump, load
 from skopt.space import Real, Categorical
-# from skopt.utils import dump
 import multiprocessing as mp
-import matplotlib.gridspec as gridspec
-import seaborn as sns
 import datetime
-import glob
 from collections import defaultdict
 from Circuit_Properties import *
 from Functions import *
@@ -220,10 +216,10 @@ class RSoftSim:
         onedrive_neff_csv_path = Path(onedrive_results_folder) / f"{wave}_Guided Modes_{run_tag}.csv"
         neff_csv_path = Path(results_folder) / f"{wave}_Guided Modes_{run_tag}.csv"
 
-        file_extensions_to_copy = [
+        files_to_copy_to_onedrive = {
            onedrive_filename, onedrive_filename_results, onedrive_field_results,
-           onedrive_femsim_filename_results,onedrive_neff_csv_path
-        ]
+           onedrive_femsim_filename_results
+        }
 
         files_to_move = [
             filename,
@@ -236,7 +232,7 @@ class RSoftSim:
         
         # Normalize to basenames in case paths are used
         files_to_move = [os.path.basename(f) for f in files_to_move]
-        file_extensions_to_move = [os.path.basename(k) for k in file_extensions_to_copy]
+        files_to_copy_to_onedrive = {os.path.basename(k) for k in files_to_copy_to_onedrive}
 
         # Safely access the .mon file in its new location
         if Launch_params["mon_type"] == "pathway_mon" and sim_tool != "ST_FEMSIM":
@@ -271,16 +267,12 @@ class RSoftSim:
         uf_neff = RSoftUserFunction()
         uf_neff.read(str(nef_path))
         x_neff, y_neff = uf_neff.get_arrays()
+        x_all, y_all, z_all = uf.get_arrays()
+        del uf
+        del uf_neff
 
-        if simulation_val["simulate_tf_metric"]:
-            stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
-            _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), wave)
-            fixed_params["cladding_neff"] = stored_data["SiO2"].to_numpy()[idx]
-            guided_mask = y_neff > fixed_params["cladding_neff"]
-            guided_neff = np.array(y_neff[guided_mask])
-        else:
-            guided_mask = y_neff > fixed_params["cladding_neff"]
-            guided_neff = np.array(y_neff[guided_mask])
+        guided_mask = y_neff > fixed_params["cladding_neff"]
+        guided_neff = np.array(y_neff[guided_mask])
 
         with open(neff_csv_path, mode="w", newline="") as f_neff:
             writer = csv.writer(f_neff)
@@ -288,31 +280,42 @@ class RSoftSim:
             for idx, nval in enumerate(guided_neff, start=1):
                 writer.writerow([idx, nval, wave, pid_csv, run_tag])
 
+        os.makedirs(onedrive_neff_csv_path.parent, exist_ok=True)
         with open(onedrive_neff_csv_path, mode="w", newline="") as f_neff_od:
             writer = csv.writer(f_neff_od)
             writer.writerow(["Mode_Index", "n_eff", "Wavelength (um)", "PID", "Run Tag"])
             for idx, nval in enumerate(guided_neff, start=1):
                 writer.writerow([idx, nval, wave, pid_csv, run_tag])
 
-        # move files AFTER they have been read
+        owned_files = []
         for file in os.listdir():
-            # copy important files to Onedrive
-            for l in file_extensions_to_move:
-                if file == l:
-                    os.makedirs(onedrive_results_folder, exist_ok=True)
-                    shutil.copy(file, os.path.join(onedrive_results_folder,file))
-                    
+            if (
+                file in files_to_move
+                or file == f"{name_tag}.ind"
+                or file == f"{femsim_name_tag}.ind"
+                or file.startswith(f"{name_tag}_")
+                or file.startswith(f"{name_tag}.")
+                or file.startswith(f"{femsim_name_tag}_")
+                or file.startswith(f"{femsim_name_tag}.")
+            ):
+                owned_files.append(file)
+
+        # move files AFTER they have been read
+        for file in owned_files:
+            if file in files_to_copy_to_onedrive:
+                os.makedirs(onedrive_results_folder, exist_ok=True)
+                copy_when_available(file, os.path.join(onedrive_results_folder, file))
+
             # move everything to the desktop
-            if (file in files_to_move or file.startswith(name_tag) or file.startswith(femsim_name_tag)):
-                shutil.move(file, os.path.join(results_folder, file))
+            move_when_available(file, os.path.join(results_folder, file))
 
         if Launch_params["mon_type"] == "pathway_mon":
-            x_all, y_all, z_all = uf.get_arrays()
             num_monitors = z_all.shape[1]
 
             # Write throughput CSV to same folder
             csv_tag = f"Throughput_{name_tag}.csv"
             csv_pathway = Path(results_folder) / csv_tag
+            csv_pathway_onedrive = Path(onedrive_results_folder) / csv_tag
 
             with open(csv_pathway, mode="w", newline="") as file:
                 writer = csv.writer(file)
@@ -321,9 +324,17 @@ class RSoftSim:
                 for i in range(z_all.shape[0]):
                     row = [x_all[i]] + [np.real(z_all[i, j]) for j in range(z_all.shape[1])]
                     writer.writerow(row)
+
+            os.makedirs(csv_pathway_onedrive.parent, exist_ok=True)
+            with open(csv_pathway_onedrive, mode="w", newline="") as file_onedrive:
+                writer = csv.writer(file_onedrive)
+                header = ["x"] + [f"Monitor_{i}" for i in range(num_monitors)]
+                writer.writerow(header)
+                for i in range(z_all.shape[0]):
+                    row = [x_all[i]] + [np.real(z_all[i, j]) for j in range(z_all.shape[1])]
+                    writer.writerow(row)
         
         elif Launch_params["mon_type"] == "port_mon":
-            x_all, y_all, z_all = uf.get_arrays()
             if Simulation_params["skip_core"] is not None:
                 num_monitors = (z_all.shape[1] - (Simulation_params["core_num"] - len(Simulation_params["skip_core"])))
             else:
@@ -346,8 +357,9 @@ class RSoftSim:
                     row = [x_all[i]] + list(z_all[i])
                     writer.writerow(row)
 
-            with open(csv_pathway_onedrive, mode="w", newline="") as file_onedrvie:
-                writer = csv.writer(file_onedrvie)
+            os.makedirs(csv_pathway_onedrive.parent, exist_ok=True)
+            with open(csv_pathway_onedrive, mode="w", newline="") as file_onedrive:
+                writer = csv.writer(file_onedrive)
                 header = ["x"]
                 for i in range(num_monitors):
                     header.append(f"Monitor_{i+1}_Amplitude")
@@ -530,7 +542,12 @@ class RSoftSim:
             name_tag = f"{wave}_LP{launch_mode}{launch_mode_radial}_{param_string}"
         else:
             grid = simulation_val["grid_size"] # use only when trying to find the optimal gridding to run BeamPROP in.
-            name_tag = f"_Grid{grid}".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
+            launch_mode = simulation_val.get("launch_mode", "MM")
+            launch_mode_radial = simulation_val.get("launch_mode_radial", "")
+            param_string = "_".join(f"{key}_{val:.6f}" for key, val in param_dict.items())
+            name_tag = f"{wave}_LP{launch_mode}{launch_mode_radial}_Grid{grid}_{param_string}"
+        if run_tag:
+            name_tag = f"{name_tag}_{run_tag}"
         
         if fem:
             self.sym["Name"] = name_tag
@@ -681,10 +698,15 @@ def multiple_mode_tf(arg_list):
     '''
     TO DO: fix up the gridding part of this code.
     '''
+    task_idx = None
+    if len(arg_list) in (18, 17, 16, 14):
+        task_idx, *arg_list = arg_list
+
     if len(arg_list) == 15:
-        sim_val, custom_priors, wave, m, rm, cand_idx, param, fem, taper_min, taper_max, gridding, delta_index_at_reference_wavelength, cladding_delta_ri_at_reference_wavelength, core_neff_idx, iteration_num = arg_list
+        sim_val, custom_priors, wave, m, rm, cand_idx, param, fem, taper_min, taper_max, gridding, delta_index_at_reference_wavelength, core_neff_idx, wave_indices, iteration_num = arg_list
     elif len(arg_list) == 13:
         sim_val, custom_priors, wave, m, rm, cand_idx, param, fem, taper_min, taper_max, gridding, iteration_num = arg_list
+        wave_indices = None
     elif len(arg_list) == 9:
         sim_val, custom_priors, gr, cand_idx, param, taper_min, taper_max, gridding, iteration_num = arg_list
     else:
@@ -711,34 +733,23 @@ def multiple_mode_tf(arg_list):
         optimizer_result = f"Grid_{gr}_Optimizer_Result.csv"
         param_num = f"Grid {gr}"
     else:
-        # sim_val, custom_priors, wave, m, rm, params, fem, taper_min, taper_max, gridding, iteration_num = arg_list
         sim_val = copy.deepcopy(sim_val)
         sim_val["launch_mode"] = m
         sim_val["launch_mode_radial"] = rm
         sim_val["iter_num"] = iteration_num
-        sim_val["free_space_wavelength"] = wave
         sim_val["cand_idx"] = cand_idx
+        if fem:
+            sim_val["Fem_present"] = False
 
-        if sim_val["simulate_tf_metric"]:
-            # Open file containing the refractive indices determined from the Selmeier equation
+        if wave_indices is None and sim_val["sellmeier"]:
             stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
-            _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), wave)
-            sim_val["core_neff"] = stored_data["GeO2_2_mol%"].to_numpy()[idx]
-            fixed_params["cladding_neff"] = stored_data["SiO2"].to_numpy()[idx]
-            Launch_params["cladding_neff"] = fixed_params["cladding_neff"]
-            RSoft_params["background_index"] = stored_data["F_2_mol%"].to_numpy()[idx]
+            wave_indices = get_wavelength_dependent_indices(wave, sim_val, fixed_params, stored_data)
 
-        elif not sim_val["simulate_tf_metric"] and sim_val["sellmeier"]:
-            # calculate how the refractive index of the specified parameters change with wavelength
-            stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
-            _, idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), wave)
-            fixed_params["cladding_neff"] = stored_data["SiO2"].to_numpy()[idx] + cladding_delta_ri_at_reference_wavelength
+        if wave_indices is not None:
+            sim_val["core_neff"] = wave_indices["non_ms_core_neff"]
+            fixed_params["cladding_neff"] = wave_indices["cladding_neff"]
             Launch_params["cladding_neff"] = fixed_params["cladding_neff"]
-            RSoft_params["background_index"] = stored_data["F_2_mol%"].to_numpy()[idx] - RSoft_params["background_index_offset"]
-            other_core_refractive_index = np.sqrt(0.14**2 + fixed_params["cladding_neff"]**2) # <-- 0.14 is the NA of SMF28 https://brightspotcdn.byu.edu/c5/a3/eaf794ab47889d39559a4fac1e68/smf28.pdf
-            # deterministic non-ms core
-            sim_val["core_neff"] = other_core_refractive_index
-            # raise RuntimeError(f"cladding n: {fixed_params['cladding_neff']}, non-ms core n: {sim_val['core_neff']}")
+            RSoft_params["background_index"] = wave_indices["capillary_neff"]
 
         # if sim_val["add_cladding_to_cores"] is not None:  
             # fixed_params["core_cladding_neff"] = core_cladding_refractive_index
@@ -758,10 +769,14 @@ def multiple_mode_tf(arg_list):
         if fem:
             variable_params["core_neff"] = sim_val["core_neff"]
 
+        sim_val["free_space_wavelength"] = wave
+
         # dump configuration paras into json for use later
         # pid is needed to avoid cross-talking between files created/used in multiprocessing tasks
         pid = os.getpid()
-        run_tag = f"iter_{iteration_num}_cand_{cand_idx}_wave_{wave}_LP_{m}{rm}_pid_{pid}"
+        task_suffix = f"_t{task_idx}" if task_idx is not None else ""
+        # run_tag format: i=iteration, c=candidate (for multiple parameter batches), p=pid, task_suffix = job number
+        run_tag = f"i{iteration_num}_c{cand_idx}_p{pid}{task_suffix}"
 
         # prior space identifier
         prior_space_pid = f"{run_tag}_prior_space.json"
@@ -804,12 +819,16 @@ def multiple_mode_tf(arg_list):
     plotting_optimizer_results(data, param_names, tf=tf_vectors, plot= False)
     return (cand_idx, param_num, tf_vectors, wave, res_folder, pid_csv, run_tag)
 
-def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper_min, taper_max, fem = False, gridding = False): #mode_vals, radial_mode_vals,
+def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper_min, taper_max, fem = False, gridding = False):
 
     tf_list = []
     params = np.asarray(params, dtype=float)
     if params.ndim == 1:
         params = params[np.newaxis, :]
+
+    stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
+    _, refractive_index_at_reference_wave = find_nearest(stored_data["Wavelength (um)"].to_numpy(), 1.5)
+    Silica_refractive_index_at_reference_wavelength = stored_data["SiO2"].to_numpy()[refractive_index_at_reference_wave]
 
     if "core_neff" in variable_params:
         # get index of core_neff in variable_params
@@ -818,22 +837,16 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
                 core_neff_idx = i
 
         # define index contrast to scale each sampled refractive index according to some fixed index contrast calculated at a reference wavelength
-        stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
-        _, refractive_index_at_reference_wave = find_nearest(stored_data["Wavelength (um)"].to_numpy(), min(simulation_val["free_space_wavelength"])) # only calculate the contrast from the smallest wavelength simulated
-        Silica_refractive_index_at_reference_wavelength = stored_data["SiO2"].to_numpy()[refractive_index_at_reference_wave]
-        simulation_val["Si_RI_ref_wavelength"] = Silica_refractive_index_at_reference_wavelength
         delta_index_at_reference_wavelength = params[:, core_neff_idx] - Silica_refractive_index_at_reference_wavelength
-        cladding_delta_ri_at_reference_wavelength = None
+    else:
+        core_neff_idx = None
+        delta_index_at_reference_wavelength = np.full(
+            params.shape[0],
+            simulation_val.get("core_neff", fixed_params.get("core_neff")) - Silica_refractive_index_at_reference_wavelength
+        )
 
-        if not simulation_val["simulate_tf_metric"] and simulation_val["sellmeier"]:
-            cladding_delta_ri_at_reference_wavelength = fixed_params["cladding_neff"] - Silica_refractive_index_at_reference_wavelength # want to scale measured cladding index with wavelength
-
-    # extract mode labels into numpy array
-    mode_labels = []
-    for u in LP_mode_rsoft_dict.keys():
-        mode_labels.append(u)
-    mode_labels = np.array(mode_labels)
-    # build the mode_vals and radial_mode_vals arrays that RSoft recognises.
+    # Include sine/cosine orientations for each supported LP family.
+    mode_labels = np.array(list(LP_mode_rsoft_dict.keys()))
     mode_vals = np.array([LP_mode_rsoft_dict[m][0] for m in mode_labels])
     radial_mode_vals = np.array([LP_mode_rsoft_dict[m][1] for m in mode_labels])
     res_dict = []
@@ -841,10 +854,9 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
     # dynamically generate an array of arrays listing the supported number of modes per free space wavelength
     for w in simulation_val["free_space_wavelength"]:
         b_arr = []
-        stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
-        _, refractive_index_at_wave = find_nearest(stored_data["Wavelength (um)"].to_numpy(), w)
-        cladding_refractive_index_at_wavelength = stored_data["SiO2"].to_numpy()[refractive_index_at_wave]
-        capillary_refractive_index_at_wavelength = stored_data["F_2_mol%"].to_numpy()[refractive_index_at_wave] - RSoft_params["background_index_offset"]
+        wave_indices = get_wavelength_dependent_indices(w, simulation_val, fixed_params, stored_data)
+        cladding_refractive_index_at_wavelength = wave_indices["cladding_neff"]
+        capillary_refractive_index_at_wavelength = wave_indices["capillary_neff"]
 
         numerical_apeture = ofiber.numerical_aperture(cladding_refractive_index_at_wavelength, capillary_refractive_index_at_wavelength)
         v_number = ofiber.V_parameter((fixed_params["MCFCladd"]/fixed_params["taper"])/2, numerical_apeture, w)
@@ -859,6 +871,7 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
             "Wavelength": w,
             "Cladding Index": cladding_refractive_index_at_wavelength,
             "Capillary Index": capillary_refractive_index_at_wavelength,
+            "Index Values": wave_indices,
             "Propagation Constants":np.array(b_arr) # organised as LP01, LP02, LP11, LP21, LP31,..., increasing l in LPln
         }
         res_dict.append(res)
@@ -872,7 +885,7 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
             count += rot_val
             if mode_num == total_spatial_modes_supported:
                 total_mode = {
-                    "Total supported scalar modes": count
+                    "Total supported scalar modes": min(count, len(mode_labels))
                 }
                 total.append(total_mode)
     total_df = pd.DataFrame(total)
@@ -896,46 +909,28 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
     final_df = combined_df.join(rsoft_modes_df)
 
     if not gridding:
-        # initialise global parent argument list. This creates multiple instances of args_list based on the length of
-        # mode_vals or radial_mode_vals. i.e. 
-        # [(simulation_val, 0, 1, params, False),(simulation_val, 1, 1, params, False),(simulation_val, -1, 1, params, False), .....]
-        if "core_neff" in variable_params.keys():
-            args_list = [
-                        (simulation_val, 
-                        custom_priors, 
-                        row["Wavelength"], 
-                        int(m),
-                        int(rm), 
-                        cand_idx, 
-                        param, 
-                        fem, 
-                        taper_min, 
-                        taper_max, 
-                        gridding, 
-                        delta_index_at_reference_wavelength, cladding_delta_ri_at_reference_wavelength,
-                        core_neff_idx, 
-                        iteration_num) 
-                        for cand_idx, param in enumerate(params)
-                        for _, row in final_df.iterrows()
-                        for m, rm in zip(row["mode_vals"], row["radial_mode_vals"])
-                        ] 
-        else:
-            args_list = [
-                        (simulation_val, 
-                        custom_priors,
-                        wavelengths,
-                        int(m), 
-                        int(rm), 
-                        cand_idx, 
-                        param, fem, 
-                        taper_min, 
-                        taper_max, 
-                        gridding, 
-                        iteration_num) 
-                        for cand_idx, param in enumerate(params)
-                        for wavelengths in simulation_val["free_space_wavelength"] 
-                        for m, rm in zip(mode_vals, radial_mode_vals)
-                        ] 
+        args_list = [
+            (
+                simulation_val,
+                custom_priors,
+                row["Wavelength"],
+                int(m),
+                int(rm),
+                cand_idx,
+                param,
+                fem,
+                taper_min,
+                taper_max,
+                gridding,
+                delta_index_at_reference_wavelength,
+                core_neff_idx,
+                row["Index Values"],
+                iteration_num,
+            )
+            for cand_idx, param in enumerate(params)
+            for _, row in final_df.iterrows()
+            for m, rm in zip(row["mode_vals"], row["radial_mode_vals"])
+        ]
     else:
         # run gridding determination
         grid_size_list = np.arange(0.1, 2.1, 0.1)
@@ -948,17 +943,11 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
         args_list = [(simulation_val, custom_priors, gr, params, taper_min, taper_max, gridding, iteration_num) for gr in grid_size_range] 
 
         
-    # note 'spawn' means Python will start n separate processes each with their own memory of global variables. 
-    # You need to define any changes within their own instance or else NOTHING changes.
-    # with mp.get_context("spawn").Pool(processes=simulation_val["n_points"]*len(simulation_val["mode_vals"])*len(simulation_val["free_space_wavelength"]) if not gridding else 20) as pool:
     if not gridding:
-        n_workers = min(len(args_list), os.cpu_count() or 1) # use which ever is the smallest number between len(args_list) or the total number of threads of the CPU. "or 1" is if the latter fails
-    else:
-        n_workers = min(20, os.cpu_count() or 1)
-    with mp.get_context("spawn").Pool(processes=n_workers) as pool:
-        # supply multiple_mode_tf with the arguments required to run. 
-        # Since the number of processes match the length of the mode_vals/radial_mode_vals
-        # then each worker gets an instance of arg_list. i.e. arg_list[i]
+        args_list = [(task_idx, *args) for task_idx, args in enumerate(args_list)]
+
+    # 'spawn' starts separate processes with separate memory; each job must receive all state it needs.
+    with mp.get_context("spawn").Pool(processes=30) as pool:
         results = pool.map(multiple_mode_tf, args_list) # (param_num, tf_vectors, wave, res_folder, pid_csv)
     
     res_folder = results[-1][4]
@@ -983,14 +972,12 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         # run gridding determination
         grid_size_range, tf_list, res_folder = run_tf_multproc(params, iteration_num, simulation_val, 
                                                                custom_priors, 
-                                                            #    mode_vals, radial_mode_vals, 
                                                                taper_min, taper_max, gridding=gridding)
         return grid_size_range, tf_list
     
     # multiprocessing in here, we only want multiprocessing in this function and not in main_optimizer!!!!
     tf_list, res_folder = run_tf_multproc(params, iteration_num, simulation_val, 
                                             custom_priors, 
-                                            # mode_vals, radial_mode_vals, 
                                             taper_min, taper_max, gridding)
     
     params = np.asarray(params, dtype=float)
@@ -1022,7 +1009,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             for i, pname in enumerate(param_names)
         )
 
-        ind_pattern = f"{chosen_wavelength}_LP01_{param_tag}.ind"
+        ind_pattern = f"{chosen_wavelength}_LP01_{param_tag}*.ind"
         ind_files = list(results_path.glob(ind_pattern))
 
         if not ind_files:
@@ -1114,7 +1101,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
     
     return final_loss, df_wave_log
 
-def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, taper_max): #mode_vals, radial_mode_vals,
+def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, taper_max):
     simulate_tf_metric = simulation_val["simulate_tf_metric"]
     gridding = simulation_val["gridding"]
     total_calls = simulation_val["num_paras"]
@@ -1194,7 +1181,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
         if bestvals:
             # checking if femsim files exist. If they do, continue. If not, generate them
-            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.447962_Taper_L_50000.000000_ex.m00"
+            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_ex.m00"
             if not fem_fields_present(femSIM_file_example):
                 simulation_val["Fem_present"] = False
                 print("No suitable FemSIM field profiles detected. Generating...")
@@ -1202,8 +1189,6 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 params = [variable_params[k] for k in param_names]
                 run_tf_multproc(
                     params, 1, simulation_val, custom_priors, 
-                    # mode_vals,
-                    # radial_mode_vals, 
                     taper_min, taper_max, fem=True, gridding=gridding
                 )
 
@@ -1306,7 +1291,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             return all_results
         
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.447962_Taper_L_50000.000000_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
             param_names = ["core_diam", "core_neff"]
@@ -1465,7 +1450,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         params = [variable_params[k] for k in param_names]
 
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.200000_core_neff_1.456191_Taper_L_50000.000000_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.4492_Taper_L_50000.000000_ex.m00"
         # femSIM_file_example = "1.55_GIF_outer_fibre_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
@@ -1512,7 +1497,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     for i, pname in enumerate(param_names)
                 )
 
-                ind_pattern = f"{chosen_wavelength}_LP01_{param_tag}.ind"
+                ind_pattern = f"{chosen_wavelength}_LP01_{param_tag}*.ind"
                 ind_files = list(results_path.glob(ind_pattern))
 
                 if not ind_files:
