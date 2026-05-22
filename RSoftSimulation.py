@@ -162,8 +162,11 @@ class RSoftSim:
 
             results_folder = create_folders(folder_BP, "Desktop")
 
-            # we want to copy the important files in Onedrive for backup purposes
-            onedrive_results_folder = create_folders(folder_BP, "Onedrive")
+            # # we want to copy the important files in Onedrive for backup purposes
+            # onedrive_results_folder = create_folders(folder_BP, "Onedrive")
+
+            # we want to copy the important files into a separate folder for backup purposes
+            backup_results_folder = create_folders(folder_BP, "analysis_path")
 
             try:
                 subprocess.run(
@@ -208,17 +211,17 @@ class RSoftSim:
         pid_csv = os.getpid()
         # Move all output files immediately after simulation
         
-        # files to copy to Onedrive
-        onedrive_filename = name_tag + ".ind"
-        onedrive_filename_results = name_tag + "_mon.dat"
-        onedrive_field_results = name_tag + ".fld"
-        onedrive_femsim_filename_results = femsim_name_tag + ".ind"
-        onedrive_neff_csv_path = Path(onedrive_results_folder) / f"{wave}_Guided Modes_{run_tag}.csv"
+        # files to copy to backup location
+        backup_filename = name_tag + ".ind"
+        backup_filename_results = name_tag + "_mon.dat"
+        backup_field_results = name_tag + ".fld"
+        backup_femsim_filename_results = femsim_name_tag + ".ind"
+        backup_neff_csv_path = Path(backup_results_folder) / f"{wave}_Guided Modes_{run_tag}.csv"
         neff_csv_path = Path(results_folder) / f"{wave}_Guided Modes_{run_tag}.csv"
 
-        files_to_copy_to_onedrive = {
-           onedrive_filename, onedrive_filename_results, onedrive_field_results,
-           onedrive_femsim_filename_results
+        files_to_copy_to_backup = {
+           backup_filename, backup_filename_results, backup_field_results,
+           backup_femsim_filename_results
         }
 
         files_to_move = [
@@ -232,7 +235,7 @@ class RSoftSim:
         
         # Normalize to basenames in case paths are used
         files_to_move = [os.path.basename(f) for f in files_to_move]
-        files_to_copy_to_onedrive = {os.path.basename(k) for k in files_to_copy_to_onedrive}
+        files_to_copy_to_backup = {os.path.basename(k) for k in files_to_copy_to_backup}
 
         # Safely access the .mon file in its new location
         if Launch_params["mon_type"] == "pathway_mon" and sim_tool != "ST_FEMSIM":
@@ -280,8 +283,8 @@ class RSoftSim:
             for idx, nval in enumerate(guided_neff, start=1):
                 writer.writerow([idx, nval, wave, pid_csv, run_tag])
 
-        os.makedirs(onedrive_neff_csv_path.parent, exist_ok=True)
-        with open(onedrive_neff_csv_path, mode="w", newline="") as f_neff_od:
+        os.makedirs(backup_neff_csv_path.parent, exist_ok=True)
+        with open(backup_neff_csv_path, mode="w", newline="") as f_neff_od:
             writer = csv.writer(f_neff_od)
             writer.writerow(["Mode_Index", "n_eff", "Wavelength (um)", "PID", "Run Tag"])
             for idx, nval in enumerate(guided_neff, start=1):
@@ -302,9 +305,9 @@ class RSoftSim:
 
         # move files AFTER they have been read
         for file in owned_files:
-            if file in files_to_copy_to_onedrive:
-                os.makedirs(onedrive_results_folder, exist_ok=True)
-                copy_when_available(file, os.path.join(onedrive_results_folder, file))
+            if file in files_to_copy_to_backup:
+                os.makedirs(backup_results_folder, exist_ok=True)
+                copy_when_available(file, os.path.join(backup_results_folder, file))
 
             # move everything to the desktop
             move_when_available(file, os.path.join(results_folder, file))
@@ -315,7 +318,7 @@ class RSoftSim:
             # Write throughput CSV to same folder
             csv_tag = f"Throughput_{name_tag}.csv"
             csv_pathway = Path(results_folder) / csv_tag
-            csv_pathway_onedrive = Path(onedrive_results_folder) / csv_tag
+            csv_pathway_backup = Path(backup_results_folder) / csv_tag
 
             with open(csv_pathway, mode="w", newline="") as file:
                 writer = csv.writer(file)
@@ -325,9 +328,9 @@ class RSoftSim:
                     row = [x_all[i]] + [np.real(z_all[i, j]) for j in range(z_all.shape[1])]
                     writer.writerow(row)
 
-            os.makedirs(csv_pathway_onedrive.parent, exist_ok=True)
-            with open(csv_pathway_onedrive, mode="w", newline="") as file_onedrive:
-                writer = csv.writer(file_onedrive)
+            os.makedirs(csv_pathway_backup.parent, exist_ok=True)
+            with open(csv_pathway_backup, mode="w", newline="") as file_backup:
+                writer = csv.writer(file_backup)
                 header = ["x"] + [f"Monitor_{i}" for i in range(num_monitors)]
                 writer.writerow(header)
                 for i in range(z_all.shape[0]):
@@ -343,7 +346,7 @@ class RSoftSim:
             # Write throughput CSV to same folder
             csv_tag = f"Throughput_{name_tag}.csv"
             csv_pathway = Path(results_folder) / csv_tag
-            csv_pathway_onedrive = Path(onedrive_results_folder) / csv_tag
+            csv_pathway_backup = Path(backup_results_folder) / csv_tag
 
             with open(csv_pathway, mode="w", newline="") as file:
                 writer = csv.writer(file)
@@ -357,9 +360,9 @@ class RSoftSim:
                     row = [x_all[i]] + list(z_all[i])
                     writer.writerow(row)
 
-            os.makedirs(csv_pathway_onedrive.parent, exist_ok=True)
-            with open(csv_pathway_onedrive, mode="w", newline="") as file_onedrive:
-                writer = csv.writer(file_onedrive)
+            os.makedirs(csv_pathway_backup.parent, exist_ok=True)
+            with open(csv_pathway_backup, mode="w", newline="") as file_backup:
+                writer = csv.writer(file_backup)
                 header = ["x"]
                 for i in range(num_monitors):
                     header.append(f"Monitor_{i+1}_Amplitude")
@@ -575,6 +578,9 @@ class RSoftSim:
                 fs_add_cladding_to_cores=fs_add_cladding_to_cores,
                 fs_core_num=fs_path_num - 1,
                 fs_core_positions=fs_core_positions)
+        
+        force_file_to_disk(f"{name_tag}.ind")
+        force_file_to_disk(f"{femsim_name_tag}.ind")
         '''
         Manual setup to loop through a list of values. Runs the terminal line that will initiate RSoft and will calculate the 
         metric to test.
@@ -947,7 +953,7 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
         args_list = [(task_idx, *args) for task_idx, args in enumerate(args_list)]
 
     # 'spawn' starts separate processes with separate memory; each job must receive all state it needs.
-    with mp.get_context("spawn").Pool(processes=30) as pool:
+    with mp.get_context("spawn").Pool(processes=int(30-Simulation_params["number_of_rsoft_instances"])) as pool:
         results = pool.map(multiple_mode_tf, args_list) # (param_num, tf_vectors, wave, res_folder, pid_csv)
     
     res_folder = results[-1][4]
@@ -1181,7 +1187,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
         if bestvals:
             # checking if femsim files exist. If they do, continue. If not, generate them
-            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_ex.m00"
+            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.446789_Taper_L_50000.000000_i1_c0_p34888_t0_ex.m00"
             if not fem_fields_present(femSIM_file_example):
                 simulation_val["Fem_present"] = False
                 print("No suitable FemSIM field profiles detected. Generating...")
@@ -1291,7 +1297,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             return all_results
         
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.446789_Taper_L_50000.000000_i1_c0_p34888_t0_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
             param_names = ["core_diam", "core_neff"]
@@ -1302,6 +1308,13 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         # start at whatever the last iteration was (or 0), but scale the total number of iterations based
         # on the number of selected parameter vectors.
         for batch_idx in range(completed_batches, total_calls//simulation_val["n_points"]):
+            # adaptable gridding to hasten simulations slightly after Bayesian optimisation kicks in
+            if batch_idx < 2*int(Simulation_params["n_init_points"]):
+                simulation_val["grid_size"] = 0.74
+                simulation_val["grid_size_y"] = 0.74
+            else:
+                simulation_val["grid_size"] = 0.37
+                simulation_val["grid_size_y"] = 0.37
             # ask for 1 set of parameter vectors only to prevent daemonic process having children 
             param_batch = opt.ask(n_points=simulation_val["n_points"]) 
 
@@ -1450,7 +1463,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         params = [variable_params[k] for k in param_names]
 
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.4492_Taper_L_50000.000000_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.446789_Taper_L_50000.000000_i1_c0_p34888_t0_ex.m00"
         # femSIM_file_example = "1.55_GIF_outer_fibre_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")

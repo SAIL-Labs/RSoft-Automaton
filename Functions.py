@@ -190,7 +190,11 @@ def create_folders(folder_name, pos):
         results_root_onedrive = os.path.join(onedrive_path, "Results")
         results_folder_onedrive = os.path.join(results_root_onedrive, folder_name)
         os.makedirs(results_folder_onedrive, exist_ok=True)
-        return results_folder_onedrive
+    elif pos == "analysis_path":
+        analysis_path = os.path.join(user_home, r"C:\Users\RSoft Things\Desktop\Results\To compress")
+        results_folder_analysis_path = os.path.join(analysis_path, folder_name)
+        os.makedirs(results_folder_analysis_path, exist_ok=True)
+        return results_folder_analysis_path
 #######################################################################################################################################################
 def copy_when_available(src, dst, timeout=30):
     os.makedirs(os.path.dirname(os.path.abspath(dst)), exist_ok=True)
@@ -980,7 +984,7 @@ def build_df_wave_log_for_candidate(
     candidate_params = np.asarray(candidate_params, dtype=float)
 
     def material_indices_for_wave(w):
-        if simulation_val["sellmeier"]:
+        if not simulation_val["sellmeier"]:
             indices = get_wavelength_dependent_indices(w, simulation_val, fixed_params, stored_data)
 
             special_core_ref_ind = None
@@ -1231,8 +1235,8 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
         path_num += 1
         core = circuit.add_segment(
             position=(x / taper, y / taper, 0),
-            offset=(x, y, Taper_length),
-            # offset=(x - (x / taper), y - (y / taper), Taper_length),
+            # offset=(x, y, Taper_length),
+            offset=(x - (x / taper), y - (y / taper), Taper_length),
             dimensions=core_beginning_dims_list[j],
             dimensions_end=core_final_dims_list[j]
         )
@@ -3290,3 +3294,9 @@ def fem_fields_present(base_name, fields=("ex", "ey", "hx", "hy")):
     discovered_files = np.array(discovered_files)
     print(f"Found {len(discovered_files)} existing FemSIM files. Using these.")
     return True
+
+
+def force_file_to_disk(path):
+    with open(path, "a") as f:
+        f.flush()
+        os.fsync(f.fileno())
