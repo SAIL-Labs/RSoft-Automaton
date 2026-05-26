@@ -15,6 +15,21 @@ from rstools import RSoftUserFunction, RSoftCircuit # type:ignore
 class RSoftSim:
     def __init__(self):
         self.sym = {}
+        self.last_sim_health = {"status": "OK", "message": "", "simulation": ""}
+
+    def dummy_tf_result(self, simulation_val):
+        if simulation_val.get("mon_type", Launch_params["mon_type"]) == "port_mon":
+            skip_core = simulation_val.get("skip_core", Simulation_params["skip_core"])
+            core_num = simulation_val.get("core_num", Simulation_params["core_num"])
+            if skip_core is not None:
+                core_monitors = core_num - len(skip_core)
+            else:
+                core_monitors = core_num
+            extra_monitors = 5
+            return np.zeros(1 + 2 * (core_monitors + extra_monitors), dtype=float)
+
+        monitor_count = simulation_val.get("core_num", Simulation_params["core_num"]) + 1
+        return np.zeros(monitor_count, dtype=float)
 
     def init_priors(self , prior_space_pid, build_tf, custom = None):
         base_priors = {}
@@ -151,6 +166,13 @@ class RSoftSim:
         filename_FS = f"{femsim_name_tag}.ind"
         sim_tool = simulation_val.get("sim_tool", RSoft_params["sim_tool"])
         iter_number = simulation_val["iter_num"]
+        expected_monitor_files = []
+        pid_csv = os.getpid()
+        self.last_sim_health = {
+            "status": "OK",
+            "message": "",
+            "simulation": f"{name_tag} | {femsim_name_tag}",
+        }
         # Run RSoft simulation
         if sim_tool == "ST_BEAMPROP":
             prefix_BP   = f"prefix={name_tag}"
@@ -175,6 +197,18 @@ class RSoftSim:
                     capture_output=True,
                     text=True
                 )
+                # functions to ensure that the correct monitor files are being used, and that they exist prior to BPM running
+                expected_monitor_files = extract_monitor_files_from_ind(filename)
+
+                wait_for_files_stable(
+                    expected_monitor_files,
+                    timeout=300,
+                    interval=1.0,
+                    stable_checks=3,
+                    min_size=390*1024, # waits for files > 390 KB to be made
+                    require_rsoft_header=True
+                )
+
                 subprocess.run(
                     [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\bsimw32.exe", filename, prefix_BP, "wait=0"],
                     check=True,
@@ -186,6 +220,16 @@ class RSoftSim:
                 print("Command:", e.cmd)
                 print("stdout:\n", e.stdout)
                 print("stderr:\n", e.stderr)
+                return -1e6
+            except (TimeoutError, ValueError) as e:
+                print(e)
+                self.last_sim_health = {
+                    "status": "TIMEOUT",
+                    "message": str(e).replace("\r", " ").replace("\n", " | "),
+                    "simulation": f"{name_tag} | {femsim_name_tag}",
+                }
+                if Simulation_params["metric"] == "TF":
+                    return self.dummy_tf_result(simulation_val), 0.0, results_folder, pid_csv
                 return -1e6
         elif sim_tool == "ST_FEMSIM":
             prefix   = f"prefix=FS_{name_tag}"
@@ -208,7 +252,6 @@ class RSoftSim:
                 return -1e6
         
         # invoke special identifier for csv files to prevent multiprocessing from overwriting the same file
-        pid_csv = os.getpid()
         # Move all output files immediately after simulation
         
         # files to copy to backup location
@@ -228,6 +271,7 @@ class RSoftSim:
             filename,
             filename_FS,
             femsim_name_tag,
+            *[f for f in expected_monitor_files if os.path.basename(f).startswith("REF_")],
             csv_path,
             json_config,
             prior_space_pid,
@@ -251,16 +295,24 @@ class RSoftSim:
             mon_path = Path(f"{name_tag}_mon.dat")
             nef_path = Path(f"{femsim_name_tag}.nef")
 
-            timeout = 10
-            t_start = time.time()
-            while not mon_path.exists():
-                if time.time() - t_start > timeout:
-                    raise FileNotFoundError(f"{mon_path} not found within {timeout} seconds after simulation.")
-                time.sleep(0.1)
-            while not nef_path.exists():
-                if time.time() - t_start > timeout:
-                    raise FileNotFoundError(f"{nef_path} not found within {timeout} seconds after simulation.")
-                time.sleep(0.1)
+            try:
+                wait_for_files_stable(
+                    [mon_path, nef_path],
+                    timeout=120,
+                    interval=0.5,
+                    stable_checks=2,
+                    min_size=10
+                )
+            except (TimeoutError, ValueError) as e:
+                print(e)
+                self.last_sim_health = {
+                    "status": "TIMEOUT",
+                    "message": str(e).replace("\r", " ").replace("\n", " | "),
+                    "simulation": f"{name_tag} | {femsim_name_tag}",
+                }
+                if Simulation_params["metric"] == "TF":
+                    return self.dummy_tf_result(simulation_val), 0.0, results_folder, pid_csv
+                return -1e6
 
         # Read .mon file from moved location
         uf = RSoftUserFunction()
@@ -672,7 +724,8 @@ class RSoftSim:
             results_folder = res_folder,
             csv_path = csv_path,
             name_tag = self.sym["Name"],
-            run_tag = run_tag
+            run_tag = run_tag,
+            health_batch=[self.last_sim_health]
         )
         return results_folder, res_folder, pid_csv
 
@@ -821,9 +874,21 @@ def multiple_mode_tf(arg_list):
     else:
         tf_vectors = None
 
+    health = {
+        "status": "OK",
+        "message": "",
+        "simulation": "",
+    }
+    if "Simulation Health" in data.columns:
+        health["status"] = str(data["Simulation Health"].iloc[0])
+    if "Simulation Message" in data.columns:
+        health["message"] = "" if pd.isna(data["Simulation Message"].iloc[0]) else str(data["Simulation Message"].iloc[0])
+    if "Failed Simulation" in data.columns:
+        health["simulation"] = "" if pd.isna(data["Failed Simulation"].iloc[0]) else str(data["Failed Simulation"].iloc[0])
+
     # Call plotting function
     plotting_optimizer_results(data, param_names, tf=tf_vectors, plot= False)
-    return (cand_idx, param_num, tf_vectors, wave, res_folder, pid_csv, run_tag)
+    return (cand_idx, param_num, tf_vectors, wave, res_folder, pid_csv, run_tag, health)
 
 def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper_min, taper_max, fem = False, gridding = False):
 
@@ -957,8 +1022,16 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
         results = pool.map(multiple_mode_tf, args_list) # (param_num, tf_vectors, wave, res_folder, pid_csv)
     
     res_folder = results[-1][4]
-    for cand_idx, param, result, wave, _, csv_pid, run_tag in results:
-        tf_list.append((cand_idx, param, result, wave, csv_pid, run_tag))
+    for result_item in results:
+        if len(result_item) >= 8:
+            cand_idx, param, result, wave, _, csv_pid, run_tag = result_item[:7]
+            health = result_item[7]
+        elif len(result_item) == 7:
+            cand_idx, param, result, wave, _, csv_pid, run_tag = result_item
+            health = {"status": "OK", "message": "", "simulation": ""}
+        else:
+            raise ValueError(f"Unexpected worker result shape: expected 7 or 8+ values, got {len(result_item)}")
+        tf_list.append((cand_idx, param, result, wave, csv_pid, run_tag, health))
         
     if gridding:
         return grid_size_range, tf_list, res_folder
@@ -991,8 +1064,16 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         params = params[np.newaxis, :]
 
     by_candidate = defaultdict(list)
-    for cand_idx, param_num, tf_vec, wave, csv_pid, run_tag in tf_list:
-        by_candidate[cand_idx].append((param_num, tf_vec, wave, csv_pid, run_tag))
+    for item in tf_list:
+        if len(item) >= 7:
+            cand_idx, param_num, tf_vec, wave, csv_pid, run_tag = item[:6]
+            health = item[6]
+        elif len(item) == 6:
+            cand_idx, param_num, tf_vec, wave, csv_pid, run_tag = item
+            health = {"status": "OK", "message": "", "simulation": ""}
+        else:
+            raise ValueError(f"Unexpected tf_list item shape: expected 6 or 7+ values, got {len(item)}")
+        by_candidate[cand_idx].append((param_num, tf_vec, wave, csv_pid, run_tag, health))
     
     outdir = r"C:\Users\RSoft Things\Desktop\Results\Wavelength_results"
     os.makedirs(outdir, exist_ok=True)
@@ -1076,6 +1157,9 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Extra Mode Intensity in Loss_a": "Total number of amplitudes corresponding to higher order modes included in Loss_a",
             f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should give a slightly different value for different wavelengths.",
             "Guided Modes": "Total number of modes, including rotations AND polarisations, being guided in the fibre.",
+            "Simulation Health": "OK if the RSoft simulation completed; TIMEOUT if a guarded wait returned a dummy zero transfer vector.",
+            "Simulation Message": "Timeout details, including missing, small, or bad-header files when applicable.",
+            "Failed Simulation": "Name tags for the BPM and FemSIM files associated with the failed simulation.",
             "Pre-tapered": "Inidication if the MS core is pre-tapered to a different spec before being inserted and tapered with the rest of the cores.",
             "Pre-taper factor": "Factor by which the MS core is pre-tapered by.",
             "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration",
@@ -1187,7 +1271,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
         if bestvals:
             # checking if femsim files exist. If they do, continue. If not, generate them
-            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.446789_Taper_L_50000.000000_i1_c0_p34888_t0_ex.m00"
+            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p27988_t0_ex.m00"
             if not fem_fields_present(femSIM_file_example):
                 simulation_val["Fem_present"] = False
                 print("No suitable FemSIM field profiles detected. Generating...")
@@ -1297,7 +1381,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             return all_results
         
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.446789_Taper_L_50000.000000_i1_c0_p34888_t0_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p27988_t0_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
             param_names = ["core_diam", "core_neff"]
@@ -1463,7 +1547,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         params = [variable_params[k] for k in param_names]
 
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_6.500000_core_neff_1.446789_Taper_L_50000.000000_i1_c0_p34888_t0_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p27988_t0_ex.m00"
         # femSIM_file_example = "1.55_GIF_outer_fibre_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
@@ -1486,8 +1570,16 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 params = params[np.newaxis, :]
 
             by_candidate = defaultdict(list)
-            for cand_idx, param_num, tf_vec, wave, csv_pid, run_tag in tf_list:
-                by_candidate[cand_idx].append((param_num, tf_vec, wave, csv_pid, run_tag))
+            for item in tf_list:
+                if len(item) >= 7:
+                    cand_idx, param_num, tf_vec, wave, csv_pid, run_tag = item[:6]
+                    health = item[6]
+                elif len(item) == 6:
+                    cand_idx, param_num, tf_vec, wave, csv_pid, run_tag = item
+                    health = {"status": "OK", "message": "", "simulation": ""}
+                else:
+                    raise ValueError(f"Unexpected tf_list item shape: expected 6 or 7+ values, got {len(item)}")
+                by_candidate[cand_idx].append((param_num, tf_vec, wave, csv_pid, run_tag, health))
             
             outdir = r"C:\Users\RSoft Things\Desktop\Results\Wavelength_results"
             os.makedirs(outdir, exist_ok=True)
@@ -1565,6 +1657,9 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     "Extra Mode Intensity in Loss_a": "Total number of amplitudes corresponding to higher order modes included in Loss_a",
                     f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should give a slightly different value for different wavelengths.",
                     "Guided Modes": "Total number of modes, including rotations AND polarisations, being guided in the fibre.",
+                    "Simulation Health": "OK if the RSoft simulation completed; TIMEOUT if a guarded wait returned a dummy zero transfer vector.",
+                    "Simulation Message": "Timeout details, including missing, small, or bad-header files when applicable.",
+                    "Failed Simulation": "Name tags for the BPM and FemSIM files associated with the failed simulation.",
                     "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration"
                 }
 

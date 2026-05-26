@@ -195,6 +195,132 @@ def create_folders(folder_name, pos):
         results_folder_analysis_path = os.path.join(analysis_path, folder_name)
         os.makedirs(results_folder_analysis_path, exist_ok=True)
         return results_folder_analysis_path
+
+
+def wait_for_files_stable(
+    files,
+    timeout=300,
+    interval=1.0,
+    stable_checks=3,
+    min_size=100,
+    require_rsoft_header=False
+    ):
+    """
+    Wait until all files exist, are larger than min_size, and have stable sizes.
+
+    files: list of file paths
+    timeout: maximum wait time in seconds
+    interval: time between checks
+    stable_checks: number of consecutive unchanged-size checks required
+    min_size: reject suspiciously tiny/empty files
+    require_rsoft_header: require the first non-space byte to look like an RSoft
+        user data header. This catches empty/truncated field files before BeamPROP
+        opens them and raises a modal error.
+    """
+    files = [Path(f) for f in files]
+    if not files:
+        raise ValueError("No files were supplied to wait_for_files_stable.")
+
+    start = time.time()
+
+    last_sizes = {f: None for f in files}
+    stable_counts = {f: 0 for f in files}
+
+    while True:
+        if time.time() - start > timeout:
+            missing = [str(f) for f in files if not f.exists()]
+            small = [
+                f"{f} ({f.stat().st_size} bytes)"
+                for f in files
+                if f.exists() and f.stat().st_size < min_size
+            ]
+            bad_header = [
+                str(f)
+                for f in files
+                if (
+                    require_rsoft_header
+                    and f.exists()
+                    and f.stat().st_size >= min_size
+                    and not rsoft_user_data_header_present(f)
+                )
+            ]
+
+            raise TimeoutError(
+                "Timed out waiting for FemSIM files to become stable.\n"
+                f"Missing files: {missing}\n"
+                f"Small files: {small}\n"
+                f"Bad RSoft headers: {bad_header}"
+            )
+
+        all_stable = True
+
+        for f in files:
+            if not f.exists():
+                stable_counts[f] = 0
+                all_stable = False
+                continue
+
+            size = f.stat().st_size
+
+            if size < min_size:
+                stable_counts[f] = 0
+                all_stable = False
+                continue
+
+            if require_rsoft_header and not rsoft_user_data_header_present(f):
+                stable_counts[f] = 0
+                all_stable = False
+                continue
+
+            if size == last_sizes[f]:
+                stable_counts[f] += 1
+            else:
+                stable_counts[f] = 0
+
+            last_sizes[f] = size
+
+            if stable_counts[f] < stable_checks:
+                all_stable = False
+
+        if all_stable:
+            return True
+
+        time.sleep(interval)
+
+def rsoft_user_data_header_present(path):
+    try:
+        with open(path, "rb") as f:
+            prefix = f.read(256)
+    except OSError:
+        return False
+
+    prefix = prefix.lstrip()
+    return bool(prefix) and prefix.startswith(b"/")
+
+def extract_monitor_files_from_ind(ind_path, components=("ex", "ey", "hx", "hy")):
+    ind_path = Path(ind_path)
+    monitor_files = []
+
+    with open(ind_path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+
+            if line.startswith("monitor_file"):
+                _, rhs = line.split("=", 1)
+                fname = rhs.strip()
+
+                p = Path(fname)
+                for component in components:
+                    # RSoft monitor_file entries point at the base mode name
+                    # (file.m00); BeamPROP then reads file_ex.m00, file_ey.m00,
+                    # etc. for the vector field data.
+                    monitor_files.append(p.with_name(f"{p.stem}_{component}{p.suffix}"))
+
+    # remove duplicates while preserving order
+    return list(dict.fromkeys(monitor_files))
+
+# def expected_femsim_mode_files(prefix_FS, mode_indices):
+#     return [Path(f"{prefix_FS}.m{i:02d}") for i in mode_indices]
 #######################################################################################################################################################
 def copy_when_available(src, dst, timeout=30):
     os.makedirs(os.path.dirname(os.path.abspath(dst)), exist_ok=True)
@@ -648,7 +774,8 @@ end launch_field
                             else:
                                 # enforce other cores to have a field profile as a function of wavelength
                                 monfiledir = r"C:\Users\RSoft Things\Desktop\Results\FemSIM_DET"
-                                base_files = find_field_base_filenames(monfiledir, wave) # <- this should copy the ALL .m00 femsim files with prefix ex, ey, hx, and hy to the working directory, and list the files copied.
+                                ref_prefix = f"REF_{os.getpid()}_{abs(hash(file_name)) % 1000000}"
+                                base_files = find_field_base_filenames(monfiledir, wave, dest_prefix=ref_prefix) # <- this should copy the ALL .m00 femsim files with prefix ex, ey, hx, and hy to the working directory, and list the files copied.
                                 # check if no files were copied
                                 if len(base_files) == 0:
                                     raise FileNotFoundError(
@@ -888,7 +1015,7 @@ def filter_parameter_space_by_v_number(para_space, background_index, wavelength,
 def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_names,
                           iteration_start, batch_size,
                           penalty_batch=None, transfer_vector_batch=None, results_folder="",
-                          csv_path="", name_tag=None, run_tag=None):
+                          csv_path="", name_tag=None, run_tag=None, health_batch=None):
     """
     Save a batch of scikit-optimize parameter evaluations to CSV, and plot the results.
     Moves both csv_path and best_params_log_{pid}.csv to the folder named by name_tag if provided.
@@ -896,6 +1023,7 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
 
     include_penalty = penalty_batch is not None
     include_tf = transfer_vector_batch is not None and transfer_vector_batch[0] is not None
+    include_health = health_batch is not None
 
     # Setup dynamic header
     header = ["Iteration"] + param_names + ["Throughput"]
@@ -904,6 +1032,8 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
     if include_tf:
         tf_len = len(transfer_vector_batch[0])
         header += [f"TF_{k+1}" for k in range(tf_len)]
+    if include_health:
+        header += ["Simulation Health", "Simulation Message", "Failed Simulation"]
 
     os.makedirs(os.path.dirname(csv_path) or ".", exist_ok=True)
     write_header = not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0
@@ -921,6 +1051,13 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
                 row.append(penalty_batch[j])
             if include_tf:
                 row.extend(transfer_vector_batch[j])
+            if include_health:
+                health = health_batch[j] or {}
+                row.extend([
+                    health.get("status", "OK"),
+                    health.get("message", ""),
+                    health.get("simulation", ""),
+                ])
             writer.writerow(row)
 
     # Log best point
@@ -933,12 +1070,19 @@ def log_optimizer_results(x_iters, y_vals, param_batch, result_batch, param_name
         para_tag = f"best_params_log_{pid}.csv"
     else:
         para_tag = f"best_params_log_{run_tag}.csv"
+    best_health = health_batch[best_idx] if include_health else {}
     with open(para_tag, "w", newline="") as log:
         writer = csv.writer(log)
         writer.writerow(["Iteration"] + param_names + ["Throughput"] +
-                        ([f"TF_{i+1}" for i in range(len(best_tf))] if include_tf else []))
+                        ([f"TF_{i+1}" for i in range(len(best_tf))] if include_tf else []) +
+                        (["Simulation Health", "Simulation Message", "Failed Simulation"] if include_health else []))
         writer.writerow([iteration_start // batch_size + 1] + list(best_params) + [best_throughput] +
-                        (list(best_tf) if include_tf else []))
+                        (list(best_tf) if include_tf else []) +
+                        ([
+                            best_health.get("status", "OK"),
+                            best_health.get("message", ""),
+                            best_health.get("simulation", ""),
+                        ] if include_health else []))
 
     # Move both CSV files to the results folder, if name_tag is specified
     if name_tag is not None:
@@ -971,7 +1115,7 @@ def build_df_wave_log_for_candidate(
     hyp_param_b = simulation_val.get("hyp_param_b", Simulation_params["hyp_param_b"])
     hyp_param_c = simulation_val.get("hyp_param_c", Simulation_params["hyp_param_c"])
 
-    waves = np.asarray([w for (_, _, w, _, _) in candidate_tf_list], dtype=float)
+    waves = np.asarray([item[2] for item in candidate_tf_list], dtype=float)
     unique_waves = np.unique(waves)
 
     wave_rows = []
@@ -1010,21 +1154,32 @@ def build_df_wave_log_for_candidate(
 
     for w in unique_waves:
         tf_list_w = [
-            (lab, arr, wave, pid, rtag)
-            for (lab, arr, wave, pid, rtag) in candidate_tf_list
-            if float(wave) == float(w)
+            item
+            for item in candidate_tf_list
+            if float(item[2]) == float(w)
         ]
+        tf_list_w_metric = [item[:5] for item in tf_list_w]
+        health_entries = [
+            item[5]
+            for item in tf_list_w
+            if len(item) > 5 and item[5] and item[5].get("status", "OK") != "OK"
+        ]
+        health_status = "TIMEOUT" if health_entries else "OK"
+        health_message = " || ".join(h.get("message", "") for h in health_entries)
+        failed_simulation = " || ".join(h.get("simulation", "") for h in health_entries)
         # run_tag_w = tf_list_w[0][4] # all rows in this wavelength group should belong to the same candidate and share the same run tag
-        run_tags_w = [rtag for (_, _, _, _, rtag) in tf_list_w]
-        if len(run_tags_w) != 1:
-            run_tag_w = run_tags_w[0]
-            # raise ValueError(f"Expected one run_tag for candidate {candidate_idx}, wavelength {w}, got {run_tags_w}")
-        # run_tag_w = next(iter(run_tags_w))
-        tf_list_w_arr = [arr for (_, arr, _, _,_) in tf_list_w]
-        mode_labels_raw = [lab for (lab, _, _, _,_) in tf_list_w]
-        pid_w = [pid_raw for (_, _, _, pid_raw,_) in tf_list_w]
+        run_tags_w = [rtag for (_, _, _, _, rtag) in tf_list_w_metric]
+        run_tag_w = run_tags_w[0]
+        for candidate_run_tag in run_tags_w:
+            guided_mode_pattern = os.path.join(res_folder, f"{w}_Guided Modes_{candidate_run_tag}.csv")
+            if glob.glob(guided_mode_pattern):
+                run_tag_w = candidate_run_tag
+                break
+        tf_list_w_arr = [arr for (_, arr, _, _,_) in tf_list_w_metric]
+        mode_labels_raw = [lab for (lab, _, _, _,_) in tf_list_w_metric]
+        pid_w = [pid_raw for (_, _, _, pid_raw,_) in tf_list_w_metric]
         loss, arr_results, _, len_modes_arr, loss_a_num_extra_modes = mode_selective_tf_matrix_metric(
-            tf_list_w,
+            tf_list_w_metric,
             res_folder,
             w,
             pid_w,
@@ -1068,6 +1223,9 @@ def build_df_wave_log_for_candidate(
                 "Injected Mode": str(mode_label),
                 "Mode Index": int(m),
                 "PID": pid_w,
+                "Simulation Health": health_status,
+                "Simulation Message": health_message,
+                "Failed Simulation": failed_simulation,
                 "Guided Modes": int(len_modes_arr[0]),
                 "Extra Mode Intensity in Loss_a": (
                     int(len(loss_a_num_extra_modes[0]))
@@ -1416,6 +1574,16 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_b,
     guided_mode_pattern = os.path.join(folder, f"{wave}_Guided Modes_{run_tag}.csv")
     matches = glob.glob(guided_mode_pattern)
     if not matches:
+        _, results, _, _, _ = zip(*tf_list)
+        # failsafe in the event that the simulation failed. Adopt terrible result to keep optimisation running
+        if all(np.allclose(np.asarray(arr, dtype=float), 0.0) for arr in results):
+            return (
+                2.0,
+                np.zeros(4, dtype=float),
+                wave,
+                np.array([0]),
+                np.array([[]], dtype=float),
+            )
         raise FileNotFoundError(f"No {wave}_Guided Modes_{run_tag}.csv files found in {folder}")
     guided_path = max(matches, key=os.path.getmtime)
     df = pd.read_csv(guided_path)
@@ -3235,10 +3403,12 @@ def get_wavelength_dependent_indices(wave, simulation_val, fixed_params, sellmei
 
 ###################################################################################################################################################################################################################################################
 
-def find_field_base_filenames(folder, wave, field=("ex", "ey", "hx", "hy")):
+def find_field_base_filenames(folder, wave, field=("ex", "ey", "hx", "hy"), dest_prefix=None):
     """
     Copies LP01 FEM field files (*_ex/_ey/_hx/_hy.m00) for a given wavelength
-    into the working directory.
+    into the working directory. When dest_prefix is supplied, the copied files
+    are given run-specific names so concurrent BeamPROP runs do not read files
+    while another worker is overwriting them.
 
     Returns:
         list of unique base filenames (ending in .m00)
@@ -3266,8 +3436,15 @@ def find_field_base_filenames(folder, wave, field=("ex", "ey", "hx", "hy")):
         for fi in field:
             suf = f"_{fi}.m00"
             if name.endswith(suf):
-                base_name = f.name[:-len(suf)] + ".m00"
-                shutil.copy2(f, cwd / f.name)
+                source_base = f.name[:-len(suf)]
+                if dest_prefix:
+                    dest_name = f"{dest_prefix}_{source_base}_{fi}.m00"
+                    base_name = f"{dest_prefix}_{source_base}.m00"
+                else:
+                    dest_name = f.name
+                    base_name = source_base + ".m00"
+
+                shutil.copy2(f, cwd / dest_name)
                 base_files.add(base_name)
                 break
 

@@ -2,17 +2,17 @@ from Circuit_Properties import *
 import random, numpy as np
 
 fixed_params = {
-    "core_sep":  60, #125
-    "MCFCladd": 208,#3*125,  #250 , #400
+    "core_sep":  125,
+    "MCFCladd": 3*125,#3*125,  #250 , #400
     # "core_claddings": None, 
     "core_cladding_diam": None, #125  #80,
-    "cladding_neff": 1.44,#1.44402, # this value gets replaced through the Sellmeier equation
+    "cladding_neff": 1.4402,#1.44402, # this value gets replaced through the Sellmeier equation
     "core_cladding_neff": None, #1.4433510951304291734406199895015, #from using SMF-28 index (). Determined automatically using Sellmeier
     "cen_core_cladding_neff": None,#1.44,#0.00949,
-    "other_core_diam": 6.5, #8.2, # non-ms core diameter
+    "other_core_diam": 8.3, # non-ms core diameter
     # "Taper_L": 50000, #45000
     # "core_neff": 0.0122895, #0.015,
-    "taper": 10.2,#18.75,#,#7.7639751553, 15.9
+    "taper": 18.75,
     # "core_diam": 8.2,
     "alpha": 0,
     "length_hyperparam": 0.01
@@ -99,7 +99,7 @@ Simulation_params = {
 
     # optimiser settings
     "acq_type": "EI",
-    "acq_hyperparam": 0.01,
+    "acq_hyperparam": 0.8,
     "acq_opt": "lbfgs",
     "n_init_points": 3,
 
@@ -127,10 +127,9 @@ bestval_limits = {
 }
 
 variable_params= {
-    "core_diam": 6.5, # using 3D mode val: 8.104383, 4.36,#
-    "core_neff": 1.4492, #1.45, # using 3D mode val: 1.449049,1.4467895
-    # "taper": 6.55789308, #22, #8.53
-    "Taper_L":  50000, # using 3D mode val: 48587.538152
+    "core_diam": 8.3, 
+    "core_neff": 1.4492, 
+    "Taper_L":  50000, 
 }   
 
 # # GIF settings     
