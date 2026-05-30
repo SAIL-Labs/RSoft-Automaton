@@ -3,7 +3,7 @@ import random, numpy as np
 
 fixed_params = {
     "core_sep":  125,
-    "MCFCladd": 3*125,#3*125,  #250 , #400
+    "MCFCladd": 5*125,#3*125,  #250 , #400
     # "core_claddings": None, 
     "core_cladding_diam": None, #125  #80,
     "cladding_neff": 1.4402,#1.44402, # this value gets replaced through the Sellmeier equation
@@ -12,7 +12,7 @@ fixed_params = {
     "other_core_diam": 8.3, # non-ms core diameter
     # "Taper_L": 50000, #45000
     # "core_neff": 0.0122895, #0.015,
-    "taper": 18.75,
+    "taper": 19.34984520123839, #19c pigtail #18.75, 7c pigtail
     # "core_diam": 8.2,
     "alpha": 0,
     "length_hyperparam": 0.01
@@ -93,9 +93,13 @@ Simulation_params = {
     "industry_neff_values": False,
     "industry_neff_file": None,
     "free_space_wavelength": None,
+
+    # stuff for monitoring higher order mode indices in the MS core
+    "higher_order_modes": [2, 4, 6, 8, 10],
+    "higher_mode_indices": [2, 4, 6, 8, 10],
     # maximum l in LPln used by ofiber to calculate the total number of modes present in the fibre geometery 
     # e.g. max_ell = 3 --> calculate propagation constants up to LP31, or any LP3n
-    "max_ell": 3,
+    "max_ell": 4,
 
     # optimiser settings
     "acq_type": "EI",
@@ -104,7 +108,7 @@ Simulation_params = {
     "n_init_points": 3,
 
     # RSoft meta instance info
-    "number_of_rsoft_instances": 6
+    "number_of_rsoft_instances": 2
 }
 
 # Polychromatic/monochromatic switch

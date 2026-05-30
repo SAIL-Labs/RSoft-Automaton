@@ -322,6 +322,12 @@ def extract_monitor_files_from_ind(ind_path, components=("ex", "ey", "hx", "hy")
 # def expected_femsim_mode_files(prefix_FS, mode_indices):
 #     return [Path(f"{prefix_FS}.m{i:02d}") for i in mode_indices]
 #######################################################################################################################################################
+def get_higher_order_modes(config=None):
+    config = config or Simulation_params
+    if "higher_order_modes" in config:
+        return list(config["higher_order_modes"])
+    return list(config.get("higher_mode_indices", Simulation_params.get("higher_mode_indices", [])))
+
 def copy_when_available(src, dst, timeout=30):
     os.makedirs(os.path.dirname(os.path.abspath(dst)), exist_ok=True)
     t_start = time.time()
@@ -756,7 +762,7 @@ end launch_field
 
                     # Extra modes we want for the *central* core:
                     # LP11a, LP11b, LP21a, LP21b, LP02
-                    higher_mode_indices = [2, 4, 6, 8, 10]
+                    higher_order_modes = get_higher_order_modes(simulation_val)
 
                     if Simulation_params["fixed_fem_file"]:
                         # All monitors use the same supplied port_mon_file
@@ -790,8 +796,8 @@ end launch_field
                             # index of this extra monitor among the higher modes
                             idx_extra = mon_number - curr_core_num  # 0,1,2,3,4,...
 
-                            if 0 <= idx_extra < len(higher_mode_indices) and mon_number >= (curr_core_to_monitor - 1):
-                                mode_idx = higher_mode_indices[idx_extra]
+                            if 0 <= idx_extra < len(higher_order_modes) and mon_number >= (curr_core_to_monitor - 1):
+                                mode_idx = higher_order_modes[idx_extra]
                                 if mode_idx >= 10:
                                     final_lines.append(f"\tmonitor_file = {FS_file_name}.m{mode_idx}\n")
                                     for p, r in zip(port_mon_text_arr, port_mon_text_replace_special):
@@ -1432,7 +1438,7 @@ def build_PL(circuit, path_num, core_positions, core_names, taper, Taper_length,
             circuit.attach(port_mon, core_seg, 1, 0, attach_angles = 0, attach_dimensions = 1) 
 
         # Add extra port monitors to monitor higher LP modes
-        for k in range(len(port_monitors) - 2):
+        for _ in range(len(get_higher_order_modes())):
             port = circuit.add_portmonitor(dimensions = core_final_dims_list[core_to_monitor-1])
             circuit.attach(port, core_segments[core_to_monitor-1], 1, 0, attach_angles = 0, attach_dimensions = 1)
             port_monitors.append(port)
@@ -1936,6 +1942,30 @@ LP_mode_dict_rot = np.array([
     "LP21a",
     "LP21b",
     "LP02",
+    "LP31a",
+    "LP31b",
+    "LP12a",
+    "LP12b",
+    "LP41a",
+    "LP41b",
+    "LP22a",
+    "LP22b",
+    "LP03",
+    "LP51a",
+    "LP51b",
+    "LP32a",
+    "LP32b",
+    "LP13a",
+    "LP13b",
+    "LP61a",
+    "LP61b",
+    "LP42a",
+    "LP42b",
+    "LP23a",
+    "LP23b",
+    "LP04",
+    "LP71a",
+    "LP71b"
 ])
 
 def append_kv_rows(wave_rows, kind: str, mapping: dict, base_cols: set):
@@ -1962,7 +1992,29 @@ def core_pos_geo(simulation_val):
                 5: "Lower Left",
                 6: "Lower Right"
             }
-        elif simulation_val["core_num"] > 7:
+        elif simulation_val["core_num"] == 19:
+            core_pos = {
+                0: "Centre",
+                1: "Inner Ring Right",
+                2: "Inner Ring Upper Right",
+                3: "Inner Ring Upper Left",
+                4: "Inner Ring Left",
+                5: "Inner Ring Lower Left",
+                6: "Inner Ring Lower Right",
+                7: "Outer Ring Right",
+                8: "Outer Ring Middle Upper Right",
+                9: "Outer Ring Upper Right",
+                10: "Outer Ring Middle Top",
+                11: "Outer Ring Upper Left",
+                12: "Outer Ring Middle Upper Left",
+                13: "Outer Ring Left",
+                14: "Outer Ring Middle Lower Left",
+                15: "Outer Ring Lower Left",
+                16: "Outer Ring Middle Bottom",
+                17: "Outer Ring Lower Right",
+                18: "Outer Ring Middle Lower Right"
+            }
+        else:
             raise RuntimeError(f"No core position built-in yet for {simulation_val['core_num']} cores in Hex config.")
     elif simulation_val["grid_type"] == "Pent":
         if simulation_val["core_num"] == 6:
