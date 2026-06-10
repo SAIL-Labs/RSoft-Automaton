@@ -1219,6 +1219,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
     results_checkpoint_path = results_dir / "optimizer_results_checkpoint.npy"
     opt_checkpoint_path = results_dir / "optimizer_state_checkpoint.pkl"
+    previous_results_path = results_checkpoint_path
 
     # Load prior space
     for attempt in range(10):
@@ -1256,11 +1257,22 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             else:
                 para_space.append(Real(low, high, name=prior_name))
 
-    if simulate_tf_metric and opt_checkpoint_path.exists() and not simulation_val["use_previous_results"]: #and not bestvals
+    use_previous_results = bool(simulation_val.get("use_previous_results", False))
+
+    if simulate_tf_metric and opt_checkpoint_path.exists() and not use_previous_results: #and not bestvals
+        # Continue from a skopt checkpoint: this restores the optimiser's
+        # internal state and should only use files created by skopt.dump().
         opt = load(opt_checkpoint_path)
         print(f"Loaded optimiser checkpoint from {opt_checkpoint_path}")
-    elif simulate_tf_metric and results_checkpoint_path.exists() and simulation_val["use_previous_results"]:
-        print(f"Using previous optimisation results from optimiser checkpoint: {results_checkpoint_path}")
+    elif simulate_tf_metric and use_previous_results:
+        # Seed a fresh optimiser from previous result records. These are .npy
+        # dictionaries, not skopt checkpoint files, so they are replayed via tell().
+        if not previous_results_path.exists():
+            raise FileNotFoundError(
+                f"use_previous_results=True, but previous results file was not found: {previous_results_path}"
+            )
+
+        print(f"Seeding fresh optimiser from previous result records: {previous_results_path}")
         opt = Optimizer(
             dimensions=para_space, # Parameter search space (bounds + types)
             base_estimator="GP", # Surrogate model (Gaussian Process)
@@ -1271,12 +1283,56 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             n_initial_points=int(Simulation_params["n_init_points"]) # Number of random iterations before BO starts. Note this is NOT the number of parameters chosen before BO starts - it is the number of REPORTS via tell().
         )
 
-        previous_optimisation_results = np.load(results_checkpoint_path)
-        tried_params = np.array([r["params"] for r in previous_optimisation_results])
-        tried_results = np.array([r["results"] for r in previous_optimisation_results])
+        previous_optimisation_results = np.load(previous_results_path, allow_pickle=True)
+        if isinstance(previous_optimisation_results, np.ndarray):
+            previous_optimisation_results = previous_optimisation_results.tolist()
+        if isinstance(previous_optimisation_results, dict):
+            previous_optimisation_results = [previous_optimisation_results]
 
-        for tp, tr in zip(tried_params, tried_results):
-            opt.tell(tp,tr)
+        expected_dim = len(opt.space.dimensions)
+        replayed_results = 0
+        for record_idx, record in enumerate(previous_optimisation_results):
+            if isinstance(record, dict):
+                if "params" not in record:
+                    raise ValueError(f"Previous result record {record_idx} is missing required key 'params'.")
+                raw_params = record["params"]
+                if "result" in record:
+                    raw_result = record["result"]
+                elif "results" in record:
+                    raw_result = record["results"]
+                else:
+                    raise ValueError(
+                        f"Previous result record {record_idx} is missing required key 'result' or 'results'."
+                    )
+            elif isinstance(record, (list, tuple)) and len(record) >= 2:
+                raw_params, raw_result = record[0], record[1]
+            else:
+                raise ValueError(
+                    f"Previous result record {record_idx} must be a dict or a sequence with params/result."
+                )
+
+            param_vector = np.asarray(raw_params, dtype=float).ravel()
+            if param_vector.size != expected_dim:
+                raise ValueError(
+                    f"Previous result record {record_idx} has parameter length {param_vector.size}; "
+                    f"current optimiser expects {expected_dim} dimensions."
+                )
+
+            result_array = np.asarray(raw_result, dtype=float).ravel()
+            if result_array.size != 1:
+                raise ValueError(
+                    f"Previous result record {record_idx} result must be a scalar, got shape {np.shape(raw_result)}."
+                )
+            loss_value = float(result_array[0])
+            if not np.isfinite(loss_value):
+                raise ValueError(
+                    f"Previous result record {record_idx} result must be finite, got {loss_value}."
+                )
+
+            opt.tell(param_vector.tolist(), loss_value)
+            replayed_results += 1
+
+        print(f"Replayed {replayed_results} previous optimisation results into fresh optimiser.")
     else:
         opt = Optimizer(
             dimensions=para_space, # Parameter search space (bounds + types)
@@ -1291,7 +1347,9 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
     # if true, run optimisation testing the loss metric
     if simulate_tf_metric:
         wave_logs = []
-        if simulation_val["use_previous_results"]:
+        if use_previous_results:
+            # Previous records seed the surrogate only; this run's file/iteration
+            # bookkeeping starts fresh.
             all_results = []
         else:
             all_results = load_checkpoint_npy(results_checkpoint_path)
