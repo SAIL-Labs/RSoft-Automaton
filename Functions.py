@@ -44,9 +44,10 @@ def insert_after_match(lines, match_string, insert_lines, strip=True, segment_fi
 
         # Detect segment membership by comp_name
         if line_to_check.startswith("comp_name ="):
+            comp_name = line_to_check.split("=", 1)[1].strip()
             if segment_filter is None:
                 matches_segment = True
-            elif segment_filter in line_to_check:
+            elif comp_name == segment_filter:
                 matches_segment = True
             else:
                 matches_segment = False
@@ -879,15 +880,13 @@ end launch_field
                 output_lines.append(line)
                 # Insert boundary_* after boundary_gap_z = 0
                 if stripped == "boundary_gap_z = 0":
+                    if RSoft_params['femsim_boundary_gap_x'] => fixed_params["core_sep"]//2:
+                        raise RuntimeError(rf"Femsim boundary of {RSoft_params['femsim_boundary_gap_x']} $\mu m$ is greater than or equal to half the inner core separation of {fixed_params["core_sep"]//2} $\mu m$. Mode overlap is possible.")
                     output_lines.extend([
-                        f"boundary_max = 30\n", #10+38.5
-                        f"boundary_max_y = 30\n", #15
-                        f"boundary_min = -30\n", #-10+38.5
-                        f"boundary_min_y = -30\n" #-15
-                        # f"boundary_max = {fs_core_positions[fs_core_to_monitor-1][0] + 1.1*(variable_params['core_diam']/2)}\n", #10+38.5
-                        # f"boundary_max_y = {fs_core_positions[fs_core_to_monitor-1][1] + 1.1*(variable_params['core_diam']/2)}\n", #15
-                        # f"boundary_min = {fs_core_positions[fs_core_to_monitor-1][0] - 1.1*(variable_params['core_diam']/2)}\n", #-10+38.5
-                        # f"boundary_min_y = {fs_core_positions[fs_core_to_monitor-1][1] - 1.1*(variable_params['core_diam']/2)}\n" #-15
+                        f"boundary_max = {RSoft_params['femsim_boundary_gap_x']}\n",
+                        f"boundary_max_y = {RSoft_params['femsim_boundary_gap_y']}\n",
+                        f"boundary_min = -{RSoft_params['femsim_boundary_gap_x']}\n",
+                        f"boundary_min_y = -{RSoft_params['femsim_boundary_gap_y']}\n"
                     ])
                 # Insert domain_min after dimension = 3
                 if stripped == "dimension = 3":
@@ -1140,8 +1139,8 @@ def build_df_wave_log_for_candidate(
             special_core_ref_ind = None
             if "core_neff" in k_arr:
                 core_neff_idx = np.where(k_arr == "core_neff")[0][0]
-                _, ref_idx = find_nearest(stored_data["Wavelength (um)"].to_numpy(), 1.5)
-                special_core_offset = candidate_params[core_neff_idx] - stored_data["SiO2"].to_numpy()[ref_idx]
+                ref_indices = get_wavelength_dependent_indices(1.5, simulation_val, fixed_params, stored_data)
+                special_core_offset = candidate_params[core_neff_idx] - ref_indices["cladding_neff"]
                 special_core_ref_ind = indices["cladding_neff"] + special_core_offset
 
             return {

@@ -192,7 +192,7 @@ class RSoftSim:
 
             try:
                 subprocess.run(
-                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\femsim.exe", filename_FS, prefix_FS, "wait=0"],
+                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\femsim.exe", "-hide", filename_FS, prefix_FS, "wait=0"],
                     check=True,
                     capture_output=True,
                     text=True
@@ -210,7 +210,7 @@ class RSoftSim:
                 )
 
                 subprocess.run(
-                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\bsimw32.exe", filename, prefix_BP, "wait=0"],
+                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\bsimw32.exe", "-hide", filename, prefix_BP, "wait=0"],
                     check=True,
                     capture_output=True,
                     text=True
@@ -907,13 +907,27 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
             if key == "core_neff":
                 core_neff_idx = i
 
-        # define index contrast to scale each sampled refractive index according to some fixed index contrast calculated at a reference wavelength
-        delta_index_at_reference_wavelength = params[:, core_neff_idx] - Silica_refractive_index_at_reference_wavelength
+        # Keep the MS core offset relative to the configured cladding at the
+        # Sellmeier reference wavelength, then add it to each wavelength's
+        # cladding later when building the .ind file.
+        cladding_ref_at_reference = get_wavelength_dependent_indices(
+            1.5,
+            simulation_val,
+            fixed_params,
+            stored_data
+        )["cladding_neff"]
+        delta_index_at_reference_wavelength = params[:, core_neff_idx] - cladding_ref_at_reference
     else:
         core_neff_idx = None
+        cladding_ref_at_reference = get_wavelength_dependent_indices(
+            1.5,
+            simulation_val,
+            fixed_params,
+            stored_data
+        )["cladding_neff"]
         delta_index_at_reference_wavelength = np.full(
             params.shape[0],
-            simulation_val.get("core_neff", fixed_params.get("core_neff")) - Silica_refractive_index_at_reference_wavelength
+            simulation_val.get("core_neff", fixed_params.get("core_neff")) - cladding_ref_at_reference
         )
 
     # Include sine/cosine orientations for each supported LP family.
@@ -1242,9 +1256,27 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             else:
                 para_space.append(Real(low, high, name=prior_name))
 
-    if simulate_tf_metric and opt_checkpoint_path.exists() and not bestvals:
+    if simulate_tf_metric and opt_checkpoint_path.exists() and not simulation_val["use_previous_results"]: #and not bestvals
         opt = load(opt_checkpoint_path)
         print(f"Loaded optimiser checkpoint from {opt_checkpoint_path}")
+    elif simulate_tf_metric and results_checkpoint_path.exists() and simulation_val["use_previous_results"]:
+        print(f"Using previous optimisation results from optimiser checkpoint: {results_checkpoint_path}")
+        opt = Optimizer(
+            dimensions=para_space, # Parameter search space (bounds + types)
+            base_estimator="GP", # Surrogate model (Gaussian Process)
+            acq_func=Simulation_params["acq_type"], # Acquisition function (EI or LCB, chooses next point)
+            acq_func_kwargs={"xi": Simulation_params["acq_hyperparam"]}, # EI exploration strength (higher = more exploration, default=0.01)
+            acq_optimizer=Simulation_params["acq_opt"], # How the acquisition function is optimised (random sampling, lbfgs)
+            random_state=None, # Random seed (None = non-reproducible)
+            n_initial_points=int(Simulation_params["n_init_points"]) # Number of random iterations before BO starts. Note this is NOT the number of parameters chosen before BO starts - it is the number of REPORTS via tell().
+        )
+
+        previous_optimisation_results = np.load(results_checkpoint_path)
+        tried_params = np.array([r["params"] for r in previous_optimisation_results])
+        tried_results = np.array([r["results"] for r in previous_optimisation_results])
+
+        for tp, tr in zip(tried_params, tried_results):
+            opt.tell(tp,tr)
     else:
         opt = Optimizer(
             dimensions=para_space, # Parameter search space (bounds + types)
@@ -1252,15 +1284,18 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             acq_func=Simulation_params["acq_type"], # Acquisition function (EI or LCB, chooses next point)
             acq_func_kwargs={"xi": Simulation_params["acq_hyperparam"]}, # EI exploration strength (higher = more exploration, default=0.01)
             acq_optimizer=Simulation_params["acq_opt"], # How the acquisition function is optimised (random sampling, lbfgs)
-            # acq_optimizer_kwargs = {"n_points": 10000}, # Number of samples used to find best next point
             random_state=None, # Random seed (None = non-reproducible)
             n_initial_points=int(Simulation_params["n_init_points"]) # Number of random iterations before BO starts. Note this is NOT the number of parameters chosen before BO starts - it is the number of REPORTS via tell().
         )
 
     # if true, run optimisation testing the loss metric
     if simulate_tf_metric:
-        all_results = load_checkpoint_npy(results_checkpoint_path)
         wave_logs = []
+        if simulation_val["use_previous_results"]:
+            all_results = []
+        else:
+            all_results = load_checkpoint_npy(results_checkpoint_path)
+        
         completed_candidates = len(all_results)
         completed_batches = completed_candidates // simulation_val["n_points"]
 

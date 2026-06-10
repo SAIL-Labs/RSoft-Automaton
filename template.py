@@ -25,6 +25,8 @@ RSoft_params = {
     "boundary_gap_x": 10,
     "boundary_gap_y": 10,
     "boundary_gap_z": 0,
+    "femsim_boundary_gap_x": 40, # um, changes the domain size of the femsim calculations performed over the MS core
+    "femsim_boundary_gap_y": 40, # um, changes the domain size of the femsim calculations performed over the MS core
     "bpm_output_monitors": 1,
     "bpm_output_monitors_warned": 1,
     "dimension": 3,
@@ -103,9 +105,10 @@ Simulation_params = {
 
     # optimiser settings
     "acq_type": "EI",
-    "acq_hyperparam": 0.8,
+    "acq_hyperparam": 0.01,
     "acq_opt": "lbfgs",
     "n_init_points": 3,
+    "use_previous_results": False,
 
     # RSoft meta instance info
     "number_of_rsoft_instances": 2
