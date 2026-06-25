@@ -192,7 +192,7 @@ class RSoftSim:
 
             try:
                 subprocess.run(
-                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\femsim.exe", "-hide", filename_FS, prefix_FS, "wait=0"],
+                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\femsim.exe",  filename_FS, prefix_FS, "wait=0"], #"-hide",
                     check=True,
                     capture_output=True,
                     text=True
@@ -210,7 +210,7 @@ class RSoftSim:
                 )
 
                 subprocess.run(
-                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\bsimw32.exe", "-hide", filename, prefix_BP, "wait=0"],
+                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\bsimw32.exe",  filename, prefix_BP, "wait=0"], #"-hide",
                     check=True,
                     capture_output=True,
                     text=True
@@ -1219,7 +1219,8 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
     results_checkpoint_path = results_dir / "optimizer_results_checkpoint.npy"
     opt_checkpoint_path = results_dir / "optimizer_state_checkpoint.pkl"
-    previous_results_path = results_checkpoint_path
+    previous_results_file = simulation_val.get("previous_results")
+    previous_results_path = results_dir / previous_results_file if previous_results_file else results_checkpoint_path
 
     # Load prior space
     for attempt in range(10):
@@ -1364,7 +1365,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
         if bestvals:
             # checking if femsim files exist. If they do, continue. If not, generate them
-            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31892_t0_ex.m00"
+            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31592_t0_ex.m00"
             if not fem_fields_present(femSIM_file_example):
                 simulation_val["Fem_present"] = False
                 print("No suitable FemSIM field profiles detected. Generating...")
@@ -1470,23 +1471,25 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     all_results.append(iter_result)
 
                 atomic_save_npy(all_results, results_checkpoint_path)
+                save_optimizer_progress_plot(all_results, images_dir)
                 # dump(opt, opt_checkpoint_path, store_objective=False)
             return all_results
         
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31892_t0_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.456200_Taper_L_50000.000000_i1_c0_p13392_t0_ex.m00"
+        # femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31592_t0_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
-            param_names = ["core_diam", "core_neff"]
-            params = [variable_params[k] for k in param_names]
-            run_tf_multproc(params, 1,simulation_val, custom_priors, 
+            ref_param_names = ["core_diam", "core_neff"]
+            ref_params = [variable_params[k] for k in ref_param_names]
+            run_tf_multproc(ref_params, 1,simulation_val, custom_priors, 
                             taper_min, taper_max, fem = True, gridding=gridding)
 
         # start at whatever the last iteration was (or 0), but scale the total number of iterations based
         # on the number of selected parameter vectors.
         for batch_idx in range(completed_batches, total_calls//simulation_val["n_points"]):
             # adaptable gridding to hasten simulations slightly after Bayesian optimisation kicks in
-            if batch_idx < 2*int(Simulation_params["n_init_points"]):
+            if batch_idx < 2*int(Simulation_params["n_init_points"]) and not simulation_val["use_previous_results"]:
                 simulation_val["grid_size"] = 0.74
                 simulation_val["grid_size_y"] = 0.74
             else:
@@ -1573,6 +1576,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     all_results.append(iter_result)
                 atomic_save_npy(all_results, results_checkpoint_path)
                 dump(opt, opt_checkpoint_path, store_objective=False)
+                save_optimizer_progress_plot(all_results, images_dir)
             else:
                 print(f"Iteration {batch_idx+1}: {result_batch:.6f}")
                 for w, group in df_wave_logs.groupby("Wavelength"):
@@ -1632,33 +1636,34 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 all_results.append(iter_result)
                 atomic_save_npy(all_results, results_checkpoint_path)
                 dump(opt, opt_checkpoint_path, store_objective=False)
+                save_optimizer_progress_plot(all_results, images_dir)
         return all_results
     
     # if false, run tf code for the template parameters
     else:
-        param_names = variable_params.keys() #["core_diam", "core_neff"]
-        params = [variable_params[k] for k in param_names]
+        run_param_names = variable_params.keys() #["core_diam", "core_neff"]
+        run_params = [variable_params[k] for k in run_param_names]
 
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31892_t0_ex.m00"
-        # femSIM_file_example = "1.55_GIF_outer_fibre_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.456200_Taper_L_50000.000000_i1_c0_p13392_t0_ex.m00"
+        # femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31592_t0_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
-            param_names = ["core_diam", "core_neff"]
-            params = [variable_params[k] for k in param_names]
-            run_tf_multproc(params, 1,simulation_val, custom_priors, 
+            ref_param_names = ["core_diam", "core_neff"]
+            ref_params = [variable_params[k] for k in ref_param_names]
+            run_tf_multproc(ref_params, 1,simulation_val, custom_priors, 
                             taper_min, taper_max, fem = True, gridding=gridding)
             
         if gridding:
-            grid_size_range, tf_list, _ = run_tf_multproc(params, 1, simulation_val, custom_priors,
+            grid_size_range, tf_list, _ = run_tf_multproc(run_params, 1, simulation_val, custom_priors,
                                                           taper_min, taper_max, gridding)
             return grid_size_range, tf_list, _
         else:
-            tf_list, res_folder = run_tf_multproc(params, 1,simulation_val, custom_priors, 
+            tf_list, res_folder = run_tf_multproc(run_params, 1,simulation_val, custom_priors, 
                                       taper_min, taper_max, gridding)
             
             # code to save results to csv
-            params = np.asarray(params, dtype=float)
+            params = np.asarray(run_params, dtype=float)
             if params.ndim == 1:
                 params = params[np.newaxis, :]
 

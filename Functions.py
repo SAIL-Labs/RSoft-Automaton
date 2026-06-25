@@ -880,8 +880,8 @@ end launch_field
                 output_lines.append(line)
                 # Insert boundary_* after boundary_gap_z = 0
                 if stripped == "boundary_gap_z = 0":
-                    if RSoft_params['femsim_boundary_gap_x'] => fixed_params["core_sep"]//2:
-                        raise RuntimeError(rf"Femsim boundary of {RSoft_params['femsim_boundary_gap_x']} $\mu m$ is greater than or equal to half the inner core separation of {fixed_params["core_sep"]//2} $\mu m$. Mode overlap is possible.")
+                    if RSoft_params['femsim_boundary_gap_x'] >= fixed_params["core_sep"]//2:
+                        raise RuntimeError(rf"Femsim boundary of {RSoft_params['femsim_boundary_gap_x']} $\mu m$ is greater than or equal to half the inner core separation of {fixed_params['core_sep']//2} $\mu m$. Mode overlap is possible.")
                     output_lines.extend([
                         f"boundary_max = {RSoft_params['femsim_boundary_gap_x']}\n",
                         f"boundary_max_y = {RSoft_params['femsim_boundary_gap_y']}\n",
@@ -3272,6 +3272,46 @@ def load_checkpoint_npy(filepath):
     if not filepath.exists():
         return []
     return np.load(filepath, allow_pickle=True).tolist()
+
+def save_optimizer_progress_plot(results_log, images_dir):
+    losses = []
+    for record in results_log:
+        if not isinstance(record, dict) or "result" not in record:
+            continue
+
+        try:
+            loss_value = np.asarray(record["result"], dtype=float).reshape(-1)
+        except (TypeError, ValueError):
+            continue
+
+        if loss_value.size != 1 or not np.isfinite(loss_value[0]):
+            continue
+
+        losses.append(float(loss_value[0]))
+
+    if not losses:
+        return
+
+    losses = np.asarray(losses, dtype=float)
+    x_vals = np.arange(1, len(losses) + 1)
+    n_initial_points = int(Simulation_params.get("n_init_points", 0))
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(x_vals, np.minimum.accumulate(losses))
+    if n_initial_points > 0:
+        plt.axvline(
+            n_initial_points,
+            ls="--",
+            color="r",
+            label=f"First {n_initial_points} evaluations"
+        )
+        plt.legend(loc="best")
+    plt.ylabel("Loss Function Value")
+    plt.xlabel("Parameter Iteration")
+    plt.title("Variation of best result")
+    plt.tight_layout()
+    plt.savefig(images_dir / "optimiser_progress.png", dpi=300)
+    plt.close()
 
 def read_neff_values(filepath):
     with open(filepath, "r") as f:

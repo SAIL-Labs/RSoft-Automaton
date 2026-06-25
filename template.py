@@ -3,16 +3,16 @@ import random, numpy as np
 
 fixed_params = {
     "core_sep":  125,
-    "MCFCladd": 5*125,#3*125,  #250 , #400
+    "MCFCladd": 3*125,
     # "core_claddings": None, 
     "core_cladding_diam": None, #125  #80,
-    "cladding_neff": 1.4402,#1.44402, # this value gets replaced through the Sellmeier equation
+    "cladding_neff": 1.449445,#1.44402, # this value gets replaced through the Sellmeier equation
     "core_cladding_neff": None, #1.4433510951304291734406199895015, #from using SMF-28 index (). Determined automatically using Sellmeier
     "cen_core_cladding_neff": None,#1.44,#0.00949,
     "other_core_diam": 8.3, # non-ms core diameter
     # "Taper_L": 50000, #45000
     # "core_neff": 0.0122895, #0.015,
-    "taper": 19.34984520123839, #19c pigtail #18.75, 7c pigtail
+    "taper": 31.25, #7 core pigtail gif #19.34984520123839, #19c pigtail #18.75, 7c pigtail
     # "core_diam": 8.2,
     "alpha": 0,
     "length_hyperparam": 0.01
@@ -108,7 +108,8 @@ Simulation_params = {
     "acq_hyperparam": 0.01,
     "acq_opt": "lbfgs",
     "n_init_points": 3,
-    "use_previous_results": False,
+    "use_previous_results": False, # decides whether to seed a new optimiser with previous results
+    "previous_results": None, # name of the file containing the previous results
 
     # RSoft meta instance info
     "number_of_rsoft_instances": 2
@@ -133,17 +134,22 @@ bestval_limits = {
     # "Taper_L": (30000,50000) 
 }
 
+# variable_params= {
+#     "core_diam": 8.3, 
+#     "core_neff": 1.4492, 
+#     "Taper_L":  50000, 
+# }   
+
+# GIF settings     
 variable_params= {
     "core_diam": 8.3, 
-    "core_neff": 1.4492, 
+    "core_neff": 1.4562, 
     "Taper_L":  50000, 
-}   
-
-# # GIF settings     
+}       
 # variable_params= {
-#     "core_diam": 125, # using 3D mode val: 6.5
-#     "core_neff": 1.454771, #1.45, # using 3D mode val: 1.449049, 1.4467895
-#     "Taper_L":  50000, # using 3D mode val: 48587.538152
+#     "core_diam": 125, 
+#     "core_neff": 1.454771, 
+#     "Taper_L":  50000, 
 # }       
 
 # Assign core_neffs here 
