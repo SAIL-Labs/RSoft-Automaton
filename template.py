@@ -5,14 +5,15 @@ fixed_params = {
     "core_sep":  125,
     "MCFCladd": 3*125,
     # "core_claddings": None, 
-    "core_cladding_diam": None, #125  #80,
-    "cladding_neff": 1.449445,#1.44402, # this value gets replaced through the Sellmeier equation
+    "core_cladding_diam": None, #125  #80,,1.4402
+    "cladding_neff": 1.44402, # this value gets replaced through the Sellmeier equation
     "core_cladding_neff": None, #1.4433510951304291734406199895015, #from using SMF-28 index (). Determined automatically using Sellmeier
     "cen_core_cladding_neff": None,#1.44,#0.00949,
     "other_core_diam": 8.3, # non-ms core diameter
+    "silica_index": 0, #this is changed through the sellmeier values
     # "Taper_L": 50000, #45000
     # "core_neff": 0.0122895, #0.015,
-    "taper": 31.25, #7 core pigtail gif #19.34984520123839, #19c pigtail #18.75, 7c pigtail
+    "taper": 25, #7 core pigtail gif #19.34984520123839, #19c pigtail #18.75, 7c pigtail
     # "core_diam": 8.2,
     "alpha": 0,
     "length_hyperparam": 0.01
@@ -105,7 +106,7 @@ Simulation_params = {
 
     # optimiser settings
     "acq_type": "EI",
-    "acq_hyperparam": 0.01,
+    "acq_hyperparam": 0.8,
     "acq_opt": "lbfgs",
     "n_init_points": 3,
     "use_previous_results": False, # decides whether to seed a new optimiser with previous results
@@ -143,12 +144,12 @@ bestval_limits = {
 # GIF settings     
 variable_params= {
     "core_diam": 8.3, 
-    "core_neff": 1.4562, 
+    "core_neff": 1.4492, 
     "Taper_L":  50000, 
 }       
 # variable_params= {
 #     "core_diam": 125, 
-#     "core_neff": 1.454771, 
+#     "core_neff": 1.4578044315, 
 #     "Taper_L":  50000, 
 # }       
 

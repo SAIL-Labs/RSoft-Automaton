@@ -934,9 +934,25 @@ def core_layout_for_special_core(special_core_idx, sim_param, simulation_val, co
                 # core to be optimized by skopt
                 core_diam = variable_params.get("core_diam")
                 core_taper = param_dict.get("taper", fixed_params.get("taper"))
+                # if simulation_val["Fem_present"]:
+                #     # Wavelength-dependent index:
+                #     # special-core index is defined relative to the current silica index.
+                #     # This applies both during optimisation and when using template/fixed parameters.
+                #     if simulation_val["sellmeier"]:
+                #         """THIS NEEDS TO BE WAVELENGTH DEPENDENT!!!!!!!"""
+                #         core_neff = fixed_params["silica_at_any_wavelength"] + delta_index_at_reference_wavelength
+
+                #     # Fixed-index mode:
+                #     # only used when sellmeier is explicitly disabled.
+                #     else:
+                #         core_neff = param_dict.get("core_neff", fixed_params.get("core_neff"))
+
                 if simulation_val["Fem_present"] and (simulation_val["simulate_tf_metric"] or simulation_val["sellmeier"]):
-                    core_neff = fixed_params["cladding_neff"] + delta_index_at_reference_wavelength
-                elif simulation_val["Fem_present"] and not simulation_val["simulate_tf_metric"]:
+                    # core_neff = simulation_val["reference_silica_index"] + delta_index_at_reference_wavelength
+                    core_neff = fixed_params["silica_index"] + delta_index_at_reference_wavelength
+                # elif simulation_val["Fem_present"] and not simulation_val["simulate_tf_metric"]:
+                #     core_neff = fixed_params["silica_index"] + delta_index_at_reference_wavelength
+                elif simulation_val["Fem_present"] and (not simulation_val["simulate_tf_metric"] or not simulation_val["sellmeier"]):
                     core_neff = param_dict.get("core_neff", fixed_params.get("core_neff"))
                 else:
                     # fix the geometry and index to that of other cores to determine the FemSIM files.
@@ -1133,21 +1149,22 @@ def build_df_wave_log_for_candidate(
     candidate_params = np.asarray(candidate_params, dtype=float)
 
     def material_indices_for_wave(w):
-        if not simulation_val["sellmeier"]:
+        if simulation_val["sellmeier"]:
             indices = get_wavelength_dependent_indices(w, simulation_val, fixed_params, stored_data)
 
             special_core_ref_ind = None
             if "core_neff" in k_arr:
                 core_neff_idx = np.where(k_arr == "core_neff")[0][0]
                 ref_indices = get_wavelength_dependent_indices(1.5, simulation_val, fixed_params, stored_data)
-                special_core_offset = candidate_params[core_neff_idx] - ref_indices["cladding_neff"]
-                special_core_ref_ind = indices["cladding_neff"] + special_core_offset
+                special_core_offset = candidate_params[core_neff_idx] - ref_indices["silica_index"]
+                special_core_ref_ind = indices["silica_index"] + special_core_offset
 
             return {
                 "special_core": special_core_ref_ind,
                 "other_core": indices["non_ms_core_neff"],
                 "cladding": indices["cladding_neff"],
                 "capillary": indices["capillary_neff"],
+                "silica": indices["silica_index"]
             }
 
         return {
@@ -1207,6 +1224,7 @@ def build_df_wave_log_for_candidate(
         Other_core_ref_ind = material_indices["other_core"]
         Cladding_ref_ind = material_indices["cladding"]
         Capillary_ref_ind = material_indices["capillary"]
+        silica_index = material_indices["silica"]
             
         for m in range(n_modes):
             mode_label = (
@@ -1249,8 +1267,11 @@ def build_df_wave_log_for_candidate(
 
             if "core_neff" in k_arr:
                 core_neff_idx = np.where(k_arr == "core_neff")[0][0]
+                row[f"Silica index"] = float(
+                    silica_index
+                )
                 row[f"Delta n({simulation_val['free_space_wavelength'][0]} um)"] = float(
-                    candidate_params[core_neff_idx] - Cladding_ref_ind
+                    candidate_params[core_neff_idx] - silica_index
                 )
 
             for c in range(n_cores):
@@ -3470,26 +3491,26 @@ def get_wavelength_dependent_indices(wave, simulation_val, fixed_params, sellmei
         )
     )
 
-    non_ms_core_offset = requested_non_ms_core - sellmeier_df["GeO2_2_mol%"].to_numpy()[ref_idx]
+    # offsets are relative to silica at the reference wavelength
+    non_ms_core_offset = requested_non_ms_core - sellmeier_df["SiO2"].to_numpy()[ref_idx]
     cladding_offset = requested_cladding - sellmeier_df["SiO2"].to_numpy()[ref_idx]
-    capillary_offset = requested_capillary - sellmeier_df["F_2_mol%"].to_numpy()[ref_idx]
-
-    non_ms_core_neff = sellmeier_df["GeO2_2_mol%"].to_numpy()[wave_idx] + non_ms_core_offset
-    cladding_neff = sellmeier_df["SiO2"].to_numpy()[wave_idx] + cladding_offset
-    capillary_neff = sellmeier_df["F_2_mol%"].to_numpy()[wave_idx] + capillary_offset
+    capillary_offset = requested_capillary - sellmeier_df["SiO2"].to_numpy()[ref_idx]
+    
+    silica = sellmeier_df["SiO2"].to_numpy()[wave_idx]
+    non_ms_core_neff = silica + non_ms_core_offset
+    cladding_neff = silica + cladding_offset
+    capillary_neff = silica + capillary_offset
 
     return {
         "non_ms_core_neff": non_ms_core_neff,
-        "other_core": non_ms_core_neff,
         "cladding_neff": cladding_neff,
-        "cladding": cladding_neff,
         "capillary_neff": capillary_neff,
-        "capillary": capillary_neff,
         "background_index": capillary_neff,
         "reference_wavelength": 1.5,
         "non_ms_core_offset": non_ms_core_offset,
         "cladding_offset": cladding_offset,
         "capillary_offset": capillary_offset,
+        "silica_index": silica
     }
 
 ###################################################################################################################################################################################################################################################

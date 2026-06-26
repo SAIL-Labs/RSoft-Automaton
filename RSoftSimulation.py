@@ -729,17 +729,17 @@ class RSoftSim:
         )
         return results_folder, res_folder, pid_csv
 
-def run_rsoft_sim(args):
-    from RSoftSimulation import RSoftSim  
-    from Functions import overwrite_template_val
+# def run_rsoft_sim(args):
+#     from RSoftSimulation import RSoftSim  
+#     from Functions import overwrite_template_val
 
-    params, build_tf, json_config, csv_path, simulation_val, prior_space_pid = args
-    # this needs to be defined here as well or 
-    # else some paras won't be updated for some reason???
-    overwrite_template_val(json_config)
-    sim = RSoftSim()
-    sim.generate_core_positions()
-    return sim.build_circuit(params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave, delta_index_at_reference_wavelength)
+#     params, build_tf, json_config, csv_path, simulation_val, prior_space_pid = args
+#     # this needs to be defined here as well or 
+#     # else some paras won't be updated for some reason???
+#     overwrite_template_val(json_config)
+#     sim = RSoftSim()
+#     sim.generate_core_positions()
+#     return sim.build_circuit(params, build_tf, json_config, csv_path, simulation_val, prior_space_pid, wave, delta_index_at_reference_wavelength)
 
 #############################################################################################################################################################################
 """
@@ -807,6 +807,7 @@ def multiple_mode_tf(arg_list):
         if wave_indices is not None:
             sim_val["core_neff"] = wave_indices["non_ms_core_neff"]
             fixed_params["cladding_neff"] = wave_indices["cladding_neff"]
+            fixed_params["silica_index"] = wave_indices["silica_index"]
             Launch_params["cladding_neff"] = fixed_params["cladding_neff"]
             RSoft_params["background_index"] = wave_indices["capillary_neff"]
 
@@ -897,10 +898,11 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
     if params.ndim == 1:
         params = params[np.newaxis, :]
 
+    # _, refractive_index_at_reference_wave = find_nearest(stored_data["Wavelength (um)"].to_numpy(), 1.5)
+    # Silica_refractive_index_at_reference_wavelength = stored_data["SiO2"].to_numpy()[refractive_index_at_reference_wave]
     stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
-    _, refractive_index_at_reference_wave = find_nearest(stored_data["Wavelength (um)"].to_numpy(), 1.5)
-    Silica_refractive_index_at_reference_wavelength = stored_data["SiO2"].to_numpy()[refractive_index_at_reference_wave]
 
+    # simulation_val["reference_silica_index"] = Silica_refractive_index_at_reference_wavelength
     if "core_neff" in variable_params:
         # get index of core_neff in variable_params
         for i, key in enumerate(variable_params):
@@ -910,13 +912,16 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
         # Keep the MS core offset relative to the configured cladding at the
         # Sellmeier reference wavelength, then add it to each wavelength's
         # cladding later when building the .ind file.
-        cladding_ref_at_reference = get_wavelength_dependent_indices(
+        reference_wavelength_indices = get_wavelength_dependent_indices(
             1.5,
             simulation_val,
             fixed_params,
             stored_data
-        )["cladding_neff"]
-        delta_index_at_reference_wavelength = params[:, core_neff_idx] - cladding_ref_at_reference
+        )
+        reference_cladding_at_reference = reference_wavelength_indices["cladding_neff"]
+        reference_silica_index = reference_wavelength_indices["silica_index"]
+        delta_index_at_reference_wavelength = params[:, core_neff_idx] - reference_silica_index
+        # delta_index_at_reference_wavelength = params[:, core_neff_idx] - reference_cladding_at_reference
     else:
         core_neff_idx = None
         cladding_ref_at_reference = get_wavelength_dependent_indices(
@@ -1169,7 +1174,8 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Loss_d": "Mean intensity of MS mode in non MS cores",
             "Loss": "-Loss_a - Loss_b + (Loss_c + Loss_d) + 2",
             "Extra Mode Intensity in Loss_a": "Total number of amplitudes corresponding to higher order modes included in Loss_a",
-            f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should give a slightly different value for different wavelengths.",
+            "Silica index": "Reference index of silica with which the index contrasts were calculated with.",
+            f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should be constant, but when added will give a slightly different value for different wavelengths.",
             "Guided Modes": "Total number of modes, including rotations AND polarisations, being guided in the fibre.",
             "Simulation Health": "OK if the RSoft simulation completed; TIMEOUT if a guarded wait returned a dummy zero transfer vector.",
             "Simulation Message": "Timeout details, including missing, small, or bad-header files when applicable.",
@@ -1365,7 +1371,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
         if bestvals:
             # checking if femsim files exist. If they do, continue. If not, generate them
-            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31592_t0_ex.m00"
+            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p39956_t0_ex.m00"
             if not fem_fields_present(femSIM_file_example):
                 simulation_val["Fem_present"] = False
                 print("No suitable FemSIM field profiles detected. Generating...")
@@ -1476,7 +1482,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             return all_results
         
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.456200_Taper_L_50000.000000_i1_c0_p13392_t0_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p39956_t0_ex.m00"
         # femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31592_t0_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
@@ -1490,8 +1496,8 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         for batch_idx in range(completed_batches, total_calls//simulation_val["n_points"]):
             # adaptable gridding to hasten simulations slightly after Bayesian optimisation kicks in
             if batch_idx < 2*int(Simulation_params["n_init_points"]) and not simulation_val["use_previous_results"]:
-                simulation_val["grid_size"] = 0.74
-                simulation_val["grid_size_y"] = 0.74
+                simulation_val["grid_size"] = 2
+                simulation_val["grid_size_y"] = 2
             else:
                 simulation_val["grid_size"] = 0.37
                 simulation_val["grid_size_y"] = 0.37
@@ -1645,7 +1651,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         run_params = [variable_params[k] for k in run_param_names]
 
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.456200_Taper_L_50000.000000_i1_c0_p13392_t0_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p39956_t0_ex.m00"
         # femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31592_t0_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
@@ -1753,7 +1759,8 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     "Loss_d": "Mean intensity of MS mode in non MS cores",
                     "Loss": "-Loss_a - Loss_b + (Loss_c + Loss_d) + 2",
                     "Extra Mode Intensity in Loss_a": "Total number of amplitudes corresponding to higher order modes included in Loss_a",
-                    f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should give a slightly different value for different wavelengths.",
+                    "Silica index": "Reference index of silica with which the index contrasts were calculated with.",
+                    f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should be constant, but when added will give a slightly different value for different wavelengths.",
                     "Guided Modes": "Total number of modes, including rotations AND polarisations, being guided in the fibre.",
                     "Simulation Health": "OK if the RSoft simulation completed; TIMEOUT if a guarded wait returned a dummy zero transfer vector.",
                     "Simulation Message": "Timeout details, including missing, small, or bad-header files when applicable.",
