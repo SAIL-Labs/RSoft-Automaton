@@ -3,7 +3,7 @@ import random, numpy as np
 
 fixed_params = {
     "core_sep":  125,
-    "MCFCladd": 3*125,
+    "MCFCladd": 5*125,
     # "core_claddings": None, 
     "core_cladding_diam": None, #125  #80,,1.4402
     "cladding_neff": 1.44402, # this value gets replaced through the Sellmeier equation
@@ -13,7 +13,7 @@ fixed_params = {
     "silica_index": 0, #this is changed through the sellmeier values
     # "Taper_L": 50000, #45000
     # "core_neff": 0.0122895, #0.015,
-    "taper": 25, #7 core pigtail gif #19.34984520123839, #19c pigtail #18.75, 7c pigtail
+    "taper": 25, #7 core pigtail gif (also seems to work for (19cPL)#19.34984520123839, #19c pigtail #18.75, 7c pigtail
     # "core_diam": 8.2,
     "alpha": 0,
     "length_hyperparam": 0.01
@@ -76,8 +76,10 @@ Simulation_params = {
     "core_num": 7,
     "num_paras": 72,
     "batch_num": 6,
-    "hyp_param_b": 1,
-    "hyp_param_c": 1,
+    "hyp_param_a": 10,
+    "hyp_param_b": 50,
+    "hyp_param_c": 10,
+    "loss_offset": 50,
     "grid_type": "Hex",
     "plot_centre_core": True,
     "Structure": "PL", # Fibre, PL, pigtail
@@ -106,7 +108,7 @@ Simulation_params = {
 
     # optimiser settings
     "acq_type": "EI",
-    "acq_hyperparam": 0.8,
+    "acq_hyperparam": 0.01,
     "acq_opt": "lbfgs",
     "n_init_points": 3,
     "use_previous_results": False, # decides whether to seed a new optimiser with previous results

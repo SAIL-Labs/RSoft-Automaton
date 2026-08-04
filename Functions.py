@@ -1133,6 +1133,7 @@ def build_df_wave_log_for_candidate(
     core_to_monitor = simulation_val["core_to_monitor"] - 1
     modes_to_monitor = ["LP01"]
 
+    hyp_param_a = simulation_val.get("hyp_param_a", Simulation_params["hyp_param_a"])
     hyp_param_b = simulation_val.get("hyp_param_b", Simulation_params["hyp_param_b"])
     hyp_param_c = simulation_val.get("hyp_param_c", Simulation_params["hyp_param_c"])
 
@@ -1205,6 +1206,7 @@ def build_df_wave_log_for_candidate(
             res_folder,
             w,
             pid_w,
+            hyp_param_a,
             hyp_param_b,
             hyp_param_c,
             core_to_monitor=core_to_monitor,
@@ -1580,7 +1582,7 @@ def transfer_matrix_component(csv_path, row, port_mon = False):
         return row, throughput
 
             
-def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_b, hyp_param_c, 
+def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a, hyp_param_b, hyp_param_c,
                                     core_to_monitor, modes_to_monitor, simulation_val, run_tag):
     """
     Function that will sort through tf_list, extract the mode selective core values in ms/non-ms modes and return the loss function needed by scikit
@@ -1703,12 +1705,54 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_b,
         nonms_core_ms_mode = np.mean(nonms_core_ms_mode)
 
         
-        # 3. Mean of non-MS modes exciting LP01 and higher order modes in MS core
-        ms_core_other_mode_vals = ([np.abs(vals[ms_core])**2 for vals in other_mode_vals] + [np.abs(val)**2 for vals in ex_nonms_mode_vals[:len(num_mode_arr)] for val in vals])
+        # 3. Mean total power coupled into the MS core by each non-MS input.
+        # Sum the LP01 and guided higher-order-mode powers for each input first,
+        # then average those per-input totals.  Work row-by-row so empty or
+        # unequal-length extra-monitor vectors cannot cause 2-D indexing errors.
+        if not other_mode_vals:
+            ms_core_other_mode = 0.0
+        else:
+            if not 0 <= ms_core < core_num:
+                raise IndexError(
+                    f"MS core index {ms_core} is outside the valid range "
+                    f"0 to {core_num - 1}."
+                )
 
-        ms_core_other_mode = np.mean(ms_core_other_mode_vals) 
+            if any(np.asarray(vals).size <= ms_core for vals in other_mode_vals):
+                raise ValueError(
+                    "At least one non-MS result does not contain an amplitude "
+                    f"for MS core index {ms_core}."
+                )
 
-        # 4. Mean of non-MS cores in non-MS modes: 
+            main_power = np.abs(np.asarray(
+                [np.asarray(vals).ravel()[ms_core] for vals in other_mode_vals],
+                dtype=float,
+            ))**2
+
+            extra_power_rows = [
+                np.abs(np.asarray(vals, dtype=float).ravel())**2
+                for vals in ex_nonms_mode_vals
+            ]
+            if len(extra_power_rows) != main_power.size:
+                raise ValueError(
+                    "The number of higher-order-mode result rows does not "
+                    "match the number of non-MS input modes."
+                )
+
+            available_extra_modes = min(
+                (row.size for row in extra_power_rows),
+                default=0,
+            )
+            num_extra_modes = min(len(num_mode_arr), available_extra_modes)
+            extra_power_per_mode = np.asarray([
+                np.sum(row[:num_extra_modes])
+                for row in extra_power_rows
+            ], dtype=float)
+
+            total_ms_core_power_per_mode = main_power + extra_power_per_mode
+            ms_core_other_mode = float(np.mean(total_ms_core_power_per_mode))
+
+        # 4. Mean of non-MS cores in non-MS modes:
         nonms_core_other_mode_vals = [
             np.abs(val)**2
             for vals in other_mode_vals
@@ -1718,7 +1762,7 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_b,
                                                                     # This is what should be maximised and is equivelant to taking 
                                                                     # the average of each non-ms core in each individual non-ms mode
 
-        loss_func = -ms_core_mode -hyp_param_b*nonms_core_other_mode + hyp_param_c*(nonms_core_ms_mode + ms_core_other_mode) + 2
+        loss_func = -hyp_param_a*ms_core_mode -hyp_param_b*nonms_core_other_mode + hyp_param_c*(nonms_core_ms_mode + ms_core_other_mode) + Simulation_params["loss_offset"]
         array_of_results = np.array([ms_core_mode, #a
                             nonms_core_other_mode, #b
                             ms_core_other_mode, #c

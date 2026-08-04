@@ -192,7 +192,7 @@ class RSoftSim:
 
             try:
                 subprocess.run(
-                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\femsim.exe",  filename_FS, prefix_FS, "wait=0"], #"-hide",
+                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\femsim.exe", "-hide", filename_FS, prefix_FS, "wait=0"], 
                     check=True,
                     capture_output=True,
                     text=True
@@ -210,7 +210,7 @@ class RSoftSim:
                 )
 
                 subprocess.run(
-                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\bsimw32.exe",  filename, prefix_BP, "wait=0"], #"-hide",
+                    [r"C:\Keysight\PhotonicSolutions\2026\RSoft\bin\bsimw32.exe", "-hide", filename, prefix_BP, "wait=0"], 
                     check=True,
                     capture_output=True,
                     text=True
@@ -1160,7 +1160,12 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Acquisition type": Simulation_params["acq_type"],
             "Acquisition hyperparameter": Simulation_params["acq_hyperparam"],
             "Acquistion optimiser": Simulation_params["acq_opt"],
-            "Initial points": Simulation_params["n_init_points"] 
+            "Initial points": Simulation_params["n_init_points"],
+            "Loss_a config.": "LP01" if not simulation_val["all_modes"] else "LP01 + higher order modes",
+            "hyper_param_a": Simulation_params["hyp_param_a"],
+            "hyper_param_b": Simulation_params["hyp_param_b"],
+            "hyper_param_c_and_d": Simulation_params["hyp_param_c"],
+            "loss_constant_offset": Simulation_params["loss_offset"]
         }
 
         if "taper" not in param_names:
@@ -1172,7 +1177,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Loss_b": "Mean intensity of non MS modes in non MS cores",
             "Loss_c": "Mean intensity of non MS modes exciting LP01 in MS core",
             "Loss_d": "Mean intensity of MS mode in non MS cores",
-            "Loss": "-Loss_a - Loss_b + (Loss_c + Loss_d) + 2",
+            "Loss": f"-Loss_a - Loss_b + (Loss_c + Loss_d) + {Simulation_params['loss_offset']}",
             "Extra Mode Intensity in Loss_a": "Total number of amplitudes corresponding to higher order modes included in Loss_a",
             "Silica index": "Reference index of silica with which the index contrasts were calculated with.",
             f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should be constant, but when added will give a slightly different value for different wavelengths.",
@@ -1186,7 +1191,12 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Acquisition type": "Describe the acquisition function used to select new values to sample. EI = Expected Improvement",
             "Acquisition hyperparameter": "Set's the hyperparameter for the acquisition function",
             "Acquisition optimiser": "Algorithm used to optimise the selection of parameters to sample",
-            "Initial points": "Number of randomly drawn points before bayesian optimisation kicks in"
+            "Initial points": "Number of randomly drawn points before bayesian optimisation kicks in",
+            "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration",
+            "hyper_param_a": "Hyperparameter determining how much the loss term a is considered in the optimisation",
+            "hyper_param_b": "Hyperparameter determining how much the loss term b is considered in the optimisation",
+            "hyper_param_c_and_d": "Hyperparameter determining how much the loss terms c and d are considered in the optimisation",
+            "loss_constant_offset": "Constant value used to offset the loss value to keep it positive."
         }
 
         # now append the global and legend
@@ -1371,7 +1381,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
         if bestvals:
             # checking if femsim files exist. If they do, continue. If not, generate them
-            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p39956_t0_ex.m00"
+            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p35864_t0_ex.m00"
             if not fem_fields_present(femSIM_file_example):
                 simulation_val["Fem_present"] = False
                 print("No suitable FemSIM field profiles detected. Generating...")
@@ -1482,7 +1492,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             return all_results
         
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p39956_t0_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p28868_t0_ex.m00"
         # femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31592_t0_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
@@ -1499,8 +1509,9 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 simulation_val["grid_size"] = 2
                 simulation_val["grid_size_y"] = 2
             else:
-                simulation_val["grid_size"] = 0.37
-                simulation_val["grid_size_y"] = 0.37
+                # adopt established gridding defined in simulation_val
+                simulation_val["grid_size"] = 0.74
+                simulation_val["grid_size_y"] = 0.74
             # ask for 1 set of parameter vectors only to prevent daemonic process having children 
             param_batch = opt.ask(n_points=simulation_val["n_points"]) 
 
@@ -1651,7 +1662,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         run_params = [variable_params[k] for k in run_param_names]
 
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p39956_t0_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p28868_t0_ex.m00"
         # femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31592_t0_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
@@ -1745,7 +1756,15 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     "Number of Cores": simulation_val["core_num"],
                     "Example .ind File Used": str(ind_file),
                     "Loss_a config.": "LP01" if not simulation_val["all_modes"] else "LP01 + higher order modes",
-                    "Parameter vectors": simulation_val["n_points"]
+                    # "Acquisition type": Simulation_params["acq_type"],
+                    # "Acquisition hyperparameter": Simulation_params["acq_hyperparam"],
+                    # "Acquistion optimiser": Simulation_params["acq_opt"],
+                    # "Initial points": Simulation_params["n_init_points"],
+                    "Parameter vectors": simulation_val["n_points"],
+                    "hyper_param_a": Simulation_params["hyp_param_a"],
+                    "hyper_param_b": Simulation_params["hyp_param_b"],
+                    "hyper_param_c_and_d": Simulation_params["hyp_param_c"],
+                    "loss_constant_offset": Simulation_params["loss_offset"]
                 }
 
                 if "taper" not in param_names:
@@ -1757,7 +1776,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     "Loss_b": "Mean intensity of non MS modes in non MS cores",
                     "Loss_c": "Mean intensity of non MS modes exciting LP01 in MS core",
                     "Loss_d": "Mean intensity of MS mode in non MS cores",
-                    "Loss": "-Loss_a - Loss_b + (Loss_c + Loss_d) + 2",
+                    "Loss": f"-Loss_a - Loss_b + (Loss_c + Loss_d) + {Simulation_params['loss_offset']}",
                     "Extra Mode Intensity in Loss_a": "Total number of amplitudes corresponding to higher order modes included in Loss_a",
                     "Silica index": "Reference index of silica with which the index contrasts were calculated with.",
                     f"Delta n({simulation_val['free_space_wavelength'][0]} um)": "Refractive index scale factor relative to the index difference between the selected refractive index and the index of silica at a reference wavelength. This should be constant, but when added will give a slightly different value for different wavelengths.",
@@ -1765,7 +1784,11 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     "Simulation Health": "OK if the RSoft simulation completed; TIMEOUT if a guarded wait returned a dummy zero transfer vector.",
                     "Simulation Message": "Timeout details, including missing, small, or bad-header files when applicable.",
                     "Failed Simulation": "Name tags for the BPM and FemSIM files associated with the failed simulation.",
-                    "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration"
+                    "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration",
+                    "hyper_param_a": "Hyperparameter determining how much the loss term a is considered in the optimisation",
+                    "hyper_param_b": "Hyperparameter determining how much the loss term b is considered in the optimisation",
+                    "hyper_param_c_and_d": "Hyperparameter determining how much the loss terms c and d are considered in the optimisation",
+                    "loss_constant_offset": "Constant value used to offset the loss value to keep it positive."
                 }
 
                 # now append the global and legend
