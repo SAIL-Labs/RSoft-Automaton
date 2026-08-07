@@ -1164,7 +1164,8 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Loss_a config.": "LP01" if not simulation_val["all_modes"] else "LP01 + higher order modes",
             "hyper_param_a": Simulation_params["hyp_param_a"],
             "hyper_param_b": Simulation_params["hyp_param_b"],
-            "hyper_param_c_and_d": Simulation_params["hyp_param_c"],
+            "hyper_param_c": Simulation_params["hyp_param_c"],
+            "hyper_param_d": Simulation_params["hyp_param_d"],
             "loss_constant_offset": Simulation_params["loss_offset"]
         }
 
@@ -1195,7 +1196,8 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration",
             "hyper_param_a": "Hyperparameter determining how much the loss term a is considered in the optimisation",
             "hyper_param_b": "Hyperparameter determining how much the loss term b is considered in the optimisation",
-            "hyper_param_c_and_d": "Hyperparameter determining how much the loss terms c and d are considered in the optimisation",
+            "hyper_param_c": "Hyperparameter determining how much the loss term c is considered in the optimisation",
+            "hyper_param_d": "Hyperparameter determining how much the loss term d is considered in the optimisation",
             "loss_constant_offset": "Constant value used to offset the loss value to keep it positive."
         }
 
@@ -1787,7 +1789,8 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration",
                     "hyper_param_a": "Hyperparameter determining how much the loss term a is considered in the optimisation",
                     "hyper_param_b": "Hyperparameter determining how much the loss term b is considered in the optimisation",
-                    "hyper_param_c_and_d": "Hyperparameter determining how much the loss terms c and d are considered in the optimisation",
+                    "hyper_param_c": "Hyperparameter determining how much the loss term c is considered in the optimisation",
+                    "hyper_param_d": "Hyperparameter determining how much the loss term d is considered in the optimisation",
                     "loss_constant_offset": "Constant value used to offset the loss value to keep it positive."
                 }
 

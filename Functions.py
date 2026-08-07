@@ -1136,6 +1136,7 @@ def build_df_wave_log_for_candidate(
     hyp_param_a = simulation_val.get("hyp_param_a", Simulation_params["hyp_param_a"])
     hyp_param_b = simulation_val.get("hyp_param_b", Simulation_params["hyp_param_b"])
     hyp_param_c = simulation_val.get("hyp_param_c", Simulation_params["hyp_param_c"])
+    hyp_param_d = simulation_val.get("hyp_param_d", Simulation_params["hyp_param_d"])
 
     waves = np.asarray([item[2] for item in candidate_tf_list], dtype=float)
     unique_waves = np.unique(waves)
@@ -1209,6 +1210,7 @@ def build_df_wave_log_for_candidate(
             hyp_param_a,
             hyp_param_b,
             hyp_param_c,
+            hyp_param_d,
             core_to_monitor=core_to_monitor,
             modes_to_monitor=modes_to_monitor,
             simulation_val=simulation_val, 
@@ -1582,7 +1584,7 @@ def transfer_matrix_component(csv_path, row, port_mon = False):
         return row, throughput
 
             
-def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a, hyp_param_b, hyp_param_c,
+def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a, hyp_param_b, hyp_param_c, hyp_param_d,
                                     core_to_monitor, modes_to_monitor, simulation_val, run_tag):
     """
     Function that will sort through tf_list, extract the mode selective core values in ms/non-ms modes and return the loss function needed by scikit
@@ -1749,7 +1751,10 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a,
                 for row in extra_power_rows
             ], dtype=float)
 
-            total_ms_core_power_per_mode = main_power + extra_power_per_mode
+            if simulation_val["all_modes"]:
+                total_ms_core_power_per_mode = main_power + extra_power_per_mode
+            else:
+                total_ms_core_power_per_mode = main_power
             ms_core_other_mode = float(np.mean(total_ms_core_power_per_mode))
 
         # 4. Mean of non-MS cores in non-MS modes:
@@ -1762,7 +1767,7 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a,
                                                                     # This is what should be maximised and is equivelant to taking 
                                                                     # the average of each non-ms core in each individual non-ms mode
 
-        loss_func = -hyp_param_a*ms_core_mode -hyp_param_b*nonms_core_other_mode + hyp_param_c*(nonms_core_ms_mode + ms_core_other_mode) + Simulation_params["loss_offset"]
+        loss_func = -hyp_param_a*ms_core_mode -hyp_param_b*nonms_core_other_mode + (hyp_param_c*nonms_core_ms_mode + hyp_param_d*ms_core_other_mode) + Simulation_params["loss_offset"]
         array_of_results = np.array([ms_core_mode, #a
                             nonms_core_other_mode, #b
                             ms_core_other_mode, #c
