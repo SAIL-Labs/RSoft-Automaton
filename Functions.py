@@ -1752,7 +1752,7 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a,
             ], dtype=float)
 
             if simulation_val["all_modes"]:
-                total_ms_core_power_per_mode = main_power + extra_power_per_mode
+                total_ms_core_power_per_mode = main_power + extra_power_per_mode # change me!!!
             else:
                 total_ms_core_power_per_mode = main_power
             ms_core_other_mode = float(np.mean(total_ms_core_power_per_mode))
@@ -1767,7 +1767,7 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a,
                                                                     # This is what should be maximised and is equivelant to taking 
                                                                     # the average of each non-ms core in each individual non-ms mode
 
-        loss_func = -hyp_param_a*ms_core_mode -hyp_param_b*nonms_core_other_mode + (hyp_param_c*nonms_core_ms_mode + hyp_param_d*ms_core_other_mode) + Simulation_params["loss_offset"]
+        loss_func = -hyp_param_a*ms_core_mode -hyp_param_b*nonms_core_other_mode + (hyp_param_c*ms_core_other_mode + hyp_param_d*nonms_core_ms_mode) + Simulation_params["loss_offset"]
         array_of_results = np.array([ms_core_mode, #a
                             nonms_core_other_mode, #b
                             ms_core_other_mode, #c

@@ -1494,7 +1494,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             return all_results
         
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p28868_t0_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p30372_t0_ex.m00"
         # femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31592_t0_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
@@ -1664,7 +1664,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         run_params = [variable_params[k] for k in run_param_names]
 
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p28868_t0_ex.m00"
+        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p30372_t0_ex.m00"
         # femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31592_t0_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
