@@ -546,9 +546,24 @@ class RSoftSim:
         core_name = [f"core_{n}" for n in range(1, core_num + 1)]
         structure = Simulation_params["Structure"]
 
-        cladd_diam = fixed["MCFCladd"]
-        cladding_beg_dims = (cladd_diam / taper, cladd_diam / taper) 
-        cladding_end_dims = (cladd_diam , cladd_diam)
+        if "core_sep" in vars:
+            rings = ring_from_core_structure(core_num, self.core_positions, structure)
+            fixed["MCFCladd"] = rings * vars["core_sep"]
+            cladd_diam = fixed["MCFCladd"]
+
+            # calculate the taper ratio
+            if "MM_core_diam" not in fixed:
+                raise Exception("MM_core_diam is not defined as being fixed. Please specify 'MM_core_diam' in template.fixed_params")
+            else:
+                MM_core_diam = fixed["MM_core_diam"]
+
+            taper = cladd_diam / MM_core_diam
+            cladding_beg_dims = (cladd_diam / taper, cladd_diam / taper) 
+            cladding_end_dims = (cladd_diam , cladd_diam)
+        else:
+            cladd_diam = fixed["MCFCladd"]
+            cladding_beg_dims = (cladd_diam / taper, cladd_diam / taper) 
+            cladding_end_dims = (cladd_diam , cladd_diam)
 
         bp_core_to_monitor = Simulation_params["core_to_monitor"]
         fs_core_positions = self.cladd_positions if simulation_val["skip_core"] is not None and self.cladd_positions is not None else self.core_positions

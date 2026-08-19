@@ -3638,3 +3638,27 @@ def force_file_to_disk(path):
     with open(path, "a") as f:
         f.flush()
         os.fsync(f.fileno())
+
+def ring_from_core_structure(core_num, core_positions, structure):
+    """
+    Code that interrogates the PL structure and returns the number of rings needed to organise the requested core number and structure.
+
+    Arguments:
+        - core_num: how many cores requested in the model,
+        - core_positions: generated posisiton for the cores,
+        - structure: string deciding on either "Hex", "Pent" etc. Right now only "Hex" is implimented.
+    
+    Returns:
+        - rings: integer number describing the number of rings in the model    
+    """
+
+    if structure == "Hex":
+        x_axis_vals = []
+        for x, y in core_positions:
+            # count the number of core positions along the x-axis excluding the origin
+            if y == float(0) and x != float(0):
+                x_axis_vals.append((x, y))
+        x_axis_vals = np.array(x_axis_vals)
+        # due to symmetry the number of rings can be inferred from only half the number of positions recorded
+        rings = len(x_axis_vals) / 2
+        return rings
