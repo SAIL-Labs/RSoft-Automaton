@@ -15,6 +15,8 @@ from rstools import RSoftUserFunction, RSoftCircuit # type:ignore
 class RSoftSim:
     def __init__(self):
         self.sym = {}
+        self.core_positions = []
+        self.cladd_positions = None
         self.last_sim_health = {"status": "OK", "message": "", "simulation": ""}
 
     def dummy_tf_result(self, simulation_val):
@@ -47,7 +49,14 @@ class RSoftSim:
 
     def generate_core_positions(self):
         SimParam = Simulation_params
-        core_sep = fixed_params["core_sep"]
+        core_sep = variable_params.get("core_sep", fixed_params.get("core_sep"))
+        if core_sep is None:
+            raise KeyError(
+                "core_sep is missing from both template.variable_params and "
+                "template.fixed_params."
+            )
+        if not np.isfinite(core_sep) or core_sep <= 0:
+            raise ValueError(f"core_sep must be a finite value greater than zero microns; got {core_sep!r}.")
         grid_type = SimParam["grid_type"]
         core_num = SimParam["core_num"]
         if grid_type == "Hex":
@@ -55,7 +64,7 @@ class RSoftSim:
             Generate hexagonal core coordinates and store internally.
             """
             row_num, excess = number_rows(core_num)
-            hcoord, vcoord = old_generate_hex_grid(row_num, fixed_params["core_sep"], include_centre = Simulation_params["plot_centre_core"])
+            hcoord, vcoord = old_generate_hex_grid(row_num, core_sep, include_centre = Simulation_params["plot_centre_core"])
             
             if Simulation_params["plot_centre_core"]:
                 if 19 < core_num <= 37:
@@ -103,7 +112,7 @@ class RSoftSim:
             Generate pentagon core coordinates and store internally.
             """
             row_num, excess = number_rows(core_num, grid_type="pent")
-            hcoord, vcoord= generate_pent_grid(row_num, grid_spacing=fixed_params["core_sep"], include_centre=Simulation_params["plot_centre_core"])
+            hcoord, vcoord= generate_pent_grid(row_num, grid_spacing=core_sep, include_centre=Simulation_params["plot_centre_core"])
             if Simulation_params["plot_centre_core"]:
                 if core_num <= 6:
                     reorder_index_pent = [0, 5, 1, 2, 3, 4]
@@ -150,7 +159,7 @@ class RSoftSim:
                 json.dump(self.core_positions, g)
         
         if grid_type == "Triangle":
-            hcoord, vcoord = generate_triangular_grid(fixed_params["core_sep"])
+            hcoord, vcoord = generate_triangular_grid(core_sep)
             self.core_positions = list(zip(hcoord, vcoord))
             self.cladd_positions = None
 
@@ -476,6 +485,19 @@ class RSoftSim:
                     time.sleep(0.2)
             else:
                 raise RuntimeError("Failed to load prior_space.json after retries.")
+
+        if len(params) != len(param_range):
+            raise ValueError(
+                f"Received {len(params)} parameter values for {len(param_range)} optimiser parameters."
+            )
+        candidate_param_dict = dict(zip(param_range.keys(), params))
+        if "core_sep" in candidate_param_dict:
+            candidate_core_sep = candidate_param_dict["core_sep"]
+            if not np.isfinite(candidate_core_sep) or candidate_core_sep <= 0:
+                raise ValueError(
+                    "core_sep must be a finite value greater than zero microns; "
+                    f"got {candidate_core_sep!r}."
+                )
             
         if Simulation_params["industry_neff_values"] == True:
             neff_val = read_neff_values(Simulation_params["industry_neff_file"])
@@ -491,6 +513,10 @@ class RSoftSim:
         
         # update template file with chosen values from scikit.Optimize()
         variable_params.update(param_dict)
+
+        # Core coordinates depend on the current candidate when core_sep is varied.
+        # Regenerating here also keeps direct build_circuit() callers consistent.
+        self.generate_core_positions()
 
         # need two circuits:
         #   1) BPM: to run the BPM simulations - special core location is set by siulation_val
@@ -528,6 +554,22 @@ class RSoftSim:
         launch = Launch_params
 
         fixed_length = False
+        if "core_sep" in vars:
+            if "Taper_L" in vars:
+                raise ValueError(
+                    "core_sep and Taper_L cannot both be variable parameters. "
+                    "When core_sep is varied, move Taper_L to template.fixed_params."
+                )
+            if "Taper_L" not in fixed:
+                raise ValueError(
+                    "When core_sep is varied, Taper_L must be defined in template.fixed_params."
+                )
+            if "taper" in vars:
+                raise ValueError(
+                    "core_sep and taper cannot both be variable parameters because taper is derived "
+                    "from MCFCladd / MM_core_diam when core_sep is varied."
+                )
+
         if "Taper_L" not in fixed and "Taper_L" not in vars:
             raise Exception("Taper Length defined as neither being fixed nor variable. " \
             "Please specify 'Taper_L' in template.fixed_params or template.variable_params.")
@@ -538,29 +580,56 @@ class RSoftSim:
         else:
             Taper_L = vars["Taper_L"]
         
-        if "taper" in fixed:
-            taper = fixed["taper"]
-        else:
-            taper = param_dict.get("taper", vars["taper"])
         core_num = sim_param["core_num"]
         core_name = [f"core_{n}" for n in range(1, core_num + 1)]
         structure = Simulation_params["Structure"]
 
         if "core_sep" in vars:
-            rings = ring_from_core_structure(core_num, self.core_positions, structure)
-            fixed["MCFCladd"] = rings * vars["core_sep"]
-            cladd_diam = fixed["MCFCladd"]
+            core_sep = param_dict.get("core_sep", vars["core_sep"])
+            if not np.isfinite(core_sep) or core_sep <= 0:
+                raise ValueError(
+                    f"core_sep must be a finite value greater than zero microns; got {core_sep!r}."
+                )
+
+            ring_positions = self.cladd_positions if self.cladd_positions is not None else self.core_positions
+            rings = ring_from_core_structure(core_num, ring_positions, sim_param["grid_type"])
+            cladd_diam = rings * core_sep
+            if not np.isfinite(cladd_diam) or cladd_diam <= 0:
+                raise ValueError(
+                    "The calculated MCFCladd must be finite and greater than zero; "
+                    f"got {cladd_diam!r} from {rings!r} rings and core_sep={core_sep!r}."
+                )
 
             # calculate the taper ratio
             if "MM_core_diam" not in fixed:
-                raise Exception("MM_core_diam is not defined as being fixed. Please specify 'MM_core_diam' in template.fixed_params")
-            else:
-                MM_core_diam = fixed["MM_core_diam"]
+                raise KeyError(
+                    "MM_core_diam must be defined in template.fixed_params when core_sep is varied."
+                )
+            MM_core_diam = fixed["MM_core_diam"]
+            if not np.isfinite(MM_core_diam) or MM_core_diam <= 0:
+                raise ValueError(
+                    "MM_core_diam must be a finite value greater than zero microns when core_sep "
+                    f"is varied; got {MM_core_diam!r}."
+                )
 
             taper = cladd_diam / MM_core_diam
+            if not np.isfinite(taper) or taper <= 0:
+                raise ValueError(
+                    f"The calculated taper ratio must be finite and greater than zero; got {taper!r}."
+                )
+
+            # Keep existing downstream consumers of fixed_params working with the
+            # candidate geometry. Each optimisation worker owns its own process.
+            fixed["core_sep"] = core_sep
+            fixed["MCFCladd"] = cladd_diam
+            fixed["taper"] = taper
             cladding_beg_dims = (cladd_diam / taper, cladd_diam / taper) 
             cladding_end_dims = (cladd_diam , cladd_diam)
         else:
+            if "taper" in fixed:
+                taper = fixed["taper"]
+            else:
+                taper = param_dict.get("taper", vars["taper"])
             cladd_diam = fixed["MCFCladd"]
             cladding_beg_dims = (cladd_diam / taper, cladd_diam / taper) 
             cladding_end_dims = (cladd_diam , cladd_diam)
@@ -678,14 +747,12 @@ class RSoftSim:
         # write in the values within simulation_val
         overwrite_template_val(json_config)
         
-        # generate the positions of the cores. 
-        self.generate_core_positions()
-
         # remove old results
         if os.path.exists(csv_path):
             os.remove(csv_path)
 
         if simulate:
+            self.generate_core_positions()
             self.MultProc(build_tf, json_config, csv_path, simulation_val, prior_space_pid) 
             return  
 
@@ -834,7 +901,9 @@ def multiple_mode_tf(arg_list):
         core_to_monitor = sim_val["core_to_monitor"]
 
         # dynamically load parameters to vary
-        param_names = list(variable_params.keys())
+        param_names = list(custom_priors.keys()) # should be the same as variable_params in template.py
+        if param_names != list(variable_params.keys()):
+            raise Exception(f"Listed variable parameters initialised in custom_priors do not match the variable_params for the MS Core. Got: {param_names} instead of {list(variable_params.keys())}.")
 
         # Assign the new params directly to the special core
         for pname, pval in zip(param_names, param):
@@ -918,11 +987,9 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
     stored_data = pd.read_csv(r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv")
 
     # simulation_val["reference_silica_index"] = Silica_refractive_index_at_reference_wavelength
-    if "core_neff" in variable_params:
-        # get index of core_neff in variable_params
-        for i, key in enumerate(variable_params):
-            if key == "core_neff":
-                core_neff_idx = i
+    param_names = list(custom_priors.keys())
+    if "core_neff" in param_names:
+        core_neff_idx = param_names.index("core_neff")
 
         # Keep the MS core offset relative to the configured cladding at the
         # Sellmeier reference wavelength, then add it to each wavelength's
@@ -964,7 +1031,11 @@ def run_tf_multproc(params, iteration_num, simulation_val, custom_priors,  taper
         capillary_refractive_index_at_wavelength = wave_indices["capillary_neff"]
 
         numerical_apeture = ofiber.numerical_aperture(cladding_refractive_index_at_wavelength, capillary_refractive_index_at_wavelength)
-        v_number = ofiber.V_parameter((fixed_params["MCFCladd"]/fixed_params["taper"])/2, numerical_apeture, w)
+        if "core_sep" in variable_params:
+            multimode_diam = fixed_params["MM_core_diam"]
+        else:
+            multimode_diam = fixed_params["MCFCladd"] / fixed_params["taper"]
+        v_number = ofiber.V_parameter(multimode_diam / 2, numerical_apeture, w)
 
         # calculate and print out the propagation constants
         for ell in range(Simulation_params["max_ell"]+1):
@@ -1123,7 +1194,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
         results_path = Path(res_folder)
         wavelength_results_folder = Path(outdir)
         
-        param_names = list(variable_params.keys())
+        param_names = list(custom_priors.keys())
         chosen_wavelength = simulation_val["free_space_wavelength"][0]
         param_tag = "_".join(
             f"{pname}_{float(candidate_params[i]):.6f}"
@@ -1146,7 +1217,8 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             candidate_idx=cand_idx,
             iteration_num=iteration_num,
             simulation_val=simulation_val,
-            res_folder=res_folder
+            res_folder=res_folder,
+            param_names=param_names
         )
 
         out_csv = os.path.join(
@@ -1157,12 +1229,22 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
 
         # Globally fixed parameters
         core_pos = core_pos_geo(simulation_val)
+        candidate_param_values = dict(zip(param_names, candidate_params))
+        if "core_sep" in candidate_param_values:
+            result_core_sep = candidate_param_values["core_sep"]
+            result_rings = ring_from_core_structure(
+                simulation_val["core_num"], None, simulation_val["grid_type"]
+            )
+            result_mcf_cladd = result_rings * result_core_sep
+            result_taper = result_mcf_cladd / fixed_params["MM_core_diam"]
+        else:
+            result_core_sep = fixed_params["core_sep"]
+            result_mcf_cladd = fixed_params["MCFCladd"]
+            result_taper = fixed_params["taper"]
 
         glob_fix_param = {
             "Time CSV Created": datetime.datetime.now(),
             "Non-MS Core Diameter ($\mu m$)": core_params[f"core_{(simulation_val['core_to_monitor'] + 1)%simulation_val['core_num']}"]["core_diam"],
-            "Cladding Diameter ($\mu m$)": fixed_params["MCFCladd"],
-            "Core Separation ($\mu m$)": fixed_params["core_sep"],
             "MS Core Position": core_pos[simulation_val['core_to_monitor']-1],
             "MS Mode": LP_mode_dict_rot[0], # Need to somehow make this dynamic, only selects LP01 atm
             "Core Configuration": simulation_val['grid_type'],
@@ -1184,8 +1266,11 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "loss_constant_offset": Simulation_params["loss_offset"]
         }
 
+        if "core_sep" not in param_names:
+            glob_fix_param["Cladding Diameter ($\mu m$)"] = result_mcf_cladd
+            glob_fix_param["Core Separation ($\mu m$)"] = result_core_sep
         if "taper" not in param_names:
-            glob_fix_param["Taper"] = fixed_params["taper"]
+            glob_fix_param["Taper"] = result_taper
 
         ## Legend
         leg = {
@@ -1201,6 +1286,9 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Simulation Health": "OK if the RSoft simulation completed; TIMEOUT if a guarded wait returned a dummy zero transfer vector.",
             "Simulation Message": "Timeout details, including missing, small, or bad-header files when applicable.",
             "Failed Simulation": "Name tags for the BPM and FemSIM files associated with the failed simulation.",
+            "Core Separation": "Varied core-to-core separation in microns.",
+            "Cladding Diameter": "Single-mode/multicore-end cladding diameter in microns, derived from core_sep.",
+            "Taper": "Derived from Cladding Diameter / MM_core_diam ratio when Core Separation is varied, else is fixed.",
             "Pre-tapered": "Inidication if the MS core is pre-tapered to a different spec before being inserted and tapered with the rest of the cores.",
             "Pre-taper factor": "Factor by which the MS core is pre-tapered by.",
             "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration",
@@ -1265,6 +1353,56 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             time.sleep(0.2)
     else:
         raise RuntimeError(f"Failed to load {prior_space_pid} after retries.")
+
+    prior_names = list(param_range.keys())
+    variable_names = list(variable_params.keys())
+    if set(prior_names) != set(variable_names):
+        raise ValueError(
+            "The optimiser prior names must match template.variable_params. "
+            f"Priors: {prior_names}; variable parameters: {variable_names}."
+        )
+
+    if "core_sep" in prior_names:
+        if "Taper_L" in variable_params:
+            raise ValueError(
+                "core_sep and Taper_L cannot both be optimised. Move Taper_L to "
+                "template.fixed_params when core_sep is varied."
+            )
+        if "Taper_L" not in fixed_params:
+            raise ValueError(
+                "When core_sep is varied, Taper_L must be defined in template.fixed_params."
+            )
+        if "taper" in variable_params:
+            raise ValueError(
+                "core_sep and taper cannot both be optimised because taper is derived from "
+                "MCFCladd / MM_core_diam."
+            )
+        if "MM_core_diam" not in fixed_params:
+            raise KeyError(
+                "MM_core_diam must be defined in template.fixed_params when core_sep is varied."
+            )
+        mm_core_diam = fixed_params["MM_core_diam"]
+        if not np.isfinite(mm_core_diam) or mm_core_diam <= 0:
+            raise ValueError(
+                "MM_core_diam must be a finite value greater than zero microns when core_sep "
+                f"is varied; got {mm_core_diam!r}."
+            )
+        if simulation_val["grid_type"] != "Hex":
+            raise ValueError(
+                "Variable core_sep currently supports only the Hex grid type; "
+                f"got {simulation_val['grid_type']!r}."
+            )
+        core_sep_low, core_sep_high = param_range["core_sep"]
+        if (
+            not np.isfinite(core_sep_low)
+            or not np.isfinite(core_sep_high)
+            or core_sep_low <= 0
+            or core_sep_high <= 0
+        ):
+            raise ValueError(
+                "The core_sep optimiser bounds must be finite and greater than zero microns; "
+                f"got {param_range['core_sep']!r}."
+            )
     
     # read in prior space to inform optimiser of the dimensions
     if simulation_val["industry_neff_values"] == True:
@@ -1276,10 +1414,33 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             else:
                 para_space.append(Real(low, high, name=prior_name))
     elif bestvals:
+        bestval_names = list(bestvals.keys())
+        if bestval_names != list(bestval_limits.keys()):
+            raise ValueError("bestvals and bestval_limits must contain parameters in the same order.")
         mean_vals = np.array(list(bestvals.values()), dtype=float)
         mean_limits = np.array(list(bestval_limits.values()), dtype=float)
-        sigmas = np.array([2.0, 1.0, 3000.0])
-        scales = np.array([1.0, 1.0, 10000.0])
+        sigma_defaults = {
+            "core_diam": 2.0,
+            "core_neff": 1.0,
+            "Taper_L": 3000.0,
+            "core_sep": 10.0,
+            "taper": 1.0,
+        }
+        scale_defaults = {
+            "core_diam": 1.0,
+            "core_neff": 1.0,
+            "Taper_L": 10000.0,
+            "core_sep": 100.0,
+            "taper": 1.0,
+        }
+        sigmas = np.array([
+            sigma_defaults.get(name, max((bounds[1] - bounds[0]) / 6, np.finfo(float).eps))
+            for name, bounds in zip(bestval_names, mean_limits)
+        ])
+        scales = np.array([
+            scale_defaults.get(name, max(abs(value), 1.0))
+            for name, value in zip(bestval_names, mean_vals)
+        ])
         _, accepted = monte_carlo_rej(mean_vals, mean_limits, scales, sigmas, simulation_val["num_paras"])
         para_space = accepted.T # shape(len(simulation_val["num_paras"]), len(bestvals.keys()))
         print(f"Sampling of {para_space.shape[0]} parameters, begin.")
@@ -1368,6 +1529,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
         print(f"Replayed {replayed_results} previous optimisation results into fresh optimiser.")
     else:
+        # start fresh optimisation
         opt = Optimizer(
             dimensions=para_space, # Parameter search space (bounds + types)
             base_estimator="GP", # Surrogate model (Gaussian Process)
@@ -1398,7 +1560,10 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
         if bestvals:
             # checking if femsim files exist. If they do, continue. If not, generate them
-            femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p35864_t0_ex.m00"
+            femsim_param_string = "_".join(
+                f"{name}_{float(variable_params[name]):.6f}" for name in custom_priors
+            )
+            femSIM_file_example = f"FemSim_File_DET_*_{femsim_param_string}_*_ex.m00"
             if not fem_fields_present(femSIM_file_example):
                 simulation_val["Fem_present"] = False
                 print("No suitable FemSIM field profiles detected. Generating...")
@@ -1508,9 +1673,11 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 # dump(opt, opt_checkpoint_path, store_objective=False)
             return all_results
         
-        # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p30372_t0_ex.m00"
-        # femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31592_t0_ex.m00"
+        # checking if femsim files exist. If they do, continue. If not, generate them
+        femsim_param_string = "_".join(
+            f"{name}_{float(variable_params[name]):.6f}" for name in custom_priors
+        )
+        femSIM_file_example = f"FemSim_File_DET_*_{femsim_param_string}_*_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
             ref_param_names = ["core_diam", "core_neff"]
@@ -1523,12 +1690,12 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         for batch_idx in range(completed_batches, total_calls//simulation_val["n_points"]):
             # adaptable gridding to hasten simulations slightly after Bayesian optimisation kicks in
             if batch_idx < 2*int(Simulation_params["n_init_points"]) and not simulation_val["use_previous_results"]:
-                simulation_val["grid_size"] = 2
-                simulation_val["grid_size_y"] = 2
+                simulation_val["grid_size"] = 0.37
+                simulation_val["grid_size_y"] = 0.37
             else:
                 # adopt established gridding defined in simulation_val
-                simulation_val["grid_size"] = 0.74
-                simulation_val["grid_size_y"] = 0.74
+                simulation_val["grid_size"] = 0.37
+                simulation_val["grid_size_y"] = 0.37
             # ask for 1 set of parameter vectors only to prevent daemonic process having children 
             param_batch = opt.ask(n_points=simulation_val["n_points"]) 
 
@@ -1675,12 +1842,14 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
     
     # if false, run tf code for the template parameters
     else:
-        run_param_names = variable_params.keys() #["core_diam", "core_neff"]
+        run_param_names = custom_priors.keys() #["core_diam", "core_neff"]
         run_params = [variable_params[k] for k in run_param_names]
 
         # checking if femsim files exist. If they do, continue. If not, generate the,
-        femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p30372_t0_ex.m00"
-        # femSIM_file_example = "FemSim_File_DET_1.5_LP01_core_diam_8.300000_core_neff_1.449200_Taper_L_50000.000000_i1_c0_p31592_t0_ex.m00"
+        femsim_param_string = "_".join(
+            f"{name}_{float(variable_params[name]):.6f}" for name in custom_priors
+        )
+        femSIM_file_example = f"FemSim_File_DET_*_{femsim_param_string}_*_ex.m00"
         if not fem_fields_present(femSIM_file_example):
             print("No suitable FemSIM field profiles detected. Generating...")
             ref_param_names = ["core_diam", "core_neff"]
@@ -1727,7 +1896,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 results_path = Path(res_folder)
                 wavelength_results_folder = Path(outdir)
                 
-                param_names = list(variable_params.keys())
+                param_names = list(custom_priors.keys())
                 chosen_wavelength = simulation_val["free_space_wavelength"][0]
                 param_tag = "_".join(
                     f"{pname}_{float(candidate_params[i]):.6f}"
@@ -1750,7 +1919,8 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     candidate_idx=cand_idx,
                     iteration_num=0,
                     simulation_val=simulation_val,
-                    res_folder=res_folder
+                    res_folder=res_folder,
+                    param_names=param_names
                 )
 
                 out_csv = os.path.join(
@@ -1761,12 +1931,24 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
                 # Globally fixed parameters
                 core_pos = core_pos_geo(simulation_val)
+                candidate_param_values = dict(zip(param_names, candidate_params))
+                if "core_sep" in candidate_param_values:
+                    result_core_sep = candidate_param_values["core_sep"]
+                    result_rings = ring_from_core_structure(
+                        simulation_val["core_num"], None, simulation_val["grid_type"]
+                    )
+                    result_mcf_cladd = result_rings * result_core_sep
+                    result_taper = result_mcf_cladd / fixed_params["MM_core_diam"]
+                else:
+                    result_core_sep = fixed_params["core_sep"]
+                    result_mcf_cladd = fixed_params["MCFCladd"]
+                    result_taper = fixed_params["taper"]
 
                 glob_fix_param = {
                     "Time CSV Created": datetime.datetime.now(),
                     "Non-MS Core Diameter ($\mu m$)": core_params[f"core_{(simulation_val['core_to_monitor'] + 1)%simulation_val['core_num']}"]["core_diam"],
-                    "Cladding Diameter ($\mu m$)": fixed_params["MCFCladd"],
-                    "Core Separation ($\mu m$)": fixed_params["core_sep"],
+                    "Cladding Diameter ($\mu m$)": result_mcf_cladd,
+                    "Core Separation ($\mu m$)": result_core_sep,
                     "MS Core Position": core_pos[simulation_val['core_to_monitor']-1],
                     "MS Mode": LP_mode_dict_rot[0], # Need to somehow make this dynamic, only selects LP01 atm
                     "Core Configuration": simulation_val['grid_type'],
@@ -1785,7 +1967,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 }
 
                 if "taper" not in param_names:
-                    glob_fix_param["Taper"] = fixed_params["taper"]
+                    glob_fix_param["Taper"] = result_taper
 
                 ## Legend
                 leg = {
@@ -1801,6 +1983,9 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     "Simulation Health": "OK if the RSoft simulation completed; TIMEOUT if a guarded wait returned a dummy zero transfer vector.",
                     "Simulation Message": "Timeout details, including missing, small, or bad-header files when applicable.",
                     "Failed Simulation": "Name tags for the BPM and FemSIM files associated with the failed simulation.",
+                    "core_sep": "Varied core-to-core separation in microns.",
+                    "MCFCladd": "Single-mode/multicore-end cladding diameter in microns, derived from core_sep.",
+                    "taper": "Derived MCFCladd / MM_core_diam ratio when core_sep is varied.",
                     "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration",
                     "hyper_param_a": "Hyperparameter determining how much the loss term a is considered in the optimisation",
                     "hyper_param_b": "Hyperparameter determining how much the loss term b is considered in the optimisation",

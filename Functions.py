@@ -880,8 +880,12 @@ end launch_field
                 output_lines.append(line)
                 # Insert boundary_* after boundary_gap_z = 0
                 if stripped == "boundary_gap_z = 0":
-                    if RSoft_params['femsim_boundary_gap_x'] >= fixed_params["core_sep"]//2:
-                        raise RuntimeError(rf"Femsim boundary of {RSoft_params['femsim_boundary_gap_x']} $\mu m$ is greater than or equal to half the inner core separation of {fixed_params['core_sep']//2} $\mu m$. Mode overlap is possible.")
+                    effective_core_sep = param_dict.get("core_sep", fixed_params.get("core_sep"))
+                    if effective_core_sep is None:
+                        raise KeyError("core_sep is required to validate the FemSIM boundary size.")
+                    half_core_sep = effective_core_sep / 2
+                    if RSoft_params['femsim_boundary_gap_x'] >= half_core_sep:
+                        raise RuntimeError(rf"Femsim boundary of {RSoft_params['femsim_boundary_gap_x']} $\mu m$ is greater than or equal to half the inner core separation of {half_core_sep} $\mu m$. Mode overlap is possible.")
                     output_lines.extend([
                         f"boundary_max = {RSoft_params['femsim_boundary_gap_x']}\n",
                         f"boundary_max_y = {RSoft_params['femsim_boundary_gap_y']}\n",
@@ -1128,7 +1132,8 @@ def build_df_wave_log_for_candidate(
     candidate_idx,
     iteration_num,
     simulation_val,
-    res_folder
+    res_folder,
+    param_names=None
 ):
     core_to_monitor = simulation_val["core_to_monitor"] - 1
     modes_to_monitor = ["LP01"]
@@ -1147,8 +1152,22 @@ def build_df_wave_log_for_candidate(
         r"C:\Users\RSoft Things\OneDrive - The University of Sydney (Students)\Apps\VSCode\Sellmeier_Considerations\Sellmeier_vals.csv"
     )
 
-    k_arr = np.array(list(variable_params.keys()))
+    if param_names is None:
+        param_names = list(variable_params.keys())
+    k_arr = np.array(param_names)
     candidate_params = np.asarray(candidate_params, dtype=float)
+    candidate_geometry = {}
+    if "core_sep" in k_arr:
+        core_sep_idx = np.where(k_arr == "core_sep")[0][0]
+        candidate_core_sep = float(candidate_params[core_sep_idx])
+        rings = ring_from_core_structure(
+            simulation_val["core_num"], None, simulation_val["grid_type"]
+        )
+        candidate_mcf_cladd = rings * candidate_core_sep
+        candidate_geometry = {
+            r"Cladding diameter ($\mu m$)": candidate_mcf_cladd,
+            "taper": candidate_mcf_cladd / fixed_params["MM_core_diam"],
+        }
 
     def material_indices_for_wave(w):
         if simulation_val["sellmeier"]:
@@ -1268,6 +1287,7 @@ def build_df_wave_log_for_candidate(
             # write varied parameters once per row
             for p_idx, pname in enumerate(k_arr):
                 row[pname] = float(candidate_params[p_idx])
+            row.update(candidate_geometry)
 
             if "core_neff" in k_arr:
                 core_neff_idx = np.where(k_arr == "core_neff")[0][0]
@@ -1358,6 +1378,8 @@ def plotting_optimizer_results(df, param_names, tf = None, plot = True, csv_path
             elif param_name == "taper":
                 ax.set_xlabel(param_name + " ratio (MCF Diam/ MMF Diam)", fontsize = 12)
             elif param_name == "Taper_L":
+                ax.set_xlabel(param_name + r" ($\mu$m)", fontsize = 12)
+            elif param_name == "core_sep":
                 ax.set_xlabel(param_name + r" ($\mu$m)", fontsize = 12)
             else:
                 ax.set_xlabel(param_name, fontsize=12)
@@ -2147,6 +2169,7 @@ def plot_pl_results(
     simulation_val: dict,
     iteration_num: int,
     params,
+    param_names=None,
     gridding: bool,
     # gridding inputs
     tf_list=None,
@@ -2300,7 +2323,14 @@ def plot_pl_results(
         # max_value = print_max_amp_or_phase_value(amp)
 
         tf_figure = plt.figure(figsize=(20, 12))
-        param_str = ", ".join(f"{p:.3f}" for p in params)
+        if param_names is None:
+            param_names = list(variable_params.keys())
+        if len(param_names) == len(params):
+            param_str = ", ".join(
+                f"{name}={value:.3f}" for name, value in zip(param_names, params)
+            )
+        else:
+            param_str = ", ".join(f"{p:.3f}" for p in params)
         tf_figure.suptitle(
             f"Iteration {iteration_num} @ λ={w:.4g} μm\nParameters: [{param_str}]",
             y=0.7, x=0.24
@@ -2316,8 +2346,18 @@ def plot_pl_results(
         plt.setp(ax2.get_yticklabels(), visible=False)
 
         # plot core skeleton to highlight the special core
+        plot_core_sep = (
+            float(group["core_sep"].iloc[0])
+            if "core_sep" in group.columns
+            else fixed_params["core_sep"]
+        )
+        plot_mcf_cladd = (
+            float(group["MCFCladd"].iloc[0])
+            if "MCFCladd" in group.columns
+            else fixed_params["MCFCladd"]
+        )
         if simulation_val["grid_type"] == "Pent":
-            x, y = old_generate_pentagon_grid(fixed_params["MCFCladd"] / 2, fixed_params["core_sep"], simulation_val["core_num"])
+            x, y = old_generate_pentagon_grid(plot_mcf_cladd / 2, plot_core_sep, simulation_val["core_num"])
             ax0.scatter(x,y)
             ax0.scatter(x[simulation_val["core_to_monitor"] - 1], y[simulation_val["core_to_monitor"] - 1], color="r", label = "H-Core")
             ax0.set_xlabel(r"x ($\mu m$)")
@@ -2327,7 +2367,7 @@ def plot_pl_results(
             
         elif simulation_val["grid_type"] == "Hex":
             row_num, excess = number_rows(simulation_val["core_num"])
-            hcoord, vcoord = old_generate_hex_grid(row_num, fixed_params["core_sep"], include_centre = simulation_val["plot_centre_core"])
+            hcoord, vcoord = old_generate_hex_grid(row_num, plot_core_sep, include_centre = simulation_val["plot_centre_core"])
             
             if simulation_val["plot_centre_core"]:
                 if 19 < simulation_val["core_num"] <= 37:
@@ -3240,10 +3280,16 @@ def coarse_sampler(best_vals, density = 4):
     for y in best_vals:
         if y == "core_diam":
             half_widths.append(best_vals[y] * 0.1)
-        if y == "core_neff":
+        elif y == "core_neff":
             half_widths.append(best_vals[y] * 0.001)
-        if y == "Taper_L":
+        elif y == "Taper_L":
             half_widths.append(best_vals[y] * 0.01)
+        elif y == "core_sep":
+            half_widths.append(best_vals[y] * 0.1)
+        elif y == "taper":
+            half_widths.append(best_vals[y] * 0.1)
+        else:
+            raise ValueError(f"No coarse sampling window is configured for parameter {y!r}.")
 
     # search window
     half_widths = np.array(half_widths)
@@ -3419,10 +3465,15 @@ def plot_param_progression(tf_list, simulation_val, param_label_vector):
     save results for plotting/analysis
     '''
     # Unpack results
-    param_label_1, param_label_2, param_label_3 = param_label_vector 
     x_iters = [r["params"] for r in tf_list]  # parameter sets
     y_vals = [r["result"] for r in tf_list]  # throughput values
     metric = [r["Loss Metric"] for r in tf_list] # array containing the loss metrics
+    param_values = np.asarray(x_iters, dtype=float)
+    param_labels = list(param_label_vector)
+    if param_values.ndim != 2 or param_values.shape[1] != len(param_labels):
+        raise ValueError(
+            "param_label_vector must contain one label for every value in each parameter vector."
+        )
 
     simulated_wavelength = np.array([arr[:,0] for arr in metric])
     unique_waves = np.unique(simulated_wavelength)
@@ -3433,10 +3484,6 @@ def plot_param_progression(tf_list, simulation_val, param_label_vector):
 
     batch_numbers = [r['Iteration'] for r in tf_list]
 
-    # core_neff = [params[0] for params in x_iters]
-    core_diam = [params[0] for params in x_iters]
-    core_neff = [params[1] for params in x_iters]
-    taper_length = [params[2] for params in x_iters]
     throughput = [y for y in y_vals]  
     hyp_param_b = simulation_val.get("hyp_param_b", Simulation_params["hyp_param_b"])
     hyp_param_c = simulation_val.get("hyp_param_c", Simulation_params["hyp_param_c"])
@@ -3466,38 +3513,24 @@ def plot_param_progression(tf_list, simulation_val, param_label_vector):
     fig_metric.show()
     fig_metric.savefig(f"Bayesian Opt Results\{simulation_val['num_paras']}_params_gridsize_{simulation_val['grid_size']}bayesianmetric_hyperparam{hyp_param_b}_{hyp_param_c}.png")
 
-    # make 3d scatter plot and individual parameter plots
-    fig = plt.figure(figsize=(14, 8))
-    gs = gridspec.GridSpec(3, 2, width_ratios=[1, 2])  # 3 rows, 2 columns
+    # Plot every varied parameter without assuming a fixed vector length or order.
+    fig, axes = plt.subplots(
+        len(param_labels), 1,
+        figsize=(9, max(4, 3 * len(param_labels))),
+        squeeze=False,
+    )
     plt.suptitle(f"Bayesian Optimiser Results for {simulation_val['num_paras']} parameter sets \n with hyperparams {hyp_param_b} and {hyp_param_c}.png")
-    # Core neff vs Core diameter
-    ax1 = fig.add_subplot(gs[0, 0])
-    comp1 = ax1.scatter(core_diam, core_neff, c=throughput, cmap='viridis_r', s=80, edgecolor='k')
-    ax1.set_xlabel(param_label_1)
-    ax1.set_ylabel(param_label_2)
+    for index, (label, ax) in enumerate(zip(param_labels, axes[:, 0])):
+        scatter = ax.scatter(
+            param_values[:, index], throughput,
+            c=throughput, cmap='viridis_r', s=80, edgecolor='k'
+        )
+        ax.set_xlabel(label)
+        ax.set_ylabel("Loss Function")
+        ax.grid(True, linestyle='--', alpha=0.5)
+    fig.colorbar(scatter, ax=axes[:, 0].tolist(), label="Loss Function")
 
-    # Taper ratio vs Core diameter
-    ax2 = fig.add_subplot(gs[1, 0])
-    comp2 = ax2.scatter(core_diam, taper_length, c=throughput, cmap='viridis_r', s=80, edgecolor='k')
-    ax2.set_xlabel(param_label_1)
-    ax2.set_ylabel(param_label_3)
-
-    # Taper ratio vs Core neff
-    ax3 = fig.add_subplot(gs[2, 0])
-    comp3 = ax3.scatter(core_neff, taper_length, c=throughput, cmap='viridis_r', s=80, edgecolor='k')
-    ax3.set_xlabel(param_label_2)
-    ax3.set_ylabel(param_label_3)
-
-    ax4 = fig.add_subplot(gs[:, 1], projection='3d')
-    comp3d = ax4.scatter(core_diam, core_neff, taper_length, c=throughput, cmap='viridis_r', s=50, edgecolor='k')
-    ax4.set_xlabel(param_label_1)
-    ax4.set_ylabel(param_label_2)
-    ax4.set_zlabel(param_label_3)
-    cbar4 = plt.colorbar(comp3d, ax=ax4, shrink=0.6)
-    cbar4.set_label("Loss Function")
-
-    plt.tight_layout()
-    plt.show()
+    fig.subplots_adjust(hspace=0.45, top=0.9, right=0.88)
     fig.savefig(f"Bayesian Opt Results\{simulation_val['num_paras']}_params_gridsize_{simulation_val['grid_size']}bayesianresult_hyperparam{hyp_param_b}_{hyp_param_c}.png")
 
     np.save(f"Bayesian Opt Results\{simulation_val['num_paras']}_params_gridsize_{simulation_val['grid_size']}list_of_results_hyperparam{hyp_param_b}_{hyp_param_c}.npy", tf_list, allow_pickle = True)
@@ -3617,21 +3650,19 @@ def fem_fields_present(base_name, fields=("ex", "ey", "hx", "hy")):
     Check whether FEM field files for a given base name
     already exist in the current working directory.
 
-    base_name: e.g.
-      FemSim_File_DET_1.5_LP01_core_diam_..._Taper_L_....m00
+    base_name may be an exact name or a glob pattern ending in ``_ex.m00``.
     """
     cwd = Path.cwd()
-    stem = base_name[:-7]  # strip "_ex_.m00"
-    discovered_files = []
-    for f in fields:
-        path_to_check = cwd / f"{stem}_{f}.m00"
-        if not (path_to_check).exists():
-            return False
-        else:
-            discovered_files.append(path_to_check)
-    discovered_files = np.array(discovered_files)
-    print(f"Found {len(discovered_files)} existing FemSIM files. Using these.")
-    return True
+    ex_candidates = list(cwd.glob(base_name))
+    for ex_path in ex_candidates:
+        if not ex_path.name.endswith("_ex.m00"):
+            continue
+        stem = ex_path.name[:-7]  # strip "_ex.m00"
+        discovered_files = [cwd / f"{stem}_{field}.m00" for field in fields]
+        if all(path.exists() for path in discovered_files):
+            print(f"Found {len(discovered_files)} existing FemSIM files. Using these.")
+            return True
+    return False
 
 
 def force_file_to_disk(path):
@@ -3645,20 +3676,32 @@ def ring_from_core_structure(core_num, core_positions, structure):
 
     Arguments:
         - core_num: how many cores requested in the model,
-        - core_positions: generated posisiton for the cores,
-        - structure: string deciding on either "Hex", "Pent" etc. Right now only "Hex" is implimented.
+        - core_positions: generated positions for the cores, or None when only
+          the core count is available,
+        - structure: grid type such as "Hex". Right now only "Hex" is implemented.
     
     Returns:
         - rings: integer number describing the number of rings in the model    
     """
 
-    if structure == "Hex":
-        x_axis_vals = []
-        for x, y in core_positions:
-            # count the number of core positions along the x-axis excluding the origin
-            if y == float(0) and x != float(0):
-                x_axis_vals.append((x, y))
-        x_axis_vals = np.array(x_axis_vals)
-        # due to symmetry the number of rings can be inferred from only half the number of positions recorded
-        rings = len(x_axis_vals) / 2
-        return rings
+    if not isinstance(core_num, (int, np.integer)) or core_num <= 0:
+        raise ValueError(f"core_num must be a positive integer; got {core_num!r}.")
+    if structure != "Hex":
+        raise ValueError(
+            f"Variable core_sep currently supports only the Hex grid type; got {structure!r}."
+        )
+
+    # A complete hexagonal arrangement contains 1 + 3r(r + 1) cores.
+    # Taking the ceiling gives the number of rings needed for incomplete outer rings too.
+    rings = int(np.ceil((np.sqrt(12 * core_num - 3) - 3) / 6))
+
+    if core_positions is not None and len(core_positions) > 0:
+        x_axis_vals = [
+            (x, y) for x, y in core_positions
+            if np.isclose(y, 0.0) and not np.isclose(x, 0.0)
+        ]
+        coordinate_rings = len(x_axis_vals) / 2
+        if coordinate_rings > rings:
+            rings = int(np.ceil(coordinate_rings))
+
+    return rings + 1 # need to account for the central core also

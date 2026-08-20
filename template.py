@@ -2,9 +2,13 @@ from Circuit_Properties import *
 import random, numpy as np
 
 fixed_params = {
+    # For a core_sep optimisation, move Taper_L here, define MM_core_diam,
+    # and move core_sep from fixed_params to variable_params. MCFCladd and
+    # taper are then calculated for every candidate.
+    # "MM_core_diam": 25,
+    # "core_claddings": None, 
     "core_sep":  125,
     "MCFCladd": 5*125,
-    # "core_claddings": None, 
     "core_cladding_diam": None, #125  #80,,1.4402
     "cladding_neff": 1.44402, # this value gets replaced through the Sellmeier equation
     "core_cladding_neff": None, #1.4433510951304291734406199895015, #from using SMF-28 index (). Determined automatically using Sellmeier
@@ -137,19 +141,13 @@ bestval_limits = {
     # "core_neff": (1.4461, 1.465), 
     # "Taper_L": (30000,50000) 
 }
-
-# variable_params= {
-#     "core_diam": 8.3, 
-#     "core_neff": 1.4492, 
-#     "Taper_L":  50000, 
-# }   
-
-# GIF settings     
 variable_params= {
     "core_diam": 8.3, 
     "core_neff": 1.4492, 
     "Taper_L":  50000, 
 }       
+
+# GIF settings     
 # variable_params= {
 #     "core_diam": 125, 
 #     "core_neff": 1.4578044315, 
