@@ -1605,7 +1605,8 @@ def transfer_matrix_component(csv_path, row, port_mon = False):
         throughput = df[ms_col]
         return row, throughput
 
-            
+import numpy as np, os, glob, pandas as pd
+
 def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a, hyp_param_b, hyp_param_c, hyp_param_d,
                                     core_to_monitor, modes_to_monitor, simulation_val, run_tag):
     """
@@ -1622,6 +1623,7 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a,
     params, results, waves, _, _ = zip(*tf_list)
     tf_list_params_results = list(zip(params, results))
     core_num = simulation_val["core_num"]
+
     # search for each Guided Mode csv file created and pick only the most recent one to read, since they are all the same.
     guided_mode_pattern = os.path.join(folder, f"{wave}_Guided Modes_{run_tag}.csv")
     matches = glob.glob(guided_mode_pattern)
@@ -1661,33 +1663,21 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a,
         'LP51': 'LP51a',
         'LP-51': 'LP51b'
     }
-    # tf_list = tf_list[0]
-    # tf_list = np.array(tf_list) #.reshape(simulation_val["free_space_wavelength"].size,simulation_val["mode_vals"].size)
 
-    loss_arr = []
-    collected_arr = []
-    len_modes_arr = []
-    loss_a_num_extra_modes = []
-# for tf in tf_list:
-    # relabel
+    len_modes_arr = np.array([num_modes])
+    loss_a_num_extra_modes = np.array([num_mode_arr])
+
+    # relabel RSoft injected modes to the standard names
     new_tf_list = [
         (label_replacements.get(label, label), arr)
         for label, arr in tf_list_params_results
     ]
 
     mode_list = [label for label, _ in new_tf_list]
-    # # code for extra modes in central core
-    # extra_mode_order = ["LP11a", "LP11b", "LP21a", "LP21b", "LP02"]
-    # guided_modes_set = set(mode_list) 
-    # guided_mask = np.array([m in guided_modes_set for m in extra_mode_order], dtype=bool)
     # extract the amplitudes only and leave the phase information
     mode_result = {}
     extra_result = {}
 
-    # mode_result = {
-    #     f"{label}_result": new_tf_list[idx][1][0][1::2]
-    #     for idx, label in enumerate(mode_list)
-    # }
     for label, arr in new_tf_list:
         arr = np.array(arr).flatten()
 
@@ -1701,12 +1691,12 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a,
         extra_result[f"{label}_extra"] = extra_amps
 
     # Select which core and mode are mode-selective
-    ms_core = core_to_monitor            # Index (0-based) for the mode-selective core
+    ms_core = core_to_monitor # Index (0-based) for the mode-selective core
     ms_mode_index = []
 
     for h in modes_to_monitor:
         ms_mode_index.append(list(label_replacements.values()).index(h))
-    ms_modes = ms_mode_index         # Index for the mode-selective mode(s) 
+    ms_modes = np.asarray(ms_mode_index, dtype=int)         # Index for the mode-selective mode(s) 
 
     for mode_idx in ms_modes:
 
@@ -1725,14 +1715,11 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a,
             ms_core_mode = np.abs(ms_mode_vals[ms_core])**2 #- np.sum(np.abs(ex_ms_mode_vals[:num_modes])**2)
 
         # 2. All non-MS cores in MS mode:
-        nonms_core_ms_mode = [np.abs(val)**2 for idx, val in enumerate(ms_mode_vals) if idx != ms_core] 
-        nonms_core_ms_mode = np.mean(nonms_core_ms_mode)
+        nonms_core_ms_mode = np.abs(np.delete(ms_mode_vals, ms_core))**2
+        nonms_core_ms_mode = np.sum(nonms_core_ms_mode)
 
-        
         # 3. Mean total power coupled into the MS core by each non-MS input.
-        # Sum the LP01 and guided higher-order-mode powers for each input first,
-        # then average those per-input totals.  Work row-by-row so empty or
-        # unequal-length extra-monitor vectors cannot cause 2-D indexing errors.
+        # Sum the LP01 only or LP01 and guided higher-order-mode powers for each input.
         if not other_mode_vals:
             ms_core_other_mode = 0.0
         else:
@@ -1773,18 +1760,19 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a,
                 for row in extra_power_rows
             ], dtype=float)
 
+            # these should be arrays of shape = num_injected_modes - 1
             if simulation_val["all_modes"]:
-                total_ms_core_power_per_mode = main_power + extra_power_per_mode # change me!!!
+                total_ms_core_power_per_mode = main_power + extra_power_per_mode 
             else:
                 total_ms_core_power_per_mode = main_power
-            ms_core_other_mode = float(np.mean(total_ms_core_power_per_mode))
+            ms_core_other_mode = float(np.sum(total_ms_core_power_per_mode))
 
         # 4. Mean of non-MS cores in non-MS modes:
-        nonms_core_other_mode_vals = [
+        nonms_core_other_mode_vals = np.asarray([
             np.abs(val)**2
             for vals in other_mode_vals
             for idx, val in enumerate(vals) if idx != ms_core
-        ] # extracts every non-ms core intensity and stores it in the array called nonms_core_other_mode_vals
+        ], dtype=float) # extracts every non-ms core intensity and stores it in the array called nonms_core_other_mode_vals
         nonms_core_other_mode = np.mean(nonms_core_other_mode_vals) # averages the intensity of non-ms cores in non-ms modes. 
                                                                     # This is what should be maximised and is equivelant to taking 
                                                                     # the average of each non-ms core in each individual non-ms mode
@@ -1795,12 +1783,8 @@ def mode_selective_tf_matrix_metric(tf_list, folder, wave, csv_pid, hyp_param_a,
                             ms_core_other_mode, #c
                             nonms_core_ms_mode #d
                             ])
-        loss_arr.append(loss_func)
-        # collected_arr.append(array_of_results)
-        len_modes_arr.append(num_modes)
-        loss_a_num_extra_modes.append(num_mode_arr)
-        return loss_func, array_of_results, waves, np.array(len_modes_arr), np.array(loss_a_num_extra_modes)
-        # return np.asarray(loss_func, dtype=float), np.asarray(collected_arr, dtype=float)
+        return loss_func, array_of_results, waves, len_modes_arr, loss_a_num_extra_modes
+
 
 def read_port_mon_file(filepath = ""):
     dat = pd.read_csv(filepath, skiprows = 3, sep=r'\s+', header = None)
