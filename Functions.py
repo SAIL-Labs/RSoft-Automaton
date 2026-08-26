@@ -3373,7 +3373,7 @@ def load_checkpoint_npy(filepath):
         return []
     return np.load(filepath, allow_pickle=True).tolist()
 
-def save_optimizer_progress_plot(results_log, images_dir):
+def save_optimizer_progress_plot(results_log, images_dir, initial_point_count=None):
     losses = []
     for record in results_log:
         if not isinstance(record, dict) or "result" not in record:
@@ -3394,7 +3394,11 @@ def save_optimizer_progress_plot(results_log, images_dir):
 
     losses = np.asarray(losses, dtype=float)
     x_vals = np.arange(1, len(losses) + 1)
-    n_initial_points = int(Simulation_params.get("n_init_points", 0))
+    n_initial_points = (
+        int(Simulation_params.get("n_init_points", 0))
+        if initial_point_count is None
+        else int(initial_point_count)
+    )
 
     plt.figure(figsize=(8, 6))
     plt.plot(x_vals, np.minimum.accumulate(losses))
@@ -3688,4 +3692,4 @@ def ring_from_core_structure(core_num, core_positions, structure):
         if coordinate_rings > rings:
             rings = int(np.ceil(coordinate_rings))
 
-    return rings + 1 # need to account for the central core also
+    return rings

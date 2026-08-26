@@ -1242,6 +1242,7 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             result_mcf_cladd = fixed_params["MCFCladd"]
             result_taper = fixed_params["taper"]
 
+        manual_initial_point_count = int(simulation_val.get("manual_initial_point_count", 0))
         glob_fix_param = {
             "Time CSV Created": datetime.datetime.now(),
             "Non-MS Core Diameter ($\mu m$)": core_params[f"core_{(simulation_val['core_to_monitor'] + 1)%simulation_val['core_num']}"]["core_diam"],
@@ -1257,7 +1258,12 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Acquisition type": Simulation_params["acq_type"],
             "Acquisition hyperparameter": Simulation_params["acq_hyperparam"],
             "Acquistion optimiser": Simulation_params["acq_opt"],
-            "Initial points": Simulation_params["n_init_points"],
+            "Initial points": (
+                manual_initial_point_count
+                if manual_initial_point_count
+                else Simulation_params["n_init_points"]
+            ),
+            "Initial point source": "manual" if manual_initial_point_count else "random",
             "Loss_a config.": "LP01" if not simulation_val["all_modes"] else "LP01 + higher order modes",
             "hyper_param_a": Simulation_params["hyp_param_a"],
             "hyper_param_b": Simulation_params["hyp_param_b"],
@@ -1295,7 +1301,8 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
             "Acquisition type": "Describe the acquisition function used to select new values to sample. EI = Expected Improvement",
             "Acquisition hyperparameter": "Set's the hyperparameter for the acquisition function",
             "Acquisition optimiser": "Algorithm used to optimise the selection of parameters to sample",
-            "Initial points": "Number of randomly drawn points before bayesian optimisation kicks in",
+            "Initial points": "Number of evaluated points before bayesian optimisation kicks in",
+            "Initial point source": "Whether the initial points were supplied manually or drawn randomly",
             "Parameter vectors": "Number of simultaneous parameter vectors sampled per iteration",
             "hyper_param_a": "Hyperparameter determining how much the loss term a is considered in the optimisation",
             "hyper_param_b": "Hyperparameter determining how much the loss term b is considered in the optimisation",
@@ -1325,6 +1332,92 @@ def run_all_modes_for_params(params, iteration_num, simulation_val, custom_prior
     #     return final_losses[0], df_wave_logs[0]
     
     return final_loss, df_wave_log
+
+def _validate_manual_initialisation_points(points, param_names, custom_priors, dimensions):
+    if points is None:
+        return []
+
+    # check if the dimensions of the manual points array matches the dimensions supplied to the optimiser
+    try:
+        points_array = np.asarray(points, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("manually_initialise_points must be a rectangular numeric array.") from exc
+
+    if points_array.size == 0:
+        return []
+    if points_array.ndim == 1:
+        points_array = points_array[np.newaxis, :]
+    if points_array.ndim != 2:
+        raise ValueError(
+            "manually_initialise_points must be a two-dimensional array of parameter vectors."
+        )
+    if points_array.shape[1] != len(param_names):
+        raise ValueError(
+            "Each manually_initialise_points vector must contain exactly one value for every "
+            f"optimised parameter {param_names}; got vector length {points_array.shape[1]}."
+        )
+    if len(dimensions) != len(param_names):
+        raise ValueError("The optimiser dimensions do not match the configured parameter names.")
+
+    validated_points = []
+    for point_index, point in enumerate(points_array):
+        validated_point = []
+        for value, param_name, dimension in zip(point, param_names, dimensions):
+            if not np.isfinite(value):
+                raise ValueError(
+                    f"manually_initialise_points[{point_index}] parameter {param_name!r} "
+                    f"must be finite; got {value!r}."
+                )
+
+            # check if the manual points are within/defined in the prior ranges
+            low, high = custom_priors[param_name]
+            if value < low or value > high:
+                raise ValueError(
+                    f"manually_initialise_points[{point_index}] parameter {param_name!r}={value} "
+                    f"is outside custom_priors range [{low}, {high}]."
+                )
+
+            if value not in dimension:
+                raise ValueError(
+                    f"manually_initialise_points[{point_index}] parameter {param_name!r}={value} "
+                    "is not an allowed value in the optimiser search space."
+                )
+            validated_point.append(float(value))
+        validated_points.append(validated_point)
+
+    return validated_points
+
+def _build_optimizer_result_record(param_vec, loss_val, iteration_num, candidate_idx, df_wave_log):
+    loss_terms = df_wave_log[["Wavelength", "Loss_a", "Loss_b", "Loss_c", "Loss_d"]].to_numpy()
+    core_amp_cols = sorted(
+        [c for c in df_wave_log.columns if c.startswith("Core_") and c.endswith("_Amp")],
+        key=lambda s: int(s.split("_")[1])
+    )
+    core_phase_cols = sorted(
+        [c for c in df_wave_log.columns if c.startswith("Core_") and c.endswith("_Phase")],
+        key=lambda s: int(s.split("_")[1])
+    )
+    extra_amp_cols = sorted(
+        [c for c in df_wave_log.columns if c.startswith("Extra_") and c.endswith("_Amp")],
+        key=lambda s: int(s.split("_")[1])
+    )
+    extra_phase_cols = sorted(
+        [c for c in df_wave_log.columns if c.startswith("Extra_") and c.endswith("_Phase")],
+        key=lambda s: int(s.split("_")[1])
+    )
+
+    return {
+        "params": np.asarray(param_vec, dtype=float),
+        "result": float(loss_val),
+        "Iteration": int(iteration_num),
+        "Candidate Index": int(candidate_idx),
+        "Loss Metric": loss_terms,
+        "Number of Guided Modes": df_wave_log["Guided Modes"].to_numpy(),
+        "Core Amplitudes": df_wave_log[core_amp_cols].to_numpy(dtype=float),
+        "Core Phases": df_wave_log[core_phase_cols].to_numpy(dtype=float),
+        "Extra Core Amplitudes": df_wave_log[extra_amp_cols].to_numpy(dtype=float),
+        "Extra Core Phases": df_wave_log[extra_phase_cols].to_numpy(dtype=float),
+    }
 
 def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, taper_max):
     simulate_tf_metric = simulation_val["simulate_tf_metric"]
@@ -1356,10 +1449,13 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
     prior_names = list(param_range.keys())
     variable_names = list(variable_params.keys())
-    if set(prior_names) != set(variable_names):
+    custom_prior_names = list(custom_priors.keys())
+    if prior_names != variable_names or prior_names != custom_prior_names:
         raise ValueError(
-            "The optimiser prior names must match template.variable_params. "
-            f"Priors: {prior_names}; variable parameters: {variable_names}."
+            "The optimiser priors, custom_priors, and template.variable_params must contain "
+            "the same parameter names in the same order so parameter-vector values cannot be "
+            f"misassigned. Prior file: {prior_names}; custom_priors: {custom_prior_names}; "
+            f"variable parameters: {variable_names}."
         )
 
     if "core_sep" in prior_names:
@@ -1403,7 +1499,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 "The core_sep optimiser bounds must be finite and greater than zero microns; "
                 f"got {param_range['core_sep']!r}."
             )
-    
+
     # read in prior space to inform optimiser of the dimensions
     if simulation_val["industry_neff_values"] == True:
         neff_val = read_neff_values(simulation_val["industry_neff_file"])
@@ -1453,8 +1549,48 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 para_space.append(Real(low, high, name=prior_name))
 
     use_previous_results = bool(simulation_val.get("use_previous_results", False))
+    configured_manual_points = manually_initialise_points
+    manual_points_configured = (
+        configured_manual_points is not None
+        and np.asarray(configured_manual_points, dtype=object).size > 0
+    )
+    if simulate_tf_metric and bestvals and manual_points_configured:
+        raise ValueError(
+            "manually_initialise_points cannot be combined with bestvals sampling. "
+            "Choose one initialisation method."
+        )
+    if simulate_tf_metric and use_previous_results and manual_points_configured:
+        raise ValueError(
+            "manually_initialise_points cannot be combined with use_previous_results. "
+            "Use manual points for a new optimiser or use_previous_results to replay a prior run."
+        )
 
-    if simulate_tf_metric and opt_checkpoint_path.exists() and not use_previous_results: #and not bestvals
+    manual_points = []
+    if simulate_tf_metric and not bestvals:
+        manual_points = _validate_manual_initialisation_points(
+            configured_manual_points,
+            prior_names,
+            custom_priors,
+            para_space,
+        )
+    manual_point_count = len(manual_points)
+    if manual_point_count:
+        if int(simulation_val["n_points"]) != 1:
+            raise ValueError(
+                "manually_initialise_points requires simulation_val['n_points'] == 1 so each "
+                "manual parameter vector and result maps to exactly one optimiser iteration."
+            )
+        if manual_point_count > int(total_calls):
+            raise ValueError(
+                f"manually_initialise_points contains {manual_point_count} vectors, but num_paras "
+                f"allows only {total_calls} total evaluations."
+            )
+    simulation_val["manual_initial_point_count"] = manual_point_count
+    resuming_checkpoint = (
+        simulate_tf_metric and opt_checkpoint_path.exists() and not use_previous_results
+    )
+
+    if resuming_checkpoint: #and not bestvals
         # Continue from a skopt checkpoint: this restores the optimiser's
         # internal state and should only use files created by skopt.dump().
         opt = load(opt_checkpoint_path)
@@ -1529,7 +1665,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
         print(f"Replayed {replayed_results} previous optimisation results into fresh optimiser.")
     else:
-        # start fresh optimisation
+        # Manual points replace, rather than supplement, skopt's random initial points.
         opt = Optimizer(
             dimensions=para_space, # Parameter search space (bounds + types)
             base_estimator="GP", # Surrogate model (Gaussian Process)
@@ -1537,7 +1673,9 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             acq_func_kwargs={"xi": Simulation_params["acq_hyperparam"]}, # EI exploration strength (higher = more exploration, default=0.01)
             acq_optimizer=Simulation_params["acq_opt"], # How the acquisition function is optimised (random sampling, lbfgs)
             random_state=None, # Random seed (None = non-reproducible)
-            n_initial_points=int(Simulation_params["n_init_points"]) # Number of random iterations before BO starts. Note this is NOT the number of parameters chosen before BO starts - it is the number of REPORTS via tell().
+            n_initial_points=(
+                0 if manual_point_count else int(Simulation_params["n_init_points"])
+            )
         )
 
     # if true, run optimisation testing the loss metric
@@ -1547,11 +1685,22 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             # Previous records seed the surrogate only; this run's file/iteration
             # bookkeeping starts fresh.
             all_results = []
+        elif manual_point_count and not resuming_checkpoint:
+            # Manual initialisation is a new run. Do not merge it with an unrelated
+            # results file when no matching optimiser checkpoint was loaded.
+            all_results = []
         else:
             all_results = load_checkpoint_npy(results_checkpoint_path)
         
         completed_candidates = len(all_results)
-        completed_batches = completed_candidates // simulation_val["n_points"]
+        completed_batches = max(
+            (
+                int(record.get("Iteration", 0))
+                for record in all_results
+                if isinstance(record, dict)
+            ),
+            default=0,
+        )
 
         if completed_candidates > 0:
             print(f"Resuming from iteration {completed_batches + 1}")
@@ -1685,17 +1834,152 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             run_tf_multproc(ref_params, 1,simulation_val, custom_priors, 
                             taper_min, taper_max, fem = True, gridding=gridding)
 
+        manual_results = []
+        completed_manual_points = 0
+        if manual_point_count and resuming_checkpoint:
+            if not all_results:
+                raise ValueError(
+                    "An optimiser checkpoint exists, but its results checkpoint is empty. "
+                    "Cannot verify which manually_initialise_points were already evaluated."
+                )
+            for point_index, manual_point in enumerate(manual_points):
+                if point_index >= len(all_results):
+                    break
+                record = all_results[point_index]
+                record_params = np.asarray(record.get("params"), dtype=float).ravel()
+                record_result = np.asarray(record.get("result"), dtype=float).ravel()
+                if (
+                    int(record.get("Iteration", -1)) != point_index + 1
+                    or record_params.size != len(manual_point)
+                    or not np.allclose(record_params, manual_point, rtol=0.0, atol=1e-12)
+                ):
+                    raise ValueError(
+                        "The loaded optimiser checkpoint does not begin with the configured "
+                        f"manually_initialise_points entry {point_index}. Move or remove the old "
+                        "checkpoint files before starting this manual-initialisation run."
+                    )
+                if record_result.size != 1 or not np.isfinite(record_result[0]):
+                    raise ValueError(
+                        f"Stored manual result {point_index} must be one finite scalar."
+                    )
+                manual_results.append(float(record_result[0]))
+                completed_manual_points += 1
+
+            optimiser_points = list(getattr(opt, "Xi", []))
+            optimiser_results = list(getattr(opt, "yi", []))
+            shared_manual_count = min(len(optimiser_points), completed_manual_points)
+            for point_index in range(shared_manual_count):
+                optimiser_point = np.asarray(optimiser_points[point_index], dtype=float).ravel()
+                optimiser_result = np.asarray(optimiser_results[point_index], dtype=float).ravel()
+                if (
+                    optimiser_point.size != len(manual_points[point_index])
+                    or not np.allclose(
+                        optimiser_point, manual_points[point_index], rtol=0.0, atol=1e-12
+                    )
+                    or optimiser_result.size != 1
+                    or not np.isclose(
+                        optimiser_result[0], manual_results[point_index], rtol=0.0, atol=1e-12
+                    )
+                ):
+                    raise ValueError(
+                        "The optimiser checkpoint observations do not match the configured "
+                        f"manual point/result at index {point_index}."
+                    )
+
+            if len(optimiser_points) > len(all_results):
+                raise ValueError(
+                    "The optimiser checkpoint contains more observations than the results "
+                    "checkpoint, so the missing result records cannot be reconstructed safely."
+                )
+
+            # The results file is saved before the optimiser file. If interruption occurred
+            # between those writes, replay only the missing manual observations.
+            for point_index in range(len(optimiser_points), completed_manual_points):
+                opt.tell(manual_points[point_index], manual_results[point_index])
+
+            if completed_batches > completed_manual_points and completed_manual_points < manual_point_count:
+                raise ValueError(
+                    "The loaded checkpoint contains Bayesian iterations before all configured "
+                    "manually_initialise_points were completed."
+                )
+
+        for point_index in range(completed_manual_points, manual_point_count):
+            manual_point = manual_points[point_index]
+            iteration_num = point_index + 1
+            simulation_val["grid_size"] = 0.74
+            simulation_val["grid_size_y"] = 0.74
+
+            print(f"Iteration {iteration_num}:")
+            print("Trying " + ", ".join(
+                f"Core Refractive Index: {manual_point[index]:.3f}" if name == "core_neff"
+                else f"{name}: {manual_point[index]:.3f}"
+                for index, name in enumerate(prior_names)
+            ))
+
+            result_batch, df_wave_logs = run_all_modes_for_params(
+                manual_point,
+                iteration_num,
+                simulation_val,
+                custom_priors,
+                taper_min,
+                taper_max,
+                gridding=gridding,
+            )
+            result_array = np.asarray(result_batch, dtype=float).ravel()
+            if result_array.size != 1 or not np.isfinite(result_array[0]):
+                raise ValueError(
+                    f"Manual parameter vector {point_index} produced a non-scalar or non-finite "
+                    f"result: {result_batch!r}."
+                )
+            manual_result = float(result_array[0])
+            manual_results.append(manual_result)
+
+            # Tell exactly once, immediately after evaluation. With n_initial_points=0,
+            # the next ask() is Bayesian rather than another random initial point.
+            opt.tell(manual_point, manual_result)
+            all_results.append(
+                _build_optimizer_result_record(
+                    manual_point,
+                    manual_result,
+                    iteration_num,
+                    0,
+                    df_wave_logs,
+                )
+            )
+            print(f"Iteration {iteration_num}: {manual_result:.6f}")
+            for w, group in df_wave_logs.groupby("Wavelength"):
+                row = group.iloc[0]
+                print(
+                    f"  wavelength = {w:.3f} µm | "
+                    f"(a, b, c, d)=("
+                    f"{row['Loss_a']:.6g}, "
+                    f"{row['Loss_b']:.6g}, "
+                    f"{row['Loss_c']:.6g}, "
+                    f"{row['Loss_d']:.6g})"
+                )
+            completed_batches = iteration_num
+            atomic_save_npy(all_results, results_checkpoint_path)
+            dump(opt, opt_checkpoint_path, store_objective=False)
+            save_optimizer_progress_plot(
+                all_results, images_dir, initial_point_count=manual_point_count
+            )
+
         # start at whatever the last iteration was (or 0), but scale the total number of iterations based
         # on the number of selected parameter vectors.
         for batch_idx in range(completed_batches, total_calls//simulation_val["n_points"]):
             # adaptable gridding to hasten simulations slightly after Bayesian optimisation kicks in
-            if batch_idx < 2*int(Simulation_params["n_init_points"]) and not simulation_val["use_previous_results"]:
-                simulation_val["grid_size"] = 0.37
-                simulation_val["grid_size_y"] = 0.37
+            if (
+                not manual_point_count
+                and batch_idx < 2*int(Simulation_params["n_init_points"])
+                and not simulation_val["use_previous_results"]
+            ):
+                simulation_val["grid_size"] = 0.74
+                simulation_val["grid_size_y"] = 0.74
             else:
                 # adopt established gridding defined in simulation_val
-                simulation_val["grid_size"] = 0.37
-                simulation_val["grid_size_y"] = 0.37
+                simulation_val["grid_size"] = 0.74
+                simulation_val["grid_size_y"] = 0.74
+
             # ask for 1 set of parameter vectors only to prevent daemonic process having children 
             param_batch = opt.ask(n_points=simulation_val["n_points"]) 
 
@@ -1777,7 +2061,13 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     all_results.append(iter_result)
                 atomic_save_npy(all_results, results_checkpoint_path)
                 dump(opt, opt_checkpoint_path, store_objective=False)
-                save_optimizer_progress_plot(all_results, images_dir)
+                save_optimizer_progress_plot(
+                    all_results,
+                    images_dir,
+                    initial_point_count=(
+                        manual_point_count or int(Simulation_params["n_init_points"])
+                    ),
+                )
             else:
                 print(f"Iteration {batch_idx+1}: {result_batch:.6f}")
                 for w, group in df_wave_logs.groupby("Wavelength"):
@@ -1837,7 +2127,13 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 all_results.append(iter_result)
                 atomic_save_npy(all_results, results_checkpoint_path)
                 dump(opt, opt_checkpoint_path, store_objective=False)
-                save_optimizer_progress_plot(all_results, images_dir)
+                save_optimizer_progress_plot(
+                    all_results,
+                    images_dir,
+                    initial_point_count=(
+                        manual_point_count or int(Simulation_params["n_init_points"])
+                    ),
+                )
         return all_results
     
     # if false, run tf code for the template parameters

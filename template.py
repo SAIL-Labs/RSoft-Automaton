@@ -130,6 +130,15 @@ else:
     RSoft_params["free_space_wavelength"] = Simulation_params["free_space_wavelength"]
 RSoft_params["lambda"] = RSoft_params["free_space_wavelength"]
 
+# Optional parameter vectors to evaluate before Bayesian optimisation begins.
+# Leave this empty to retain the normal n_init_points random-initialisation path.
+# Values in each row must follow variable_params/custom_priors key order exactly.
+manually_initialise_points = np.array([
+    # [24.658300, 1.464243, 45249.523300],
+    # [20.164148, 1.471537, 50000.000000],
+    # [16.312202, 1.479005, 50000.000000]
+], dtype=float)
+
 bestvals = {         		            
     # "core_diam": 8.601, 		
     # "core_neff": 1.4579, 
