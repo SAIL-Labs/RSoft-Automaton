@@ -80,9 +80,9 @@ Simulation_params = {
     "core_num": 7,
     "num_paras": 72,
     "batch_num": 6,
-    "hyp_param_a": 1,
+    "hyp_param_a": 10,
     "hyp_param_b": 10,
-    "hyp_param_c": 100,
+    "hyp_param_c": 50,
     "hyp_param_d": 10,
     "loss_offset": 50,
     "grid_type": "Hex",
@@ -113,7 +113,7 @@ Simulation_params = {
 
     # optimiser settings
     "acq_type": "EI",
-    "acq_hyperparam": 0.8,
+    "acq_hyperparam": 0.01,
     "acq_opt": "lbfgs",
     "n_init_points": 3,
     "use_previous_results": False, # decides whether to seed a new optimiser with previous results

@@ -1677,6 +1677,10 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 0 if manual_point_count else int(Simulation_params["n_init_points"])
             )
         )
+        if manual_point_count:
+            print("Initialising optimiser with manually set points.")
+        else:
+            print(f"Initialising optimiser with {int(Simulation_params['n_init_points'])} random points.")
 
     # if true, run optimisation testing the loss metric
     if simulate_tf_metric:
@@ -1688,6 +1692,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
         elif manual_point_count and not resuming_checkpoint:
             # Manual initialisation is a new run. Do not merge it with an unrelated
             # results file when no matching optimiser checkpoint was loaded.
+            print("Manually initialising the optimiser using specified points in template.manually_initialise_points")
             all_results = []
         else:
             all_results = load_checkpoint_npy(results_checkpoint_path)
@@ -1973,8 +1978,8 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 and batch_idx < 2*int(Simulation_params["n_init_points"])
                 and not simulation_val["use_previous_results"]
             ):
-                simulation_val["grid_size"] = 0.74
-                simulation_val["grid_size_y"] = 0.74
+                simulation_val["grid_size"] = 0.8
+                simulation_val["grid_size_y"] = 0.8
             else:
                 # adopt established gridding defined in simulation_val
                 simulation_val["grid_size"] = 0.74

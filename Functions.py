@@ -899,14 +899,14 @@ end launch_field
                     else:
                         output_lines.append(f"domain_min = {fixed_params['Taper_L']}\n")
 
-            # Process other replacements in a second pass
+            # Process other replacements for the FemSIM file only in a second pass
             final_lines = []
             for line in output_lines:
                 stripped = line.strip()
                 if stripped == "sim_tool = ST_BEAMPROP":
                     final_lines.append("sim_tool = ST_FEMSIM\n")
                 elif stripped == f"grid_size = {simulation_val['grid_size']}":
-                    final_lines.append("grid_size = 0.5\n")
+                    final_lines.append("grid_size = 0.5\n") # NOTE: if you change this be aware of the filesize each femSIM file is; if it is too small it mightn't be copied correctly...
                 elif stripped == f"grid_size_y = {simulation_val['grid_size_y']}":
                     final_lines.append("grid_size_y = 0.5\n")
                 elif stripped == "metric = TF":
