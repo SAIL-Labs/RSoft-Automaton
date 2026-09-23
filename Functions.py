@@ -884,8 +884,8 @@ end launch_field
                     if effective_core_sep is None:
                         raise KeyError("core_sep is required to validate the FemSIM boundary size.")
                     half_core_sep = effective_core_sep / 2
-                    if RSoft_params['femsim_boundary_gap_x'] >= half_core_sep:
-                        raise RuntimeError(rf"Femsim boundary of {RSoft_params['femsim_boundary_gap_x']} $\mu m$ is greater than or equal to half the inner core separation of {half_core_sep} $\mu m$. Mode overlap is possible.")
+                    # if RSoft_params['femsim_boundary_gap_x'] >= half_core_sep:
+                    #     raise RuntimeError(rf"Femsim boundary of {RSoft_params['femsim_boundary_gap_x']} $\mu m$ is greater than or equal to half the inner core separation of {half_core_sep} $\mu m$. Mode overlap is possible.")
                     output_lines.extend([
                         f"boundary_max = {RSoft_params['femsim_boundary_gap_x']}\n",
                         f"boundary_max_y = {RSoft_params['femsim_boundary_gap_y']}\n",

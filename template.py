@@ -7,17 +7,17 @@ fixed_params = {
     # taper are then calculated for every candidate.
     # "MM_core_diam": 25,
     # "core_claddings": None, 
-    "core_sep":  125,
-    "MCFCladd": 5*125,
+    "core_sep":  60,
+    "MCFCladd": 330,
     "core_cladding_diam": None, #125  #80,,1.4402
-    "cladding_neff": 1.44402, # this value gets replaced through the Sellmeier equation
+    "cladding_neff": 1.44, # this value gets replaced through the Sellmeier equation
     "core_cladding_neff": None, #1.4433510951304291734406199895015, #from using SMF-28 index (). Determined automatically using Sellmeier
     "cen_core_cladding_neff": None,#1.44,#0.00949,
-    "other_core_diam": 8.3, # non-ms core diameter
+    "other_core_diam": 6.5, # non-ms core diameter
     "silica_index": 0, #this is changed through the sellmeier values
     # "Taper_L": 50000, #45000
     # "core_neff": 0.0122895, #0.015,
-    "taper": 25, #7 core pigtail gif (also seems to work for (19cPL)#19.34984520123839, #19c pigtail #18.75, 7c pigtail
+    "taper": 10, 
     # "core_diam": 8.2,
     "alpha": 0,
     "length_hyperparam": 0.01
@@ -113,7 +113,7 @@ Simulation_params = {
 
     # optimiser settings
     "acq_type": "EI",
-    "acq_hyperparam": 0.01,
+    "acq_hyperparam": 0.8,
     "acq_opt": "lbfgs",
     "n_init_points": 3,
     "use_previous_results": False, # decides whether to seed a new optimiser with previous results
@@ -151,8 +151,8 @@ bestval_limits = {
     # "Taper_L": (30000,50000) 
 }
 variable_params= {
-    "core_diam": 8.3, 
-    "core_neff": 1.4492, 
+    "core_diam": 6.5, 
+    "core_neff": 1.4467895, 
     "Taper_L":  50000, 
 }       
 
