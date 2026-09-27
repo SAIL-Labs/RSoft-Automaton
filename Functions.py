@@ -3286,9 +3286,10 @@ def coarse_sampler(best_vals, density = 4):
     param_grid = np.array(list(itertools.product(*grids)))  # shape (N, len(best)), e.g. N = n1*n2*n3
     return param_grid
 
-def monte_carlo_rej(mean_vals, mean_limits, scales, sigmas, n_accept):
+def monte_carlo_rej(mean_vals, mean_limits, scales, sigmas, n_accept, randomise = False):
     """
     Function that samples values in gaussian distributions centred on some mean value to simulate.  
+    Randomise: decides whether monte carlo rejection occurs.
     """
     generated = []
     accepted = []
@@ -3296,7 +3297,7 @@ def monte_carlo_rej(mean_vals, mean_limits, scales, sigmas, n_accept):
     if scales is None:
         scales = np.ones_like(mean_vals, dtype=float)
     else:
-        scales = scales
+        # scales = scales
         if scales.shape != mean_vals.shape: # ensure that the number of scales matches the number of variables
             raise ValueError(f"scales must have shape {mean_vals.shape}, got {scales.shape}")
         if np.any(scales <= 0): # ensure that the scales are positive definite
@@ -3305,24 +3306,32 @@ def monte_carlo_rej(mean_vals, mean_limits, scales, sigmas, n_accept):
     rng = np.random.default_rng()
     for m, mu in enumerate(mean_vals):
         counter = 0
-        
+
+        # scale the normal distributions to keep everything on the 
+        # same scale
         s = scales[m]
         mu_s = mu / s
         sigma_s = sigmas[m] / s
 
-        while counter < n_accept:
+        if not randomise:
+            while counter < n_accept:
+                x_s = rng.normal(mu_s, sigma_s)
+                x = x_s * s
+                generated.append(x)
+
+                x_low, x_upp = mean_limits[m]
+                if (x_low <= x <= x_upp):
+                    accepted.append(x)
+                    counter += 1
+                else:
+                    continue
+        else:
             x_s = rng.normal(mu_s, sigma_s)
             x = x_s * s
             generated.append(x)
-
-            x_low, x_upp = mean_limits[m]
-            if (x_low <= x <= x_upp):
-                accepted.append(x)
-                counter += 1
-            else:
-                continue
-
+            accepted.append(x)
     return np.array(generated), np.array(accepted).reshape(len(mean_vals),n_accept)
+
 
 def atomic_save_npy(obj, filepath):
     """

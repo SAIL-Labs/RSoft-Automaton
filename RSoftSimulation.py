@@ -1510,11 +1510,14 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             else:
                 para_space.append(Real(low, high, name=prior_name))
     elif bestvals:
+        print("Sampling from centred on bestvals.")
         bestval_names = list(bestvals.keys())
         if bestval_names != list(bestval_limits.keys()):
             raise ValueError("bestvals and bestval_limits must contain parameters in the same order.")
         mean_vals = np.array(list(bestvals.values()), dtype=float)
         mean_limits = np.array(list(bestval_limits.values()), dtype=float)
+
+        # template defaults in case they are not provided.
         sigma_defaults = {
             "core_diam": 2.0,
             "core_neff": 1.0,
@@ -1529,6 +1532,8 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             "core_sep": 100.0,
             "taper": 1.0,
         }
+
+        # find what keys in default settings are being varied
         sigmas = np.array([
             sigma_defaults.get(name, max((bounds[1] - bounds[0]) / 6, np.finfo(float).eps))
             for name, bounds in zip(bestval_names, mean_limits)
@@ -1537,9 +1542,24 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             scale_defaults.get(name, max(abs(value), 1.0))
             for name, value in zip(bestval_names, mean_vals)
         ])
-        _, accepted = monte_carlo_rej(mean_vals, mean_limits, scales, sigmas, simulation_val["num_paras"])
+        all_results = load_checkpoint_npy(results_checkpoint_path)
+        completed_candidates = len(all_results)
+        completed_batches = max(
+            (
+                int(record.get("Iteration", 0))
+                for record in all_results
+                if isinstance(record, dict)
+            ),
+            default=0,
+        )
+
+        # if completed_candidates > 0:
+        #     print(f"Resuming from iteration {completed_batches + 1}")
+        generated, accepted = monte_carlo_rej(mean_vals, mean_limits, scales, sigmas, simulation_val["num_paras"] - completed_candidates)
+        # excess = 
+        # print(f"Generated {generated.shape[1]} samples, accepted {accepted.shape[1]}.")
         para_space = accepted.T # shape(len(simulation_val["num_paras"]), len(bestvals.keys()))
-        print(f"Sampling of {para_space.shape[0]} parameters, begin.")
+        print(f"Sampling of {para_space.shape[0]} parameters with standard deviations of {sigmas}, begin.")
     else:
         para_space = []
         for prior_name, (low, high) in param_range.items():
@@ -1713,7 +1733,8 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             print("No existing results checkpoint found. Starting fresh.")
 
         if bestvals:
-            # checking if femsim files exist. If they do, continue. If not, generate them
+            # checking if femsim files exist. If they do, continue. If not, generate them. 
+            # Ideally, this should only be used to remove ambiguity, so they assumption is these files already exist.
             femsim_param_string = "_".join(
                 f"{name}_{float(variable_params[name]):.6f}" for name in custom_priors
             )
@@ -1734,22 +1755,22 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
 
             batch_size = simulation_val["n_points"]
 
-            for batch_idx, start_idx in enumerate(range(completed_candidates, len(para_space), batch_size)):
+            for batch_idx, start_idx in enumerate(range(completed_candidates, total_calls//batch_size)):
                 param_batch = para_space[start_idx:start_idx + batch_size]
 
-                print(f"Iteration {batch_idx + 1}:")
-                for cand_idx, para in enumerate(param_batch):
-                    print(
-                        f"  Candidate {cand_idx}: "
-                        + ", ".join(
-                            f"Core neff: {para[l]:.3f}" if text == "core_neff"
+                # adopt established gridding defined in simulation_val
+                simulation_val["grid_size"] = 0.74
+                simulation_val["grid_size_y"] = 0.74
+                print(f"Iteration {start_idx + 1}:")
+                for para in param_batch:
+                    print("Trying " + ", ".join(
+                            f"Core Refractive Index: {para[l]:.3f}" if text == "core_neff"
                             else f"{text}: {para[l]:.3f}"
                             for l, text in enumerate(variable_params.keys())
-                        )
-                    )
+                        ))
 
                 result_batch, df_wave_logs = run_all_modes_for_params(
-                    param_batch, batch_idx + 1,
+                    param_batch, start_idx + 1,
                     simulation_val, custom_priors, taper_min,
                     taper_max, gridding=gridding
                 )
@@ -1762,8 +1783,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 for cand_idx, (param_vec, df_wave_log, loss_val) in enumerate(
                     zip(param_batch, df_wave_logs, result_batch)
                 ):
-                    print(f"\nCandidate {cand_idx}: final_loss = {loss_val:.6f}")
-
+                    print(f"Iteration {start_idx+1}: {loss_val:.6f}")
                     for w, group in df_wave_log.groupby("Wavelength"):
                         row = group.iloc[0]
 
@@ -1776,6 +1796,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                             f"{row['Loss_d']:.6g})"
                         )
 
+                    # convert df_wave_log to numpy array
                     loss_terms = df_wave_log[["Wavelength", "Loss_a", "Loss_b", "Loss_c", "Loss_d"]].to_numpy()
 
                     core_amp_cols = sorted(
@@ -1809,9 +1830,9 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     iter_result = {
                         "params": param_vec,
                         "result": loss_val,
-                        "Iteration": batch_idx + 1,
+                        "Iteration": start_idx + 1,
                         "Candidate Index": cand_idx,
-                        "Global Candidate Index": start_idx + cand_idx,
+                        # "Global Candidate Index": start_idx + cand_idx,
                         "Loss Metric": loss_terms,
                         "Number of Guided Modes": number_of_guided_modes,
                         "Core Amplitudes": amp,
@@ -1823,8 +1844,8 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     all_results.append(iter_result)
 
                 atomic_save_npy(all_results, results_checkpoint_path)
+                dump(opt, opt_checkpoint_path, store_objective=False)
                 save_optimizer_progress_plot(all_results, images_dir)
-                # dump(opt, opt_checkpoint_path, store_objective=False)
             return all_results
         
         # checking if femsim files exist. If they do, continue. If not, generate them
@@ -1968,7 +1989,10 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             save_optimizer_progress_plot(
                 all_results, images_dir, initial_point_count=manual_point_count
             )
-
+        if sampling_means and sampling_sd:
+            print("Randomly sampling about values specified in sampling_means and sampling_sd.")
+        else:
+            print("Normal Bayesian Optimisation commencing...")
         # start at whatever the last iteration was (or 0), but scale the total number of iterations based
         # on the number of selected parameter vectors.
         for batch_idx in range(completed_batches, total_calls//simulation_val["n_points"]):
@@ -1985,8 +2009,32 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 simulation_val["grid_size"] = 0.74
                 simulation_val["grid_size_y"] = 0.74
 
-            # ask for 1 set of parameter vectors only to prevent daemonic process having children 
-            param_batch = opt.ask(n_points=simulation_val["n_points"]) 
+            if sampling_means and sampling_sd:
+                # randomly draws a single vector of parameters within specified dimensions
+                rng = np.random.default_rng()
+                param_draw = []
+                draws = 1
+    
+                for name in sampling_means:
+                    acc = 0
+                    m = sampling_means[name]
+                    s = sampling_sd[name]
+    
+                    x_low = m - s
+                    x_high = m + s
+    
+                    while acc < draws:
+                        p = rng.normal(loc=m, scale=s)
+    
+                        if x_low <= p <= x_high:
+                            param_draw.append(p)
+                            acc +=1
+                        else:
+                            continue
+                param_batch = np.array(param_draw).reshape(len(sampling_means), draws).T.tolist()
+            else:
+                # ask for 1 set of parameter vectors only to prevent daemonic process having children 
+                param_batch = opt.ask(n_points=simulation_val["n_points"]) 
 
             print(f"Iteration {batch_idx + 1}:")
             for para in param_batch:
@@ -2116,6 +2164,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                 ex_phase = df_wave_logs[extra_phase_cols].to_numpy(dtype=float)
 
                 number_of_guided_modes = df_wave_logs["Guided Modes"].to_numpy()
+
                 iter_result = {
                     'params': param_batch[0],
                     'result': result_batch,
@@ -2140,7 +2189,7 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
                     ),
                 )
         return all_results
-    
+
     # if false, run tf code for the template parameters
     else:
         run_param_names = custom_priors.keys() #["core_diam", "core_neff"]
@@ -2160,11 +2209,11 @@ def main_optimizer(prior_space_pid, simulation_val, custom_priors,  taper_min, t
             
         if gridding:
             grid_size_range, tf_list, _ = run_tf_multproc(run_params, 1, simulation_val, custom_priors,
-                                                          taper_min, taper_max, gridding)
+                                                            taper_min, taper_max, gridding)
             return grid_size_range, tf_list, _
         else:
             tf_list, res_folder = run_tf_multproc(run_params, 1,simulation_val, custom_priors, 
-                                      taper_min, taper_max, gridding)
+                                        taper_min, taper_max, gridding)
             
             # code to save results to csv
             params = np.asarray(run_params, dtype=float)

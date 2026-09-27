@@ -140,14 +140,14 @@ manually_initialise_points = np.array([
 ], dtype=float)
 
 bestvals = {         		            
-    # "core_diam": 8.601, 		
-    # "core_neff": 1.4579, 
+    # "core_diam": 24, 		
+    # "core_neff": 1.45, 
     # "Taper_L": 45000 
 }
 
 bestval_limits = {         		            
-    # "core_diam": (5.5, 20), 	
-    # "core_neff": (1.4461, 1.465), 
+    # "core_diam": (8, 40), 	
+    # "core_neff": (1.44, 1.46), 
     # "Taper_L": (30000,50000) 
 }
 variable_params= {
@@ -155,6 +155,17 @@ variable_params= {
     "core_neff": 1.4467895, 
     "Taper_L":  50000, 
 }       
+
+sampling_means = {
+    "core_diam": 7, 		
+    "core_neff": 1.48, 
+    "Taper_L": 40000 
+}
+sampling_sd = {
+    "core_diam": 6, 		
+    "core_neff": 0.01, 
+    "Taper_L": 10000 
+}
 
 # GIF settings     
 # variable_params= {
